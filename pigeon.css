@@ -1,0 +1,41 @@
+* {
+	margin: 0px;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+}
+
+body {
+	font-family: "Trebuchet MS";
+	font-size: 14pt;
+	background-color: #f8f8f8;
+	text-align: center;
+}
+
+header {
+	background-color: #eee;
+	text-align: left;
+}
+
+canvas {
+	margin: 20px;
+}
+
+footer {
+	background-color: #eee;
+	position: absolute;
+	bottom: 0;
+	width: 100%;
+}
+
+.palettine {
+	display: inline-block;
+	vertical-align: middle;
+	width: 16px;
+	height: 16px;
+	border: 1px solid black;
+	cursor: pointer;
+	margin: 1px;
+}
