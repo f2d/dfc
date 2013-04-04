@@ -174,21 +174,19 @@ function clearScreen() {
 }
 
 function updateColor(value) {
-	var value=value||"";
-	if(value!="")
-		document.getElementById("color").value=value;
-	var regShort = /^#[0-9a-fA-F]{3}$/i;
-	var regLong = /^#[0-9a-fA-F]{6}$/i;
-	var colorValue = document.getElementById("color").value;
+	var c=document.getElementById("color"), v=value||c.value;
 	var colorSummary = 0;
-	var isShort = false;
-    if(regLong.test(colorValue)||regShort.test(colorValue)) {
-		colorSummary = parseInt(colorValue.substr(1), 16);
-		if(regShort.test(colorValue))
-			isShort = true;
-	}
-	var hexDivider = isShort ? 17 : 1;
-	var hexMultiplier = isShort ? 16 : 256;
+	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
+	var regLong = /^#[0-9a-fA-F]{6}$/i;
+	if(regShort.test(v))
+		v=v.replace(regShort, '#$1$1$2$2$3$3');
+	if(!regLong.test(v))
+		return;
+	colorSummary = parseInt(v.substr(1), 16);
+	if (value!="")
+		c.value=v;
+	var hexDivider = 1;
+	var hexMultiplier = 256;
 	color = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
 		+ ((Math.floor(colorSummary / hexMultiplier) % hexMultiplier) * hexDivider) + ", "
 		+ ((colorSummary % hexMultiplier) * hexDivider);
