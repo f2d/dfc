@@ -1,7 +1,5 @@
 var canvas;
 var dc;
-var pX;
-var pY;
 var x;
 var y;
 var activeDrawing = false;
@@ -15,8 +13,9 @@ var color = "0, 0, 0";
 var debugMode = false;
 
 var drugMode = false;
+var neverFlushCursor = true;
 var flushCursor = false;
-var infoVersion = "v1.1.0";
+var infoVersion = "v1.1.1";
 var infoDate = "April 5, 2013"
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
@@ -101,27 +100,42 @@ function updatePosition(event) {
 	y -= canvas.offsetTop;
 }
 
+function drawCursor () {
+	//Отрисовка курсора:
+	dc.beginPath();
+	dc.lineWidth = 1;
+	dc.strokeStyle = "gray";
+	dc.arc(x, y, document.getElementById("rangeW").value/2, 0, Math.PI*2, false);
+	dc.closePath();
+	dc.stroke();
+	if(!neverFlushCursor)
+		flushCursor = true;
+}
+
 function cDraw(event) {
 	updatePosition(event);
 	updateDebugScreen();
-	if(flushCursor || activeDrawing) {
+
+	if(flushCursor || neverFlushCursor || activeDrawing) {
 		dc.putImageData(history[historyPosition], 0, 0);
-		flushCursor = false;
+		if(!neverFlushCursor)
+			flushCursor = false;
 	}
 
 	if(activeDrawing) {
 		dc.lineTo(x + 0.5, y + 0.5);
 	    dc.stroke();
 	}
-
-	pX=x;
-	pY=y;
+	else
+		if(neverFlushCursor)
+			drawCursor();
 }
 
 function cDrawStart(event) {
 	updatePosition(event);
 	updateColor();
 	if(event.which == 1) {
+		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
 	    dc.lineWidth = document.getElementById("rangeW").value;
 	    dc.strokeStyle = "rgba(" + color +", " + document.getElementById("rangeO").value + ")";
@@ -187,15 +201,9 @@ function cLWChange(event) {
 			document.getElementById("rangeW").value ++;
 	}
 	if(delta != 0 && !event.ctrlKey) {
+		cDrawEnd(event);
 		dc.putImageData(history[historyPosition], 0, 0);
-	    //Отрисовка курсора:
-	    dc.beginPath();
-	    dc.lineWidth = 1;
-	    dc.strokeStyle = "gray";
-		dc.arc(x, y, document.getElementById("rangeW").value/2, 0, Math.PI*2, false);
-		dc.closePath();
-		dc.stroke();
-		flushCursor = true;
+	    drawCursor();
 	}
 	updateDebugScreen();
 }
