@@ -1,21 +1,24 @@
+var infoVersion = "v1.1.3";
+var infoDate = "April 6, 2013"
+
 var canvas;
 var dc;
 var x;
 var y;
+
 var activeDrawing = false;
 var historyStorage = 32;
 var history = new Array(historyStorage);
 var historyPosition = 0;
 var historyPositionMax = 0;
+
 var cWidth = 600;
 var cHeight = 360;
 var color = "0, 0, 0";
-var debugMode = false;
 
+var debugMode = false;
 var neverFlushCursor = true;
 var flushCursor = false;
-var infoVersion = "v1.1.2";
-var infoDate = "April 5, 2013"
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
 var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16};
@@ -148,13 +151,7 @@ function cDrawStart(event) {
 		dc.stroke();
 	}
 	if(event.which == 2) {
-		//alert("¬␣¬");
-		var tCol = dc.getImageData(x, y, 1, 1).data;
-		var tTex = (tCol[0] * 65536 + tCol[1] * 256 + tCol[2]).toString(16);
-		while(tTex.length < 6) {
-			tTex = "0" + tTex;
-		}
-        updateColor("#" + tTex);
+		cCopyColor();
 	}
 }
 
@@ -174,6 +171,15 @@ function cDrawCancel() {
 	}
 	activeDrawing=false;
 	updateDebugScreen();
+}
+
+function cCopyColor() {	
+	var tCol = dc.getImageData(x, y, 1, 1).data;
+	var tTex = (tCol[0] * 65536 + tCol[1] * 256 + tCol[2]).toString(16);
+	while(tTex.length < 6) {
+		tTex = "0" + tTex;
+	}
+    updateColor("#" + tTex);
 }
 
 function cLWChange(event) {
@@ -287,6 +293,7 @@ function cHotkeys(event) {
 		switch(event.keyCode) {
 			case 'Z'.charCodeAt(0): historyOperation(1); break;
 			case 'X'.charCodeAt(0): historyOperation(2); break;
+			case 'C'.charCodeAt(0): cCopyColor(); break;
 			case 'F'.charCodeAt(0): clearScreen(); break;
 			case 'W'.charCodeAt(0): cDrawCancel(); break;
 			case 'I'.charCodeAt(0): invertColors(); break;

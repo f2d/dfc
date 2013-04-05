@@ -23,11 +23,8 @@ canvas {
 	margin: 20px;
 }
 
-footer {
-	background-color: #eee;
-	position: absolute;
-	bottom: 0;
-	width: 100%;
+#help {
+	font-size: small;
 }
 
 .palettine {
