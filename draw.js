@@ -12,10 +12,9 @@ var cHeight = 360;
 var color = "0, 0, 0";
 var debugMode = false;
 
-var drugMode = false;
 var neverFlushCursor = true;
 var flushCursor = false;
-var infoVersion = "v1.1.1";
+var infoVersion = "v1.1.2";
 var infoDate = "April 5, 2013"
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
@@ -31,7 +30,7 @@ var palette = new Array();
 		"#500" , "#505" , "#50a" , "#50f" , "#550" , "#555" , "#55a" , "#55f" , "#5a0" , "#5a5" , "#5aa" , "#5af" , "#5f0" , "#5f5" , "#5fa" , "#5ff",
 		"#a00" , "#a05" , "#a0a" , "#a0f" , "#a50" , "#a55" , "#a5a" , "#a5f" , "#aa0" , "#aa5" , "#aaa" , "#aaf" , "#af0" , "#af5" , "#afa" , "#aff",
 		"#f00" , "#f05" , "#f0a" , "#f0f" , "#f50" , "#f55" , "#f5a" , "#f5f" , "#fa0" , "#fa5" , "#faa" , "#faf" , "#ff0" , "#ff5" , "#ffa" , "#fff"];
-var currentPalette = "cga";
+var currentPalette = "win7";
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -64,6 +63,8 @@ function init()
 
 	for(tPalette in paletteDesc) {
 		paletteSelect.options[paletteSelect.options.length] = new Option(paletteDesc[tPalette], tPalette);
+		if(tPalette == currentPalette)
+			paletteSelect.options[paletteSelect.options.length - 1].selected = true;
 	}
 	updatePalette();
 }
@@ -143,7 +144,7 @@ function cDrawStart(event) {
 		dc.lineCap = "round";
 		dc.beginPath();
 		dc.moveTo(x + 0.5, y + 0.5);
-		dc.lineTo(x + 0.5, y + 0.5);
+		dc.lineTo(x + 0.49, y + 0.49);
 		dc.stroke();
 	}
 	if(event.which == 2) {
