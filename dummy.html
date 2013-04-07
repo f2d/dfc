@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <link rel="stylesheet" href="pigeon.css">
     <script src="draw.js"></script>
     <title>Feijoa Sketch</title>
@@ -10,7 +11,7 @@
     <header>
       <h1>Feijoa Sketch</h1>
       <p><span id="version"></span> by Genius, <span id="date"></span></p>
-      <p id="help">Хоткеи: Z — назад, X — вперёд, C/MOUSE3 - пипетка, F — закрасить, I — инверсия. Колёсико — изменение толщины. Ctrl+колёсико — изменение прозрачности. Всё работает только при наведении на холст.</p>
+      <p id="help">Хоткеи: Z — назад, X — вперёд, C/MOUSE3 - пипетка, F/D — закрасить, I — инверсия. Колёсико/Q/W — изменение толщины. Ctrl+колёсико/E/R — изменение прозрачности. Всё работает только при наведении на холст.</p>
     </header>
       <canvas id="draw"></canvas>
     <div id="tools">      
@@ -27,6 +28,9 @@
       <input type="checkbox" id="checkOM" onClick="switchOM();"> Оптимизированный режим<br />
       Непрозрачность: <input type="range" min="0.05" max="1" step="0.05" value="1.00" id="rangeO">
       Толщина: <input type="range" min="1" max="70" step="1" value="4" id="rangeW"><br />
+      <span class="palettine-tool" id="colorF"></span>
+      <input type="button" value="<->" onClick="swapTools();">
+      <span class="palettine-tool" id="colorB"></span>
       Цвет: <input type="color" value="#000000" id="color" onChange="updateColor();">
       Палитра: <select id="palette-select" onChange="updatePalette();">
       </select><br />

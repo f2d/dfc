@@ -1,5 +1,5 @@
-var infoVersion = "v1.2.2";
-var infoDate = "April 7, 2013"
+var infoVersion = "v1.3.0";
+var infoDate = "April 8, 2013"
 
 var canvas;
 var dc;
@@ -14,7 +14,10 @@ var historyPositionMax = 0;
 
 var cWidth = 600;
 var cHeight = 360;
-var color = "0, 0, 0";
+
+var toolColor = ["0, 0, 0", "255, 255, 255"];
+var toolOpacity = [1.00, 1.00];
+var toolWidth = [4, 20];
 
 var debugMode = false;
 var neverFlushCursor = true;
@@ -24,16 +27,16 @@ var optimizedMode = false;
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
 var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16};
 var palette = new Array();
-	palette["classic"] = ["#000000" , "#000080" , "#008000" , "#008080" , "#800000" , "#800080" , "#808000" , "#c0c0c0" ,
-		"#808080" , "#0000ff" , "#00ff00" , "#00ffff" , "#ff0000" , "#ff00ff" , "#ffff00" , "#ffffff"];
-	palette["cga"] = ["#000" , "#00a" , "#0a0" , "#0aa" , "#a00" , "#a0a" , "#aa0" , "#aaa" , "#555" , "#55f" , "#5f5" , "#5ff" , "#f55" , "#f5f" , "#ff5" , "#fff"];
-	palette["win7"] = ["#000000" , "#7f7f7f" , "#880015" , "#ed1c24" , "#ff7f27" , "#fff200" , "#22b14c" , "#00a2e8" , "#3f48cc" , "#a349a4" ,
-		"#ffffff" , "#c3c3c3" , "#b97a57" , "#ffaec9" , "#ffc90e" , "#efe4b0" , "#b5e61d" , "#99d9ea" , "#7092be" , "#c8bfe7"];
-	palette["gray"] = ["#fff" , "#eee" , "#ddd" , "#ccc" , "#bbb" , "#aaa" , "#999" , "#888" , "#777" , "#666" , "#555" , "#444" , "#333" , "#222" , "#111" , "#000"];
-	palette["feijoa1"] = ["#000" , "#005" , "#00a" , "#00f" , "#050" , "#055" , "#05a" , "#05f" , "#0a0" , "#0a5" , "#0aa" , "#0af" , "#0f0" , "#0f5" , "#0fa" , "#0ff",
-		"#500" , "#505" , "#50a" , "#50f" , "#550" , "#555" , "#55a" , "#55f" , "#5a0" , "#5a5" , "#5aa" , "#5af" , "#5f0" , "#5f5" , "#5fa" , "#5ff",
-		"#a00" , "#a05" , "#a0a" , "#a0f" , "#a50" , "#a55" , "#a5a" , "#a5f" , "#aa0" , "#aa5" , "#aaa" , "#aaf" , "#af0" , "#af5" , "#afa" , "#aff",
-		"#f00" , "#f05" , "#f0a" , "#f0f" , "#f50" , "#f55" , "#f5a" , "#f5f" , "#fa0" , "#fa5" , "#faa" , "#faf" , "#ff0" , "#ff5" , "#ffa" , "#fff"];
+	palette["classic"] = ["#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0",
+		"#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"];
+	palette["cga"] = ["#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa", "#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"];
+	palette["win7"] = ["#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4",
+		"#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"];
+	palette["gray"] = ["#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"];
+	palette["feijoa1"] = ["#000", "#005", "#00a", "#00f", "#050", "#055", "#05a", "#05f", "#0a0", "#0a5", "#0aa", "#0af", "#0f0", "#0f5", "#0fa", "#0ff",
+		"#500", "#505", "#50a", "#50f", "#550", "#555", "#55a", "#55f", "#5a0", "#5a5", "#5aa", "#5af", "#5f0", "#5f5", "#5fa", "#5ff",
+		"#a00", "#a05", "#a0a", "#a0f", "#a50", "#a55", "#a5a", "#a5f", "#aa0", "#aa5", "#aaa", "#aaf", "#af0", "#af5", "#afa", "#aff",
+		"#f00", "#f05", "#f0a", "#f0f", "#f50", "#f55", "#f5a", "#f5f", "#fa0", "#fa5", "#faa", "#faf", "#ff0", "#ff5", "#ffa", "#fff"];
 var currentPalette = "win7";
 
 document.addEventListener("DOMContentLoaded", init, false);
@@ -71,9 +74,14 @@ function init()
 		if (tPalette == currentPalette)
 			paletteSelect.options[paletteSelect.options.length - 1].selected = true;
 	}
+
+	document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
+	document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
+
 	updateDebugScreen();
 	updatePalette();
 	updateButtons();
+	updateSliders();
 }
 
 function updatePalette() {
@@ -112,8 +120,8 @@ function drawCursor () {
 	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
 		dc.beginPath();
 		dc.lineWidth = 1;
-		dc.strokeStyle = "rgb(" + color + ")";
-		dc.arc(x, y, document.getElementById("rangeW").value / 2, 0, Math.PI*2, false);
+		dc.strokeStyle = "rgb(" + toolColor[0] + ")";
+		dc.arc(x, y, toolWidth[0] / 2, 0, Math.PI*2, false);
 		dc.closePath();
 		dc.stroke();
 		if(!neverFlushCursor)
@@ -124,7 +132,7 @@ function drawCursor () {
 function cDraw(event) {
 	var pX = x;
 	var pY = y;
-	var halfW = Math.floor(document.getElementById("rangeW").value / 2);
+	var halfW = Math.floor(toolWidth[0] / 2);
 	updatePosition(event);
 	updateDebugScreen();
 
@@ -147,17 +155,24 @@ function cDraw(event) {
 function cDrawStart(event) {
 	updatePosition(event);
 	updateColor();
-	if (event.which == 1) {
+	if (event.which == 1 || event.which == 3) {
+		event.preventDefault();
+	    event.stopPropagation();
+	    event.cancelBubble = true;
+
+		var toolIndex = event.which == 1 ? 0 : 1;
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
-	    dc.lineWidth = document.getElementById("rangeW").value;
-	    dc.strokeStyle = "rgba(" + color +", " + document.getElementById("rangeO").value + ")";
+	    dc.lineWidth = toolWidth[toolIndex];
+	    dc.strokeStyle = "rgba(" + toolColor[toolIndex] +", " + toolOpacity[toolIndex] + ")";
 	    dc.lineJoin = "round";
 		dc.lineCap = "round";
 		dc.beginPath();
 		dc.moveTo(x + 0.5, y + 0.5);
 		dc.lineTo(x + 0.49, y + 0.49);
 		dc.stroke();
+
+		return;
 	}
 	if (event.which == 2) {
 		cCopyColor();
@@ -197,45 +212,71 @@ function cCopyColor() {
 function cLWChange(event) {
 	var delta = event.deltaY || event.detail || event.wheelDelta;
 	event.preventDefault();
-	//for(opt in event)
-	//	document.write(opt + ": " + event[opt] + "<br>");
 	if (delta > 0) {
-		if (event.ctrlKey) {
-			if (document.getElementById("rangeO").value > 0.1)
-				document.getElementById("rangeO").value = (parseFloat(document.getElementById("rangeO").value) - 0.05).toFixed(2);
-			else
-				document.getElementById("rangeO").value = 0.05;
-		}
-		else if (document.getElementById("rangeW").value > 1)
-			document.getElementById("rangeW").value --;
+		if (event.ctrlKey)
+			toolOpacity[0] = (parseFloat(toolOpacity[0]) - 0.05).toFixed(2);
+		else
+			toolWidth[0] --;
 	}
 	if (delta < 0) {
-		if (event.ctrlKey) {
-			if (document.getElementById("rangeO").value < 0.95)
-				document.getElementById("rangeO").value = (parseFloat(document.getElementById("rangeO").value) + 0.05).toFixed(2);
-			else
-				document.getElementById("rangeO").value = "1.00";
-		}
-		else if(document.getElementById("rangeW").value < 70)
-			document.getElementById("rangeW").value ++;
+		if (event.ctrlKey)
+			toolOpacity[0]= (parseFloat(toolOpacity[0]) + 0.05).toFixed(2);
+		else
+			toolWidth[0] ++;
 	}
-	if (delta != 0 && !event.ctrlKey) {
-		cDrawEnd(event);
-		dc.putImageData(history[historyPosition], 0, 0, x - 36, y - 36, 72, 72);
-	    drawCursor();
-	}
+
 	updateDebugScreen();
+	updateSliders();
 }
 
 function updateDebugScreen() {
 	if (debugMode) {
 		var debug = document.getElementById("debug");
-		debug.innerHTML = "Cursor @" + x + ":" + y + " color:" + color;
+		debug.innerHTML = "Cursor @" + x + ":" + y + " color: " + toolColor[0] + " back: " + toolColor[1];
 	}
 }
 
-function clearScreen() {
-	dc.fillStyle = "rgb(" + color + ")";
+function updateSliders() {
+	if (toolOpacity[0] <= 0.1)
+		toolOpacity[0] = "0.10"
+	if (toolOpacity[0] >= 1)
+		toolOpacity[0] = "1.00"
+
+	if (toolWidth[0] <= 1)
+		toolWidth[0] = 1
+	if (toolWidth[0] >= 70)
+		toolWidth[0] = 70
+
+	document.getElementById("rangeW").value = toolWidth[0];
+	document.getElementById("rangeO").value = toolOpacity[0];
+
+	cDrawEnd();
+	dc.putImageData(history[historyPosition], 0, 0, x - 36, y - 36, 72, 72);
+    drawCursor();
+}
+
+function swapTools() {
+	var buffer;
+	buffer = toolColor[0];
+	updateColor(toolColor[1]);
+	toolColor[1] = buffer;
+
+	buffer = toolWidth[0];
+	toolWidth[0] = toolWidth[1];
+	toolWidth[1] = buffer;
+
+	buffer = toolOpacity[0];
+	toolOpacity[0] = toolOpacity[1];
+	toolOpacity[1] = buffer;
+
+	updateSliders();
+
+	document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
+	document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
+}
+
+function clearScreen(tool) {
+	dc.fillStyle = "rgb(" + toolColor[tool] + ")";
 	dc.fillRect(0, 0, cWidth, cHeight);
 	historyOperation(0);
 }
@@ -256,18 +297,31 @@ function updateColor(value) {
 	var colorSummary = 0;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
+	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/i;
 	if (regShort.test(v))
-		v = v.replace(regShort, '#$1$1$2$2$3$3');
-	if (!regLong.test(v))
-		return;
-	colorSummary = parseInt(v.substr(1), 16);
-	if (value != "")
-		c.value = v;
-	var hexDivider = 1;
-	var hexMultiplier = 256;
-	color = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
-		+ ((Math.floor(colorSummary / hexMultiplier) % hexMultiplier) * hexDivider) + ", "
-		+ ((colorSummary % hexMultiplier) * hexDivider);
+		v = v.replace(regShort, "#$1$1$2$2$3$3");
+	if (regRGB.test(v))
+	{
+		toolColor[0] = v;
+		var buffer;
+		c.value = "#"
+		for (var i = 0; i < 3; i++) {
+			buffer = parseInt(v.replace(regRGB, "$" + (i + 1))).toString(16);
+			c.value += ((buffer.length == 1 ? "0" : "") + buffer);			
+		}
+	}
+	else {
+		if (!regLong.test(v))
+			return;
+		colorSummary = parseInt(v.substr(1), 16);
+		if (value != "")
+			c.value = v;
+		var hexDivider = 1;
+		var hexMultiplier = 256;
+		toolColor[0] = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
+			+ ((Math.floor(colorSummary / hexMultiplier) % hexMultiplier) * hexDivider) + ", "
+			+ ((colorSummary % hexMultiplier) * hexDivider);
+	}
 }
 
 function historyOperation(opid) {
@@ -313,9 +367,15 @@ function cHotkeys(event) {
 			case 'Z'.charCodeAt(0): historyOperation(1); break;
 			case 'X'.charCodeAt(0): historyOperation(2); break;
 			case 'C'.charCodeAt(0): cCopyColor(); break;
-			case 'F'.charCodeAt(0): clearScreen(); break;
-			case 'W'.charCodeAt(0): cDrawCancel(); break;
+			case 'F'.charCodeAt(0): clearScreen(0); break;
+			case 'D'.charCodeAt(0): clearScreen(1); break;
 			case 'I'.charCodeAt(0): invertColors(); break;
+			case 'S'.charCodeAt(0): swapTools(); break;
+
+			case 'Q'.charCodeAt(0): toolWidth[0]--; updateSliders(); break;
+			case 'W'.charCodeAt(0): toolWidth[0]++; updateSliders(); break;
+			case 'E'.charCodeAt(0): toolOpacity[0] = (parseFloat(toolOpacity[0]) - 0.05).toFixed(2); updateSliders(); break;
+			case 'R'.charCodeAt(0): toolOpacity[0] = (parseFloat(toolOpacity[0]) + 0.05).toFixed(2); updateSliders(); break;
 		}
 	}
 }

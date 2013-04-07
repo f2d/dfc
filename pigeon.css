@@ -1,10 +1,5 @@
 * {
 	margin: 0px;
-	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
-	-o-user-select: none;
-	user-select: none;
 }
 
 body {
@@ -21,6 +16,12 @@ header {
 
 canvas {
 	margin: 20px;
+	
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
 }
 
 #tools {
@@ -32,12 +33,20 @@ canvas {
 	font-size: small;
 }
 
-.palettine {
+.palettine-tool, .palettine {
 	display: inline-block;
+	border: 1px solid black;
+	margin: 1px;
 	vertical-align: middle;
+}
+
+.palettine-tool {	
+	width: 32px;
+	height: 32px;
+}
+
+.palettine {
+	cursor: pointer;
 	width: 16px;
 	height: 16px;
-	border: 1px solid black;
-	cursor: pointer;
-	margin: 1px;
 }
