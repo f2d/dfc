@@ -1,5 +1,5 @@
-var infoVersion = "v1.1.3";
-var infoDate = "April 6, 2013"
+var infoVersion = "v1.2.0";
+var infoDate = "April 7, 2013"
 
 var canvas;
 var dc;
@@ -19,6 +19,7 @@ var color = "0, 0, 0";
 var debugMode = false;
 var neverFlushCursor = true;
 var flushCursor = false;
+var optimizedMode = false;
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
 var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16};
@@ -26,7 +27,7 @@ var palette = new Array();
 	palette["classic"] = ["#000000" , "#000080" , "#008000" , "#008080" , "#800000" , "#800080" , "#808000" , "#c0c0c0" ,
 		"#808080" , "#0000ff" , "#00ff00" , "#00ffff" , "#ff0000" , "#ff00ff" , "#ffff00" , "#ffffff"];
 	palette["cga"] = ["#000" , "#00a" , "#0a0" , "#0aa" , "#a00" , "#a0a" , "#aa0" , "#aaa" , "#555" , "#55f" , "#5f5" , "#5ff" , "#f55" , "#f5f" , "#ff5" , "#fff"];
-	palette["win7"] = ["#000000" , "#7f7f7f" , "#b97a57" , "#ed1c24" , "#ff7f27" , "#fff200" , "#22b14c" , "#00a2e8" , "#3f48cc" , "#a349a4" ,
+	palette["win7"] = ["#000000" , "#7f7f7f" , "#880015" , "#ed1c24" , "#ff7f27" , "#fff200" , "#22b14c" , "#00a2e8" , "#3f48cc" , "#a349a4" ,
 		"#ffffff" , "#c3c3c3" , "#b97a57" , "#ffaec9" , "#ffc90e" , "#efe4b0" , "#b5e61d" , "#99d9ea" , "#7092be" , "#c8bfe7"];
 	palette["gray"] = ["#fff" , "#eee" , "#ddd" , "#ccc" , "#bbb" , "#aaa" , "#999" , "#888" , "#777" , "#666" , "#555" , "#444" , "#333" , "#222" , "#111" , "#000"];
 	palette["feijoa1"] = ["#000" , "#005" , "#00a" , "#00f" , "#050" , "#055" , "#05a" , "#05f" , "#0a0" , "#0a5" , "#0aa" , "#0af" , "#0f0" , "#0f5" , "#0fa" , "#0ff",
@@ -54,9 +55,10 @@ function init()
 	canvas.width=cWidth;
 	canvas.height=cHeight;
 
+	document.getElementById("tools").style.width = cWidth + "px";
+
 	dc.fillStyle = "white";
 	dc.fillRect(0, 0, cWidth, cHeight);
-	updateDebugScreen();
 	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
 	
 	document.getElementById("version").innerHTML=infoVersion;
@@ -64,32 +66,33 @@ function init()
 
 	paletteSelect = document.getElementById("palette-select");
 
-	for(tPalette in paletteDesc) {
+	for (tPalette in paletteDesc) {
 		paletteSelect.options[paletteSelect.options.length] = new Option(paletteDesc[tPalette], tPalette);
-		if(tPalette == currentPalette)
+		if (tPalette == currentPalette)
 			paletteSelect.options[paletteSelect.options.length - 1].selected = true;
 	}
+	updateDebugScreen();
 	updatePalette();
+	updateButtons();
 }
 
 function updatePalette() {
 	currentPalette = document.getElementById("palette-select").value;
 	paletteElem = document.getElementById("palette");
 
-	while(paletteElem.childNodes.length) {
+	while (paletteElem.childNodes.length) {
 		paletteElem.removeChild(paletteElem.childNodes[0])
 	}
 
 	var colCount = 0;
 
-	for(tColor in palette[currentPalette]) {
+	for (tColor in palette[currentPalette]) {
 		var palettine = document.createElement("span");
 		palettine.className = "palettine";
 		palettine.style.background =  palette[currentPalette][tColor];
 		palettine.setAttribute('onclick', 'updateColor("' + palette[currentPalette][tColor] + '");');
 		paletteElem.appendChild(palettine);
-		if(colCount == paletteWidth[currentPalette] - 1)
-		{
+		if(colCount == paletteWidth[currentPalette] - 1) {
 			colCount = -1;
 			paletteElem.appendChild(document.createElement("br"));
 		}
@@ -102,43 +105,50 @@ function updatePosition(event) {
 	y = event.pageY;
 	x -= canvas.offsetLeft;
 	y -= canvas.offsetTop;
+		flushCursor = true;
 }
 
 function drawCursor () {
 	//Отрисовка курсора:
-	dc.beginPath();
-	dc.lineWidth = 1;
-	dc.strokeStyle = "gray";
-	dc.arc(x, y, document.getElementById("rangeW").value/2, 0, Math.PI*2, false);
-	dc.closePath();
-	dc.stroke();
-	if(!neverFlushCursor)
-		flushCursor = true;
+	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+		dc.beginPath();
+		dc.lineWidth = 1;
+		dc.strokeStyle = "rgb(" + color + ")";
+		dc.arc(x, y, document.getElementById("rangeW").value / 2, 0, Math.PI*2, false);
+		dc.closePath();
+		dc.stroke();
+		if(!neverFlushCursor)
+			flushCursor = true;
+	}
 }
 
 function cDraw(event) {
+	var pX = x;
+	var pY = y;
+	var halfW = Math.floor(document.getElementById("rangeW").value / 2);
 	updatePosition(event);
 	updateDebugScreen();
 
-	if(flushCursor || neverFlushCursor || activeDrawing) {
-		dc.putImageData(history[historyPosition], 0, 0);
-		if(!neverFlushCursor)
-			flushCursor = false;
+	if (flushCursor || neverFlushCursor) {
+		if(optimizedMode)
+			dc.putImageData(history[historyPosition], 0, 0, pX - halfW - 1, pY - halfW - 1, halfW * 2 + 2, halfW * 2 + 2);
+		else
+			dc.putImageData(history[historyPosition], 0, 0);		
 	}
 
-	if(activeDrawing) {
+	if (activeDrawing) {
 		dc.lineTo(x + 0.5, y + 0.5);
 	    dc.stroke();
 	}
 	else
-		if(neverFlushCursor)
+		if (neverFlushCursor)
 			drawCursor();
 }
 
 function cDrawStart(event) {
 	updatePosition(event);
 	updateColor();
-	if(event.which == 1) {
+	if (event.which == 1) {
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
 	    dc.lineWidth = document.getElementById("rangeW").value;
@@ -150,14 +160,17 @@ function cDrawStart(event) {
 		dc.lineTo(x + 0.49, y + 0.49);
 		dc.stroke();
 	}
-	if(event.which == 2) {
+	if (event.which == 2) {
 		cCopyColor();
 	}
 }
 
 function cDrawEnd(event) {
 	//Saving in history:
-	if(activeDrawing) {
+	if (activeDrawing) {
+		dc.putImageData(history[historyPosition], 0, 0);
+		dc.stroke();
+		dc.closePath();
 		historyOperation(0);
 	}
 	activeDrawing=false;
@@ -165,7 +178,7 @@ function cDrawEnd(event) {
 }
 
 function cDrawCancel() {
-	if(activeDrawing) {
+	if (activeDrawing) {
 		historyOperation(1);
 		historyOperation(2);
 	}
@@ -176,7 +189,7 @@ function cDrawCancel() {
 function cCopyColor() {	
 	var tCol = dc.getImageData(x, y, 1, 1).data;
 	var tTex = (tCol[0] * 65536 + tCol[1] * 256 + tCol[2]).toString(16);
-	while(tTex.length < 6) {
+	while (tTex.length < 6) {
 		tTex = "0" + tTex;
 	}
     updateColor("#" + tTex);
@@ -187,19 +200,19 @@ function cLWChange(event) {
 	event.preventDefault();
 	//for(opt in event)
 	//	document.write(opt + ": " + event[opt] + "<br>");
-	if(delta > 0) {
-		if(event.ctrlKey) {
-			if(document.getElementById("rangeO").value > 0.1)
+	if (delta > 0) {
+		if (event.ctrlKey) {
+			if (document.getElementById("rangeO").value > 0.1)
 				document.getElementById("rangeO").value = (parseFloat(document.getElementById("rangeO").value) - 0.05).toFixed(2);
 			else
 				document.getElementById("rangeO").value = 0.05;
 		}
-		else if(document.getElementById("rangeW").value > 1)
+		else if (document.getElementById("rangeW").value > 1)
 			document.getElementById("rangeW").value --;
 	}
-	if(delta < 0) {
-		if(event.ctrlKey) {
-			if(document.getElementById("rangeO").value < 0.95)
+	if (delta < 0) {
+		if (event.ctrlKey) {
+			if (document.getElementById("rangeO").value < 0.95)
 				document.getElementById("rangeO").value = (parseFloat(document.getElementById("rangeO").value) + 0.05).toFixed(2);
 			else
 				document.getElementById("rangeO").value = "1.00";
@@ -207,27 +220,25 @@ function cLWChange(event) {
 		else if(document.getElementById("rangeW").value < 70)
 			document.getElementById("rangeW").value ++;
 	}
-	if(delta != 0 && !event.ctrlKey) {
+	if (delta != 0 && !event.ctrlKey) {
 		cDrawEnd(event);
-		dc.putImageData(history[historyPosition], 0, 0);
+		dc.putImageData(history[historyPosition], 0, 0, x - 36, y - 36, 72, 72);
 	    drawCursor();
 	}
 	updateDebugScreen();
 }
 
 function updateDebugScreen() {
-	if(debugMode) {
+	if (debugMode) {
 		var debug = document.getElementById("debug");
 		debug.innerHTML = "Cursor @" + x + ":" + y + " color:" + color;
 	}
 }
 
 function clearScreen() {
-	//if (confirm("Вы уверены, что хотите очистить холст?")) {
-		dc.fillStyle = "rgb(" + color + ")";
-		dc.fillRect(0, 0, cWidth, cHeight);
-		historyOperation(0);
-	//}
+	dc.fillStyle = "rgb(" + color + ")";
+	dc.fillRect(0, 0, cWidth, cHeight);
+	historyOperation(0);
 }
 
 function invertColors() {
@@ -241,17 +252,18 @@ function invertColors() {
 }
 
 function updateColor(value) {
-	var c=document.getElementById("color"), v=value||c.value;
+	var c = document.getElementById("color");
+	var v = value||c.value;
 	var colorSummary = 0;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
-	if(regShort.test(v))
-		v=v.replace(regShort, '#$1$1$2$2$3$3');
-	if(!regLong.test(v))
+	if (regShort.test(v))
+		v = v.replace(regShort, '#$1$1$2$2$3$3');
+	if (!regLong.test(v))
 		return;
 	colorSummary = parseInt(v.substr(1), 16);
-	if (value!="")
-		c.value=v;
+	if (value != "")
+		c.value = v;
 	var hexDivider = 1;
 	var hexMultiplier = 256;
 	color = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
@@ -284,20 +296,40 @@ function historyOperation(opid) {
 		history[historyPosition] = canvas.getContext("2d").getImageData(0, 0, cWidth, cHeight);
 	}
 	updateDebugScreen();
+	updateButtons();
+}
+
+function updateButtons() {
+	document.getElementById("buttonSJ").value = "JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)";	
+	document.getElementById("buttonSP").value = "PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)";	
+
 	document.getElementById("buttonR").disabled = (historyPosition == historyPositionMax);
 	document.getElementById("buttonU").disabled = (historyPosition == 0);
+
 }
 
 function cHotkeys(event) {
-	if(x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-		switch(event.keyCode) {
+	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+		switch (event.keyCode) {
 			case 'Z'.charCodeAt(0): historyOperation(1); break;
 			case 'X'.charCodeAt(0): historyOperation(2); break;
 			case 'C'.charCodeAt(0): cCopyColor(); break;
 			case 'F'.charCodeAt(0): clearScreen(); break;
 			case 'W'.charCodeAt(0): cDrawCancel(); break;
 			case 'I'.charCodeAt(0): invertColors(); break;
-			//default: alert('def')
 		}
 	}
+}
+
+function switchOM() {
+	optimizedMode = !optimizedMode;
+	document.getElementById("checkOM").checked = optimizedMode;
+}
+
+function savePic(value) {
+	if (value == 0)
+		picTab = window.open(canvas.toDataURL(),'_blank');
+	if (value == 1)
+		picTab = window.open(canvas.toDataURL('image/jpeg'),'_blank');
+    //document.execCommand("SaveAs"); 
 }

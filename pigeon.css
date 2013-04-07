@@ -23,6 +23,11 @@ canvas {
 	margin: 20px;
 }
 
+#tools {
+	margin: 0 auto;
+	text-align: left;
+}
+
 #help {
 	font-size: small;
 }
