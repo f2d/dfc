@@ -14,9 +14,13 @@
     </header>
       <canvas id="draw"></canvas>
     <div id="tools">      
-      Сохранить:
-      <input type="button" value="PNG" id="buttonSP" onClick="savePic(0);">
-      <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);"><br />
+      <form method="post" action="localhost\test.php">
+        Сохранить:
+        <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
+        <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
+        <!--input type="submit" value="На сервер" onClick="savePic(0);"-->
+      </form>
+      <br />
       <input type="button" value="Закрасить" onClick="clearScreen();">
       <input type="button" value="Назад" id="buttonU" onClick="historyOperation(1);" disabled>
       <input type="button" value="Вперёд" id="buttonR" onClick="historyOperation(2);" disabled>

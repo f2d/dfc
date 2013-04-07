@@ -1,4 +1,4 @@
-var infoVersion = "v1.2.0";
+var infoVersion = "v1.2.1";
 var infoDate = "April 7, 2013"
 
 var canvas;
@@ -105,7 +105,6 @@ function updatePosition(event) {
 	y = event.pageY;
 	x -= canvas.offsetLeft;
 	y -= canvas.offsetTop;
-		flushCursor = true;
 }
 
 function drawCursor () {
@@ -130,7 +129,7 @@ function cDraw(event) {
 	updateDebugScreen();
 
 	if (flushCursor || neverFlushCursor) {
-		if(optimizedMode)
+		if(optimizedMode && activeDrawing)
 			dc.putImageData(history[historyPosition], 0, 0, pX - halfW - 1, pY - halfW - 1, halfW * 2 + 2, halfW * 2 + 2);
 		else
 			dc.putImageData(history[historyPosition], 0, 0);		
@@ -253,7 +252,7 @@ function invertColors() {
 
 function updateColor(value) {
 	var c = document.getElementById("color");
-	var v = value||c.value;
+	var v = value || c.value;
 	var colorSummary = 0;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
@@ -327,9 +326,10 @@ function switchOM() {
 }
 
 function savePic(value) {
-	if (value == 0)
-		picTab = window.open(canvas.toDataURL(),'_blank');
-	if (value == 1)
-		picTab = window.open(canvas.toDataURL('image/jpeg'),'_blank');
-    //document.execCommand("SaveAs"); 
+	switch (value) {
+		case 0: break;
+		case 1: picTab = window.open(canvas.toDataURL('image/jpeg'),'_blank'); break;
+		case 2: picTab = window.open(canvas.toDataURL(),'_blank'); break;
+		default: alert("Недопустимое значение (обновите кэш).");
+	}
 }
