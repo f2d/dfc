@@ -1,4 +1,4 @@
-var infoVersion = "v1.2.1";
+var infoVersion = "v1.2.2";
 var infoDate = "April 7, 2013"
 
 var canvas;
@@ -327,7 +327,13 @@ function switchOM() {
 
 function savePic(value) {
 	switch (value) {
-		case 0: break;
+		case 0: 
+			var imageToSend = document.createElement("input");
+			imageToSend.value = canvas.toDataURL('image/jpeg').length < canvas.toDataURL().length ? canvas.toDataURL('image/jpeg') : canvas.toDataURL();
+			imageToSend.name = "content";
+			imageToSend.type = "hidden";
+			document.getElementById("send").appendChild(imageToSend);
+		break;
 		case 1: picTab = window.open(canvas.toDataURL('image/jpeg'),'_blank'); break;
 		case 2: picTab = window.open(canvas.toDataURL(),'_blank'); break;
 		default: alert("Недопустимое значение (обновите кэш).");

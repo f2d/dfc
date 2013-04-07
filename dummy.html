@@ -14,11 +14,11 @@
     </header>
       <canvas id="draw"></canvas>
     <div id="tools">      
-      <form method="post" action="localhost\test.php">
+      <form method="post" id="send" action="http://localhost/receiver.php">
         Сохранить:
         <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
         <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
-        <!--input type="submit" value="На сервер" onClick="savePic(0);"-->
+        <input type="submit" value="На сервер" onClick="savePic(0);">
       </form>
       <br />
       <input type="button" value="Закрасить" onClick="clearScreen();">
