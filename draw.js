@@ -1,4 +1,4 @@
-var infoVersion = "v1.3.3";
+var infoVersion = "v1.3.4";
 var infoDate = "April 8, 2013"
 
 var canvas;
@@ -18,6 +18,7 @@ var cHeight = 360;
 var toolColor = ["0, 0, 0", "255, 255, 255"];
 var toolOpacity = [1.00, 1.00];
 var toolWidth = [4, 20];
+var toolBlur = [0, 0];
 
 var debugMode = false;
 var neverFlushCursor = true;
@@ -94,10 +95,17 @@ function init()
 		rangeSecondary.setAttribute('onchange', 'updateSliders(2);');
 		document.getElementById("slidersO").appendChild(rangeSecondary);
 
+		rangeSecondary = document.createElement("input");
+		rangeSecondary.id = "rangeBS";
+		rangeSecondary.type = "text";
+		rangeSecondary.setAttribute('onchange', 'updateSliders(2);');
+		document.getElementById("slidersB").appendChild(rangeSecondary);
+
 	}
 	else {
 		document.getElementById("rangeW").type == "text";
 		document.getElementById("rangeO").type == "text";
+		document.getElementById("rangeB").type == "text";
 	}
 
 	updateDebugScreen();
@@ -144,9 +152,13 @@ function drawCursor () {
 		dc.lineWidth = 1;
 		if (precisePreview) {			
 			dc.fillStyle = "rgba(" + toolColor[0] + ", " + toolOpacity[0] + ")";
+			dc.shadowBlur = toolBlur[0];
+			dc.shadowColor = "rgb(" + toolColor[0] + ")";
 		}
-		else
+		else {
 			dc.strokeStyle = "rgb(" + toolColor[0] + ")";
+			dc.shadowBlur = 0;
+		}
 		dc.arc(x, y, toolWidth[0] / 2, 0, Math.PI*2, false);
 		dc.closePath();
 		if (precisePreview)
@@ -193,7 +205,9 @@ function cDrawStart(event) {
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
 	    dc.lineWidth = toolWidth[toolIndex];
+	    dc.shadowBlur = toolBlur[toolIndex];
 	    dc.strokeStyle = "rgba(" + toolColor[toolIndex] +", " + toolOpacity[toolIndex] + ")";
+	    dc.shadowColor = "rgb(" + toolColor[toolIndex] + ")";
 	    dc.lineJoin = "round";
 		dc.lineCap = "round";
 		dc.beginPath();
@@ -244,12 +258,16 @@ function cLWChange(event) {
 	if (delta > 0) {
 		if (event.ctrlKey)
 			toolOpacity[0] = (parseFloat(toolOpacity[0]) - 0.05).toFixed(2);
+		else if (event.shiftKey)
+			toolBlur[0] --;
 		else
 			toolWidth[0] --;
 	}
 	if (delta < 0) {
 		if (event.ctrlKey)
 			toolOpacity[0]= (parseFloat(toolOpacity[0]) + 0.05).toFixed(2);
+		else if (event.shiftKey)
+			toolBlur[0] ++;
 		else
 			toolWidth[0] ++;
 	}
@@ -271,6 +289,7 @@ function updateSliders(initiator) {
 	if (m > 0) {
 		toolWidth[0] = document.getElementById("rangeW" + (m == 2 ? "S" : "")).value;
 		toolOpacity[0] = document.getElementById("rangeO" + (m == 2 ? "S" : "")).value;
+		toolBlur[0] = document.getElementById("rangeB" + (m == 2 ? "S" : "")).value;
 	}
 
 	if (toolOpacity[0] <= 0.1)
@@ -283,16 +302,23 @@ function updateSliders(initiator) {
 	if (toolWidth[0] >= 70)
 		toolWidth[0] = 70
 
+	if (toolBlur[0] <= 0)
+		toolBlur[0] = 0
+	if (toolBlur[0] >= 20)
+		toolBlur[0] = 20
+
 	document.getElementById("rangeW").value = toolWidth[0];
 	document.getElementById("rangeO").value = toolOpacity[0];
+	document.getElementById("rangeB").value = toolBlur[0];
 
 	if(document.getElementById("rangeWS")) {
 		document.getElementById("rangeWS").value = toolWidth[0];
 		document.getElementById("rangeOS").value = toolOpacity[0];
+		document.getElementById("rangeBS").value = toolBlur[0];
 	}
 
 	cDrawEnd();
-	dc.putImageData(history[historyPosition], 0, 0, x - 36, y - 36, 72, 72);
+	dc.putImageData(history[historyPosition], 0, 0, parseInt(x) - 64, parseInt(y) - 64, 128, 128);
     drawCursor();
 }
 
@@ -310,7 +336,12 @@ function swapTools() {
 	toolOpacity[0] = toolOpacity[1];
 	toolOpacity[1] = buffer;
 
+	buffer = toolBlur[0];
+	toolBlur[0] = toolBlur[1];
+	toolBlur[1] = buffer;
+
 	updateSliders();
+
 	document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
 	document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
 }
@@ -421,6 +452,8 @@ function cHotkeys(event) {
 			case 'W'.charCodeAt(0): toolWidth[0]++; updateSliders(); break;
 			case 'E'.charCodeAt(0): toolOpacity[0] = (parseFloat(toolOpacity[0]) - 0.05).toFixed(2); updateSliders(); break;
 			case 'R'.charCodeAt(0): toolOpacity[0] = (parseFloat(toolOpacity[0]) + 0.05).toFixed(2); updateSliders(); break;
+			case 'T'.charCodeAt(0): toolBlur[0]--; updateSliders(); break;
+			case 'Y'.charCodeAt(0): toolBlur[0]++; updateSliders(); break;
 		}
 	}
 }
