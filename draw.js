@@ -1,4 +1,4 @@
-var infoVersion = "v1.3.1";
+var infoVersion = "v1.3.2";
 var infoDate = "April 8, 2013"
 
 var canvas;
@@ -77,6 +77,28 @@ function init()
 
 	document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
 	document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
+
+	if (document.getElementById("rangeW").type == "range")	{
+		var rangeSecondary;
+
+		rangeSecondary = document.createElement("input");
+		rangeSecondary.id = "rangeWS";
+		rangeSecondary.type = "text";
+		rangeSecondary.setAttribute('onchange', 'updateSliders(2);');
+		document.getElementById("slidersW").appendChild(rangeSecondary);
+
+		rangeSecondary = document.createElement("input");
+		rangeSecondary.id = "rangeOS";
+		rangeSecondary.type = "text";
+		rangeSecondary.setAttribute('onchange', 'updateSliders(2);');
+		document.getElementById("slidersO").appendChild(rangeSecondary);
+
+	}
+	else {
+		document.getElementById("rangeW").type == "text";
+		document.getElementById("rangeO").type == "text";
+		alert(document.getElementById("rangeO").type);
+	}
 
 	updateDebugScreen();
 	updatePalette();
@@ -236,12 +258,12 @@ function updateDebugScreen() {
 	}
 }
 
-function updateSliders(manual) {
-	var m = manual || false;
+function updateSliders(initiator) {
+	var m = initiator || 0;
 
-	if (m) {
-		toolWidth[0] = document.getElementById("rangeW").value;
-		toolOpacity[0] = document.getElementById("rangeO").value;
+	if (m > 0) {
+		toolWidth[0] = document.getElementById("rangeW" + (m == 2 ? "S" : "")).value;
+		toolOpacity[0] = document.getElementById("rangeO" + (m == 2 ? "S" : "")).value;
 	}
 
 	if (toolOpacity[0] <= 0.1)
@@ -256,6 +278,11 @@ function updateSliders(manual) {
 
 	document.getElementById("rangeW").value = toolWidth[0];
 	document.getElementById("rangeO").value = toolOpacity[0];
+
+	if(document.getElementById("rangeWS")) {
+		document.getElementById("rangeWS").value = toolWidth[0];
+		document.getElementById("rangeOS").value = toolOpacity[0];
+	}
 
 	cDrawEnd();
 	dc.putImageData(history[historyPosition], 0, 0, x - 36, y - 36, 72, 72);

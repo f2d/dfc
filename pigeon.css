@@ -1,5 +1,6 @@
 * {
 	margin: 0px;
+	padding: 0px;
 }
 
 body {
@@ -49,4 +50,22 @@ canvas {
 	cursor: pointer;
 	width: 16px;
 	height: 16px;
+}
+
+form {
+	display: inline-block;
+}
+
+input {
+	font-family: "Trebuchet MS";
+	font-size: 14pt;	
+	margin: 1px;
+}
+
+input[type="text"] {
+	width: 64px;
+}
+
+#slidersW, #slidersO {
+	text-align: right;
 }
