@@ -14,20 +14,13 @@
       <p id="help">Хоткеи: Z — назад, X — вперёд, C/MOUSE3 - пипетка, F/D — закрасить, I — инверсия. Колёсико/Q/W — изменение толщины. Ctrl+колёсико/E/R — изменение прозрачности. Всё работает только при наведении на холст.</p>
     </header>
       <canvas id="draw" tabindex="0"></canvas>
-    <div id="tools">      
-      <form method="post" id="send" action="http://localhost/receiver.php">
-        Сохранить:
-        <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
-        <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
-        <input type="submit" value="На сервер" onClick="savePic(0);">
-      </form>
-      <br />
+    <div id="tools">
       <input type="button" value="Закрасить" onClick="clearScreen(0);">
       <input type="button" value="Закрасить фоновым" onClick="clearScreen(1);">
       <input type="button" value="Назад" id="buttonU" onClick="historyOperation(1);" disabled>
       <input type="button" value="Вперёд" id="buttonR" onClick="historyOperation(2);" disabled><br />
-      <input type="checkbox" id="checkOM" onClick="switchMode(0);"> Оптимизированный режим 
-      <input type="checkbox" id="checkOM" onClick="switchMode(1);"> Предпросмотр кисти 
+      <input type="checkbox" id="checkOM" onClick="switchMode(0);"> LQ-режим 
+      <input type="checkbox" id="checkPP" onClick="switchMode(1);"> Предпросмотр кисти 
       <div id="slidersW">
         Толщина: <input type="range" min="1" max="70" step="1" value="4" id="rangeW" onChange="updateSliders(1);">
       </div>
@@ -37,13 +30,23 @@
       <div id="slidersB">
         Размытие тени: <input type="range" min="0" max="20" step="1" value="0" id="rangeB" onChange="updateSliders(1);">
       </div>
-      <span class="palettine-tool" id="colorF"></span>
-      <input type="button" value="&#x2194;" onClick="swapTools();">
-      <span class="palettine-tool" id="colorB"></span>
-      Цвет: <input type="color" value="#000000" id="color" onChange="updateColor();">
-      Палитра: <select id="palette-select" onChange="updatePalette();">
-      </select><br />
-      <span id="palette"></span>
+      <div style="max-width:123">
+        Палитра: <select id="palette-select" onChange="updatePalette();"></select>
+        <br />
+        <span class="palettine-tool" id="colorF"></span>
+        <input type="button" value="&#x2194;" onClick="swapTools(0);">
+        <span class="palettine-tool" id="colorB"></span>
+        Цвет: <input type="color" value="#000000" id="color" onChange="updateColor();">
+        <br />
+        <span id="palette"></span>
+      </div>
+      <br />
+      <form method="post" id="send" action="http://localhost/receiver.php">
+        Сохранить:
+        <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
+        <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
+        <input type="submit" value="На сервер" onClick="savePic(0);">
+      </form>
     </div>
     <div id="debug"></div>
   </body>
