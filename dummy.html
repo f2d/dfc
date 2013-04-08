@@ -22,10 +22,12 @@
         <input type="submit" value="На сервер" onClick="savePic(0);">
       </form>
       <br />
-      <input type="button" value="Закрасить" onClick="clearScreen();">
+      <input type="button" value="Закрасить" onClick="clearScreen(0);">
+      <input type="button" value="Закрасить фоновым" onClick="clearScreen(1);">
       <input type="button" value="Назад" id="buttonU" onClick="historyOperation(1);" disabled>
-      <input type="button" value="Вперёд" id="buttonR" onClick="historyOperation(2);" disabled>
-      <input type="checkbox" id="checkOM" onClick="switchOM();"> Оптимизированный режим
+      <input type="button" value="Вперёд" id="buttonR" onClick="historyOperation(2);" disabled><br />
+      <input type="checkbox" id="checkOM" onClick="switchMode(0);"> Оптимизированный режим 
+      <input type="checkbox" id="checkOM" onClick="switchMode(1);"> Предпросмотр кисти 
       <div id="slidersW">
         Толщина: <input type="range" min="1" max="70" step="1" value="4" id="rangeW" onChange="updateSliders(1);">
       </div>

@@ -1,4 +1,4 @@
-var infoVersion = "v1.3.2";
+var infoVersion = "v1.3.3";
 var infoDate = "April 8, 2013"
 
 var canvas;
@@ -23,6 +23,7 @@ var debugMode = false;
 var neverFlushCursor = true;
 var flushCursor = false;
 var optimizedMode = false;
+var precisePreview = false;
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
 var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16};
@@ -97,7 +98,6 @@ function init()
 	else {
 		document.getElementById("rangeW").type == "text";
 		document.getElementById("rangeO").type == "text";
-		alert(document.getElementById("rangeO").type);
 	}
 
 	updateDebugScreen();
@@ -142,11 +142,18 @@ function drawCursor () {
 	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
 		dc.beginPath();
 		dc.lineWidth = 1;
-		dc.strokeStyle = "rgb(" + toolColor[0] + ")";
+		if (precisePreview) {			
+			dc.fillStyle = "rgba(" + toolColor[0] + ", " + toolOpacity[0] + ")";
+		}
+		else
+			dc.strokeStyle = "rgb(" + toolColor[0] + ")";
 		dc.arc(x, y, toolWidth[0] / 2, 0, Math.PI*2, false);
 		dc.closePath();
-		dc.stroke();
-		if(!neverFlushCursor)
+		if (precisePreview)
+			dc.fill();
+		else
+			dc.stroke();
+		if (!neverFlushCursor)
 			flushCursor = true;
 	}
 }
@@ -304,7 +311,6 @@ function swapTools() {
 	toolOpacity[1] = buffer;
 
 	updateSliders();
-
 	document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
 	document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
 }
@@ -325,7 +331,8 @@ function invertColors() {
 	historyOperation(0);
 }
 
-function updateColor(value) {
+function updateColor(value,toolIndex) {
+	var t = toolIndex || 0;
 	var c = document.getElementById("color");
 	var v = value || c.value;
 	var colorSummary = 0;
@@ -336,7 +343,7 @@ function updateColor(value) {
 		v = v.replace(regShort, "#$1$1$2$2$3$3");
 	if (regRGB.test(v))
 	{
-		toolColor[0] = v;
+		toolColor[t] = v;
 		var buffer;
 		c.value = "#"
 		for (var i = 0; i < 3; i++) {
@@ -352,10 +359,14 @@ function updateColor(value) {
 			c.value = v;
 		var hexDivider = 1;
 		var hexMultiplier = 256;
-		toolColor[0] = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
+		toolColor[t] = (Math.floor(colorSummary / hexMultiplier / hexMultiplier) * hexDivider) + ", "
 			+ ((Math.floor(colorSummary / hexMultiplier) % hexMultiplier) * hexDivider) + ", "
 			+ ((colorSummary % hexMultiplier) * hexDivider);
 	}
+	if (t == 0)
+		document.getElementById("colorF").style.background = "rgb(" + toolColor[0] + ")";
+	else if (t == 1)
+		document.getElementById("colorB").style.background = "rgb(" + toolColor[1] + ")";
 }
 
 function historyOperation(opid) {
@@ -414,9 +425,15 @@ function cHotkeys(event) {
 	}
 }
 
-function switchOM() {
-	optimizedMode = !optimizedMode;
-	document.getElementById("checkOM").checked = optimizedMode;
+function switchMode(id) {
+	if (id == 0) {
+		optimizedMode = !optimizedMode;
+		document.getElementById("checkOM").checked = optimizedMode;
+	}
+	if (id == 1) {
+		precisePreview = !precisePreview;
+		document.getElementById("checkPP").checked = precisePreview;
+	}	
 }
 
 function savePic(value) {
