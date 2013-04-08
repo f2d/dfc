@@ -1,10 +1,10 @@
-var infoVersion = "v1.3.4";
+var infoVersion = "v1.3.5";
 var infoDate = "April 8, 2013"
 
 var canvas;
 var dc;
-var x;
-var y;
+var x = 0;
+var y = 0;
 
 var activeDrawing = false;
 var historyStorage = 32;
@@ -53,6 +53,9 @@ function init()
 	canvas.addEventListener("mouseout", cDraw, false);
 	document.addEventListener("mousemove", updatePosition, false);
 	document.addEventListener("keydown", cHotkeys, false);
+
+	canvas.setAttribute('oncontextmenu', 'return false;');
+	canvas.setAttribute('onscroll', 'return false;');
 
 	//canvas.addEventListener("contextmenu", cDrawCancel, false);
 
@@ -128,7 +131,8 @@ function updatePalette() {
 		var palettine = document.createElement("span");
 		palettine.className = "palettine";
 		palettine.style.background =  palette[currentPalette][tColor];
-		palettine.setAttribute('onclick', 'updateColor("' + palette[currentPalette][tColor] + '");');
+		palettine.setAttribute('onclick', 'updateColor("' + palette[currentPalette][tColor] + '",0);');
+		palettine.setAttribute('oncontextmenu', 'updateColor("' + palette[currentPalette][tColor] + '",1); return false;');
 		paletteElem.appendChild(palettine);
 		if(colCount == paletteWidth[currentPalette] - 1) {
 			colCount = -1;
@@ -196,6 +200,7 @@ function cDraw(event) {
 function cDrawStart(event) {
 	updatePosition(event);
 	updateColor();
+	canvas.focus();
 	if (event.which == 1 || event.which == 3) {
 		event.preventDefault();
 	    event.stopPropagation();
@@ -214,12 +219,12 @@ function cDrawStart(event) {
 		dc.moveTo(x + 0.5, y + 0.5);
 		dc.lineTo(x + 0.49, y + 0.49);
 		dc.stroke();
-
-		return;
 	}
 	if (event.which == 2) {
 		cCopyColor();
 	}
+	event.preventDefault();
+	return false;
 }
 
 function cDrawEnd(event) {
@@ -386,7 +391,7 @@ function updateColor(value,toolIndex) {
 		if (!regLong.test(v))
 			return;
 		colorSummary = parseInt(v.substr(1), 16);
-		if (value != "")
+		if (value != "" && t == 0)
 			c.value = v;
 		var hexDivider = 1;
 		var hexMultiplier = 256;
