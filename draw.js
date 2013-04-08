@@ -1,4 +1,4 @@
-var infoVersion = "v1.3.0";
+var infoVersion = "v1.3.1";
 var infoDate = "April 8, 2013"
 
 var canvas;
@@ -236,7 +236,14 @@ function updateDebugScreen() {
 	}
 }
 
-function updateSliders() {
+function updateSliders(manual) {
+	var m = manual || false;
+
+	if (m) {
+		toolWidth[0] = document.getElementById("rangeW").value;
+		toolOpacity[0] = document.getElementById("rangeO").value;
+	}
+
 	if (toolOpacity[0] <= 0.1)
 		toolOpacity[0] = "0.10"
 	if (toolOpacity[0] >= 1)
