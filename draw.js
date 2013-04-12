@@ -1,4 +1,4 @@
-var infoVersion = "v1.3.8";
+var infoVersion = "v1.3.9";
 var infoDate = "April 12, 2013"
 
 var canvas, dc;
@@ -20,7 +20,7 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255"} //Earaser
 ], tool = tools[0];
 
-var debugMode = true;
+var debugMode = false;
 var flushCursor = false,
 	neverFlushCursor = true;
 var lowQMode = false,
@@ -60,6 +60,7 @@ function init()
 	canvas.addEventListener("mousemove", cDraw, false);
 	document.addEventListener("mouseup", cDrawEnd, false);
 	canvas.addEventListener("mouseout", cDraw, false);
+	canvas.addEventListener("mouseover", cDrawRestore, false);
 	document.addEventListener("mousemove", updatePosition, false);
 	document.addEventListener("keydown", cHotkeys, false);
 
@@ -79,6 +80,10 @@ function init()
 	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
 	document.getElementById("version").innerHTML = infoVersion;
 	document.getElementById("date").innerHTML = infoDate;
+
+	document.getElementById("color").value = "#000000";
+	document.getElementById("checkOM").checked = lowQMode;
+	document.getElementById("checkPP").checked = precisePreview;
 
 	paletteSelect = document.getElementById("palette-select");
 
@@ -183,9 +188,7 @@ function cDraw(event) {
 	updateDebugScreen();
 
 	if (flushCursor || neverFlushCursor) {
-		if (lowQMode && activeDrawing)
-			dc.putImageData(history[historyPosition], 0, 0, pX - halfW - 1, pY - halfW - 1, halfW * 2 + 2, halfW * 2 + 2);
-		else
+		if (!(lowQMode && activeDrawing))
 			dc.putImageData(history[historyPosition], 0, 0);
 	}
 
@@ -194,7 +197,7 @@ function cDraw(event) {
 		dc.stroke();
 	}
 	else
-		if (neverFlushCursor)
+		if (neverFlushCursor && !lowQMode)
 			drawCursor();
 }
 
@@ -236,6 +239,12 @@ function cDrawEnd(event) {
 	}
 	activeDrawing=false;
 	updateDebugScreen();
+}
+
+function cDrawRestore(event) {
+	if (activeDrawing)
+		dc.moveTo(x + 0.5, y + 0.5);
+	updatePosition(event);
 }
 
 function cDrawCancel() {
@@ -345,8 +354,8 @@ function swapTools(earaser) {
 		tool = tools[0] = tools[1];
 		tools[1] = back;	
 	}
-	updateColor(tool.Color, 0);
 	updateColor(tools[1].Color, 1);
+	updateColor(tool.Color, 0);
 	updateSliders();
 }
 
