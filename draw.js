@@ -1,16 +1,18 @@
-var infoVersion = "v1.3.7";
+var infoVersion = "v1.3.8";
 var infoDate = "April 12, 2013"
 
 var canvas, dc;
 var x = 0, y = 0;
 
 var activeDrawing = false;
+
 var historyStorage = 32;
 var history = new Array(historyStorage);
-var historyPosition = 0;
-var historyPositionMax = 0;
+var historyPosition = 0,
+	historyPositionMax = 0;
 
-var cWidth = 600, cHeight = 360;
+var cWidth = 600,
+	cHeight = 360;
 
 var tools = [
 	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "Color" : "0, 0, 0"}       //Fore
@@ -18,11 +20,11 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255"} //Earaser
 ], tool = tools[0];
 
-var debugMode = false;
-var flushCursor = false;
-var neverFlushCursor = true;
-var lowQMode = false;
-var precisePreview = false;
+var debugMode = true;
+var flushCursor = false,
+	neverFlushCursor = true;
+var lowQMode = false,
+	precisePreview = false;
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01", "touhou" : "Тошки"};
 var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16, "touhou" : 5};
@@ -89,7 +91,9 @@ function init()
 	document.getElementById("colorF").style.background = "rgb(" + tools[0].Color + ")";
 	document.getElementById("colorB").style.background = "rgb(" + tools[1].Color + ")";
 
-	var e = document.getElementById("rangeW"), a = ["B", "O", "W"], i = a.length;
+	var e = document.getElementById("rangeW"),
+		a = ["B", "O", "W"],
+		i = a.length;
 	if (e.type == "range") while (i--) {
 		e = document.createElement("input");
 		e.id = "range" + a[i] + "S";
@@ -114,11 +118,12 @@ function updatePalette() {
 		paletteElem.removeChild(paletteElem.childNodes[0])
 	}
 
-	var colCount = 0;
-	var rowCount = 0;
+	var colCount = 0,
+		rowCount = 0;
 
 	for (tColor in palette[currentPalette]) {
-		var palettine = document.createElement("span"), c = palette[currentPalette][tColor];
+		var palettine = document.createElement("span"),
+			c = palette[currentPalette][tColor];
 		palettine.className = "palettine";
 		palettine.style.background = c;
 		palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
@@ -195,7 +200,6 @@ function cDraw(event) {
 
 function cDrawStart(event) {
 	updatePosition(event);
-	updateColor();
 	canvas.focus();
 	event.preventDefault();
 	if (event.which == 2) {
@@ -205,7 +209,7 @@ function cDrawStart(event) {
 		event.stopPropagation();
 		event.cancelBubble = true;
 
-		var t = tools[event.which == 1 ? 0 : 1];
+		var t = tools[(event.which == 1) ? 0 : 1];
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
 		dc.lineWidth = t.Width;
@@ -352,7 +356,7 @@ function updateColor(value, toolIndex) {
 	var v = value || c.value;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
-	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/;
+	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/;	
 	if (regRGB.test(v))
 	{
 		var a = (t.Color = v).split(", ");
@@ -365,11 +369,12 @@ function updateColor(value, toolIndex) {
 			v = v.replace(regShort, "#$1$1$2$2$3$3");
 		if (!regLong.test(v))
 			return;
-		if (value != "" && t == tool)
+		if (value != "" && t == tool) {
 			c.value = v;
-		t.Color = parseInt(v.substr(1,2), 16) + ", "
-			+ parseInt(v.substr(3,2), 16) + ", "
-			+ parseInt(v.substr(5,2), 16);
+			t.Color = parseInt(v.substr(1,2), 16) + ", "
+				+ parseInt(v.substr(3,2), 16) + ", "
+				+ parseInt(v.substr(5,2), 16);
+		}
 	}
 	document.getElementById(t == tool ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
 }
