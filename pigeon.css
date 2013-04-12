@@ -16,8 +16,8 @@ header {
 }
 
 canvas {
-	margin: 20px;
-	
+	margin: 0;
+
 	-webkit-user-select: none;
 	-moz-user-select: none;
 	-ms-user-select: none;
@@ -27,7 +27,9 @@ canvas {
 
 #tools {
 	margin: 0 auto;
-	text-align: left;
+	text-align: left;	
+	display: inline-block;
+	vertical-align: top;
 }
 
 #help {
@@ -64,8 +66,4 @@ input, select {
 
 input[type="text"] {
 	width: 64px;
-}
-
-#slidersW, #slidersO, #slidersB {
-	text-align: right;
 }

@@ -1,5 +1,5 @@
-var infoVersion = "v1.3.6";
-var infoDate = "April 9, 2013"
+var infoVersion = "v1.3.7";
+var infoDate = "April 12, 2013"
 
 var canvas, dc;
 var x = 0, y = 0;
@@ -24,8 +24,8 @@ var neverFlushCursor = true;
 var lowQMode = false;
 var precisePreview = false;
 
-var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01"};
-var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16};
+var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01", "touhou" : "Тошки"};
+var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16, "touhou" : 5};
 var palette = new Array();
 	palette["classic"] = [
 		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0",
@@ -40,7 +40,13 @@ var palette = new Array();
 		"#500", "#505", "#50a", "#50f", "#550", "#555", "#55a", "#55f", "#5a0", "#5a5", "#5aa", "#5af", "#5f0", "#5f5", "#5fa", "#5ff",
 		"#a00", "#a05", "#a0a", "#a0f", "#a50", "#a55", "#a5a", "#a5f", "#aa0", "#aa5", "#aaa", "#aaf", "#af0", "#af5", "#afa", "#aff",
 		"#f00", "#f05", "#f0a", "#f0f", "#f50", "#f55", "#f5a", "#f5f", "#fa0", "#fa5", "#faa", "#faf", "#ff0", "#ff5", "#ffa", "#fff"];
-var currentPalette = "win7";
+	palette["touhou"] = [
+		"#fcefe2", "#fa5946", "#ffffff", "#000000", "#e5ff41",
+		"#fcefe2", "#000000", "#ffffff", "#fff87d", "#a864a8",
+		"#fcefe2", "#1760f3", "#ffffff", "#97ddfd", "#fd3727"];
+var palRows = new Array();
+	palRows["touhou"] = ["Рейму", "Мариса", "Сырно"];
+var currentPalette = "touhou";
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -64,7 +70,7 @@ function init()
 	canvas.width = cWidth;
 	canvas.height = cHeight;
 
-	document.getElementById("tools").style.width = cWidth + "px";
+	//document.getElementById("tools").style.width = cWidth + "px";
 
 	dc.fillStyle = "white";
 	dc.fillRect(0, 0, cWidth, cHeight);
@@ -109,17 +115,24 @@ function updatePalette() {
 	}
 
 	var colCount = 0;
+	var rowCount = 0;
 
 	for (tColor in palette[currentPalette]) {
 		var palettine = document.createElement("span"), c = palette[currentPalette][tColor];
 		palettine.className = "palettine";
 		palettine.style.background = c;
 		palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
-		palettine.setAttribute("oncontextmenu", "updateColor('" + c+  "',1); return false;");
+		palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
 		paletteElem.appendChild(palettine);
 		if (colCount == paletteWidth[currentPalette] - 1) {
 			colCount = -1;
+			if (palRows[currentPalette]) {
+				var desc = document.createElement("span");
+				desc.innerHTML = " &mdash; " + palRows[currentPalette][rowCount];
+				paletteElem.appendChild(desc);
+			}
 			paletteElem.appendChild(document.createElement("br"));
+			rowCount ++;
 		}
 		colCount ++;
 	}
@@ -320,11 +333,17 @@ function updateSliders(initiator) {
 }
 
 function swapTools(earaser) {
-	var back = tools[0];	tool = tools[0] = tools[1];	tools[1] = back;	//* <- looks messy when multiline
-	updateColor(tool.Color);
+	if(earaser)	{
+		tools[1] = tools[2];
+	}
+	else { //* looks messy when multiline
+		var back = tools[0];
+		tool = tools[0] = tools[1];
+		tools[1] = back;	
+	}
+	updateColor(tool.Color, 0);
+	updateColor(tools[1].Color, 1);
 	updateSliders();
-	document.getElementById("colorF").style.background = "rgb(" + tool.Color + ")";
-	document.getElementById("colorB").style.background = "rgb(" + back.Color + ")";
 }
 
 function updateColor(value, toolIndex) {
@@ -338,7 +357,8 @@ function updateColor(value, toolIndex) {
 	{
 		var a = (t.Color = v).split(", ");
 		v = "#";
-		for (i in a) v += ((a[i] = parseInt(a[i]).toString(16)).length == 1) ? "0"+a[i]: a[i];
+		for (i in a)
+			v += ((a[i] = parseInt(a[i]).toString(16)).length == 1) ? "0" + a[i] : a[i];
 		c.value = v;
 	} else {
 		if (regShort.test(v))
