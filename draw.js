@@ -1,4 +1,4 @@
-var infoVersion = "v1.4.0";
+var infoVersion = "v1.4.1";
 var infoDate = "April 13, 2013"
 
 var canvas, dc;
@@ -10,6 +10,9 @@ var historyStorage = 32;
 var history = new Array(historyStorage);
 var historyPosition = 0,
 	historyPositionMax = 0;
+
+var lastAutoSave = new Date().getTime(),
+	enableAutoSave = true;
 
 var cWidth = 600,
 	cHeight = 360;
@@ -47,7 +50,10 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to the new ro
 		"@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8", "@b",
 		"@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae", "@b",
 		"@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456", "@b",
-		"@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646", "@b",		
+		"@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646", "@b",
+		"@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f", "@b",
+		"@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0", "@b",
+		"@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646", "@b",
 		"@r", "Generic", "#fcefe2", "#000000" ];
 	palette["safe"] = [];
 	generatePalette("safe",51,3);
@@ -164,11 +170,10 @@ function updatePalette() {
 
 	for (tColor in palette[currentPalette]) {
 		var c = palette[currentPalette][tColor];
-		var n = palette[currentPalette][parseInt(tColor) + 1];
 		var paletteCell;
 		if (c == "@r") {
 			paletteCell = document.createElement("td");
-			paletteCell.innerHTML = n;
+			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1];;
 			paletteRow.appendChild(paletteCell);
 			colCount = -2;
 		}
@@ -457,6 +462,10 @@ function historyOperation(opid) {
 			for(i = 0; i < historyStorage - 1; i ++)
 				history[i] = history[i + 1];
 		history[historyPosition] = canvas.getContext("2d").getImageData(0, 0, cWidth, cHeight);
+		if (new Date().getTime() - lastAutoSave > 60000 && enableAutoSave) {
+			savePic(-1,true);
+			lastAutoSave = new Date().getTime()
+		}
 	}
 	updateDebugScreen();
 	updateButtons();
@@ -499,7 +508,8 @@ function switchMode(id) {
 	:	(document.getElementById("checkOM").checked = lowQMode = !lowQMode);
 }
 
-function savePic(value) {
+function savePic(value, auto) {
+	var a = auto || false;
 	switch (value) {
 		case 0:
 			var imageToSend = document.createElement("input");
@@ -513,10 +523,10 @@ function savePic(value) {
 		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
 		case 2: picTab = window.open(canvas.toDataURL(), "_blank"); break;
 		case -1:
-			if (confirm("Вы уверены, что хотите загрузить данные в Local Storage?")) {
+			if (a || confirm("Вы уверены, что хотите загрузить данные в Local Storage?")) {
 				var jpgData = canvas.toDataURL("image/jpeg");
 				var pngData = canvas.toDataURL();
-				localStorage.recovery =  (jpgData.length < pngData.length ? jpgData : pngData);
+				localStorage.recovery = (jpgData.length < pngData.length ? jpgData : pngData);
 			}
 		break;
 		case -2:
