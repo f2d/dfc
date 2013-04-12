@@ -1,4 +1,4 @@
-var infoVersion = "v1.4.1";
+var infoVersion = "v1.4.2";
 var infoDate = "April 13, 2013"
 
 var canvas, dc;
@@ -54,7 +54,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to the new ro
 		"@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f", "@b",
 		"@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0", "@b",
 		"@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646", "@b",
-		"@r", "Generic", "#fcefe2", "#000000" ];
+		"@r", "Generic", "#fcefe2", "#000000"];
 	palette["safe"] = [];
 	generatePalette("safe",51,3);
 	
@@ -429,7 +429,7 @@ function updateColor(value, toolIndex) {
 			v = v.replace(regShort, "#$1$1$2$2$3$3");
 		if (!regLong.test(v))
 			return;
-		if (value != "" && t == tool) {
+		if (value != "") {
 			c.value = v;
 			t.Color = parseInt(v.substr(1,2), 16) + ", "
 				+ parseInt(v.substr(3,2), 16) + ", "
