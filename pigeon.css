@@ -36,22 +36,31 @@ canvas {
 	font-size: small;
 }
 
-.palettine-tool, .palettine {
-	display: inline-block;
-	border: 1px solid black;
-	margin: 1px;
-	vertical-align: middle;
-}
-
 .palettine-tool {	
 	width: 32px;
 	height: 32px;
+	border: 1px solid black;
+	margin: 1px;
+	display: inline-block;
+	vertical-align: middle;
 }
 
 .palettine {
 	cursor: pointer;
-	width: 16px;
-	height: 16px;
+	width: 100%;
+	height: 100%;
+}
+
+#palette table {
+	border-collapse: collapse;
+	border: 1px solid black;
+}
+
+#palette table tr td{
+	width: 24px;
+	height: 24px;
+	margin: 0;
+	border: 1px solid black;
 }
 
 form {

@@ -1,5 +1,5 @@
-var infoVersion = "v1.3.9";
-var infoDate = "April 12, 2013"
+var infoVersion = "v1.4.0";
+var infoDate = "April 13, 2013"
 
 var canvas, dc;
 var x = 0, y = 0;
@@ -20,34 +20,39 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255"} //Earaser
 ], tool = tools[0];
 
-var debugMode = false;
+var debugMode = false,
+	fps = 0,
+	ticks = 0;
+
 var flushCursor = false,
 	neverFlushCursor = true;
 var lowQMode = false,
 	precisePreview = false;
 
-var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "feijoa1" : "Feijoa-01", "touhou" : "Тошки"};
-var paletteWidth = {"classic" : 8, "cga" : 8, "win7" : 10, "gray" : 16, "feijoa1" : 16, "touhou" : 5};
-var palette = new Array();
+var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки"};
+var palette = new Array(); //"@b" breaks the line, "@r" gives name to the new row
 	palette["classic"] = [
-		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0",
+		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0", "@b",
 		"#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"];
-	palette["cga"] = ["#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa", "#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"];
+	palette["cga"] = ["#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa", "@b",
+		"#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"];
 	palette["win7"] = [
-		"#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4",
+		"#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "@b",
 		"#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"];
 	palette["gray"] = ["#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"];
-	palette["feijoa1"] = [
-		"#000", "#005", "#00a", "#00f", "#050", "#055", "#05a", "#05f", "#0a0", "#0a5", "#0aa", "#0af", "#0f0", "#0f5", "#0fa", "#0ff",
-		"#500", "#505", "#50a", "#50f", "#550", "#555", "#55a", "#55f", "#5a0", "#5a5", "#5aa", "#5af", "#5f0", "#5f5", "#5fa", "#5ff",
-		"#a00", "#a05", "#a0a", "#a0f", "#a50", "#a55", "#a5a", "#a5f", "#aa0", "#aa5", "#aaa", "#aaf", "#af0", "#af5", "#afa", "#aff",
-		"#f00", "#f05", "#f0a", "#f0f", "#f50", "#f55", "#f5a", "#f5f", "#fa0", "#fa5", "#faa", "#faf", "#ff0", "#ff5", "#ffa", "#fff"];
+	palette["feijoa"] = [];	
+	generatePalette("feijoa",85,0);
 	palette["touhou"] = [
-		"#fcefe2", "#fa5946", "#ffffff", "#000000", "#e5ff41",
-		"#fcefe2", "#000000", "#ffffff", "#fff87d", "#a864a8",
-		"#fcefe2", "#1760f3", "#ffffff", "#97ddfd", "#fd3727"];
-var palRows = new Array();
-	palRows["touhou"] = ["Рейму", "Мариса", "Сырно"];
+		"@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41", "@b",
+		"@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8", "@b",
+		"@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae", "@b",
+		"@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456", "@b",
+		"@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646", "@b",		
+		"@r", "Generic", "#fcefe2", "#000000" ];
+	palette["safe"] = [];
+	generatePalette("safe",51,3);
+	
+
 var currentPalette = "touhou";
 
 document.addEventListener("DOMContentLoaded", init, false);
@@ -113,6 +118,34 @@ function init()
 	updatePalette();
 	updateButtons();
 	updateSliders();
+
+	if (debugMode)
+		setInterval("fpsCount()", 1000);
+}
+
+function generatePalette(name, step, slice) { //safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
+	var letters = [0, 0, 0];
+	while (letters[0]<=255 ) { 
+		var l = palette[name].length;
+		palette[name][l] = "#";
+		for (var i = 0; i < 3; i++)	{
+			var s = letters[i].toString(16);
+			if (s.length == 1)
+				s = "0" + s;
+			palette[name][l] += s;
+		}
+		letters[2] += step;
+		if (letters[2] > 255) {
+			letters[2] = 0;
+			letters[1] += step;
+		}
+		if (letters[1] > 255) {
+			letters[1] = 0;
+			letters[0] += step;
+		}
+		if (((letters[1] == step * slice) || letters[1] == 0) && letters[2] == 0)			
+			palette[name][l+1] = "@b";
+	}
 }
 
 function updatePalette() {
@@ -123,29 +156,40 @@ function updatePalette() {
 		paletteElem.removeChild(paletteElem.childNodes[0])
 	}
 
-	var colCount = 0,
-		rowCount = 0;
+	var colCount = 0;
+
+	var paletteTable = document.createElement("table");
+	paletteElem.appendChild(paletteTable);
+	var paletteRow = document.createElement("tr");
 
 	for (tColor in palette[currentPalette]) {
-		var palettine = document.createElement("span"),
-			c = palette[currentPalette][tColor];
-		palettine.className = "palettine";
-		palettine.style.background = c;
-		palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
-		palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
-		paletteElem.appendChild(palettine);
-		if (colCount == paletteWidth[currentPalette] - 1) {
+		var c = palette[currentPalette][tColor];
+		var n = palette[currentPalette][parseInt(tColor) + 1];
+		var paletteCell;
+		if (c == "@r") {
+			paletteCell = document.createElement("td");
+			paletteCell.innerHTML = n;
+			paletteRow.appendChild(paletteCell);
+			colCount = -2;
+		}
+		if (c == "@b") {
+			paletteTable.appendChild(paletteRow);
+			paletteRow = document.createElement("tr");
 			colCount = -1;
-			if (palRows[currentPalette]) {
-				var desc = document.createElement("span");
-				desc.innerHTML = " &mdash; " + palRows[currentPalette][rowCount];
-				paletteElem.appendChild(desc);
-			}
-			paletteElem.appendChild(document.createElement("br"));
-			rowCount ++;
+		}
+		if (colCount >= 0) {
+			paletteCell = document.createElement("td");
+			var palettine = document.createElement("div");
+			palettine.className = "palettine";
+			palettine.style.background = c;
+			palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
+			palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
+			paletteCell.appendChild(palettine);
+			paletteRow.appendChild(paletteCell);
 		}
 		colCount ++;
 	}
+	paletteTable.appendChild(paletteRow);
 }
 
 function updatePosition(event) {
@@ -292,7 +336,8 @@ function cLWChange(event) {
 function updateDebugScreen() {
 	if (debugMode) {
 		var debug = document.getElementById("debug");
-		debug.innerHTML = "Cursor @" + x + ":" + y + " color: " + tools[0].Color + " back: " + tools[1].Color;
+		debug.innerHTML = "Cursor @" + x + ":" + y + " FPS: " + fps;
+		ticks ++;
 	}
 }
 
@@ -347,7 +392,8 @@ function updateSliders(initiator) {
 
 function swapTools(earaser) {
 	if(earaser)	{
-		tools[1] = tools[2];
+		for (i in tool)
+			tool[i] = tools[2][i];
 	}
 	else { //* looks messy when multiline
 		var back = tools[0];
@@ -466,6 +512,24 @@ function savePic(value) {
 		break;
 		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
 		case 2: picTab = window.open(canvas.toDataURL(), "_blank"); break;
+		case -1:
+			if (confirm("Вы уверены, что хотите загрузить данные в Local Storage?")) {
+				var jpgData = canvas.toDataURL("image/jpeg");
+				var pngData = canvas.toDataURL();
+				localStorage.recovery =  (jpgData.length < pngData.length ? jpgData : pngData);
+			}
+		break;
+		case -2:
+			var image = new Image();
+	        image.src = localStorage.recovery;
+			dc.drawImage(image, 0, 0);
+			historyOperation(0);
+		break;
 		default: alert("Недопустимое значение (обновите кэш).");
 	}
+}
+
+function fpsCount() {
+	fps = ticks;
+	ticks = 0;
 }

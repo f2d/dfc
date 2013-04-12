@@ -37,14 +37,15 @@
         <input type="button" value="&#x2194;" onClick="swapTools(0);">
         <span class="palettine-tool" id="colorB"></span>
         Цвет: <input type="color" value="#000000" id="color" onChange="updateColor();">
-        <br />
-        <span id="palette"></span>
+        <div id="palette"></div>
       </div>
       <br />
       <form method="post" id="send" action="">
         <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
         <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
-        <input type="submit" value="На сервер" onClick="savePic(0);">
+        <input type="submit" value="На сервер" onClick="savePic(0);"><br />
+        <input type="button" value="Сделать back-up" onClick="savePic(-1);">
+        <input type="button" value="Извлечь back-up" onClick="savePic(-2);">
       </form>
     </div>
     <div id="debug"></div>
