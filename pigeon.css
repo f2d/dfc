@@ -50,16 +50,23 @@ canvas {
 	height: 100%;
 }
 
+#palette {
+	overflow-y: scroll;
+	height: 200px;
+	width: 300px;
+}
+
 #palette table {
 	border-collapse: collapse;
 	border: 1px solid black;
 }
 
 #palette table tr td{
-	width: 24px;
-	height: 24px;
+	width: 16px;
+	height: 16px;
 	margin: 0;
 	border: 1px solid black;
+	font-size: 10pt;
 }
 
 form {
@@ -85,7 +92,7 @@ input[type="text"] {
 	height: 32px;
 	text-align: center;
 	font-family: "Arial Unicode MS";
-	
+
 	-webkit-user-select: none;
 	-moz-user-select: none;
 	-ms-user-select: none;
