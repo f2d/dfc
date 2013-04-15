@@ -1,4 +1,4 @@
-var infoVersion = "v1.4.3";
+var infoVersion = "v1.4.4";
 var infoDate = "April 15, 2013"
 
 var canvas, dc;
@@ -382,8 +382,8 @@ function updateSliders(initiator) {
 	if (tool.Width <=   1) tool.Width = 1; else
 	if (tool.Width >= 128) tool.Width = 128;
 
-	if (tool.Blur <=   0) tool.Blur = 0; else
-	if (tool.Blur >= 123) tool.Blur = 123;
+	if (tool.Blur <=  0) tool.Blur = 0; else
+	if (tool.Blur >= 20) tool.Blur = 20;
 
 	if (tool.TurnLimit <=   1) tool.TurnLimit = 1; else
 	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
@@ -415,8 +415,8 @@ function swapTools(earaser) {
 		tool = tools[0] = tools[1];
 		tools[1] = back;	
 	}
-	updateColor(tools[1].Color, 1);
 	updateColor(tool.Color, 0);
+	updateColor(tools[1].Color, 1);
 	updateSliders();
 }
 
@@ -433,20 +433,19 @@ function updateColor(value, toolIndex) {
 		v = "#";
 		for (i in a)
 			v += ((a[i] = parseInt(a[i]).toString(16)).length == 1) ? "0" + a[i] : a[i];
-		c.value = v;
 	} else {
 		if (regShort.test(v))
 			v = v.replace(regShort, "#$1$1$2$2$3$3");
 		if (!regLong.test(v))
 			return;
 		if (value != "") {
-			c.value = v;
 			t.Color = parseInt(v.substr(1,2), 16) + ", "
 				+ parseInt(v.substr(3,2), 16) + ", "
 				+ parseInt(v.substr(5,2), 16);
 		}
 	}
-	document.getElementById(t == tool ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
+	document.getElementById((t == tool) ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
+	c.value = v;
 }
 
 function historyOperation(opid) {
@@ -482,11 +481,11 @@ function historyOperation(opid) {
 }
 
 function updateButtons() {
-	document.getElementById("buttonSJ").value = "JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)";
-	document.getElementById("buttonSP").value = "PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)";
+	document.getElementById("buttonSJ").title = "Сохранить в JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)";
+	document.getElementById("buttonSP").title = "Сохранить в PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)";
 
-	document.getElementById("buttonR").style.display = (historyPosition == historyPositionMax ? "none" : "inline-block");
-	document.getElementById("buttonU").style.display = (historyPosition == 0 ? "none" : "inline-block");
+	document.getElementById("buttonR").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
+	document.getElementById("buttonU").className = (historyPosition == 0 ? "button-disabled" : "button");
 
 }
 
@@ -516,8 +515,8 @@ function cHotkeys(event) {
 }
 
 function switchMode(id) {
-	id ?	(document.getElementById("checkPP").checked = precisePreview = !precisePreview)
-	:	(document.getElementById("checkOM").checked = lowQMode = !lowQMode);
+	id ?	(document.getElementById("checkPP").className = (precisePreview = !precisePreview) ? "button-active" : "button")
+	:	(document.getElementById("checkOM").className = (lowQMode = !lowQMode) ? "button-active" : "button");
 }
 
 function savePic(value, auto) {
@@ -531,6 +530,7 @@ function savePic(value, auto) {
 			imageToSend.name = "content";
 			imageToSend.type = "hidden";
 			document.getElementById("send").appendChild(imageToSend);
+			document.getElementById("send").submit();
 		break;
 		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
 		case 2: picTab = window.open(canvas.toDataURL(), "_blank"); break;

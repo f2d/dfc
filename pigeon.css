@@ -76,17 +76,56 @@ input[type="text"] {
 	width: 64px;
 }
 
-a {
+.button, .button-active, .button-disabled {
 	cursor: pointer;
-	background-color: #ddd;
 	padding: 2px;
 	display: inline-block;
-	margin-top: 2px;
 	border: 1px solid black;
-	width: 24px;
+	width: 32px;
+	height: 32px;
 	text-align: center;
+	font-family: "Arial Unicode MS";
+	
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
 }
 
-a:hover {
+.button {
+	background-color: #ddd;
+}
+
+.button-active {
+	background-color: #0cf;
+}
+
+.button-disabled {
+	color: gray;
+	cursor: default;
+}
+
+.button:hover {
 	background-color: #eee;
+}
+
+.button-active:hover {
+	background-color: #bef;
+}
+
+.vertical {
+	display: inline-block;
+	margin-left: 8px;
+	margin-right: 8px;
+	height: 32px;
+	border-left: 1px solid black;
+	width: 0px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+	font-family: "Arial Unicode MS";
+}
+
+#color {
+	width: 80px;
 }

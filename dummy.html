@@ -24,30 +24,31 @@
       </span> Минимальный угол <br /-->
       <div class="palette">
         Палитра: <select id="palette-select" onChange="updatePalette();"></select>
-        <br />
-        <span class="palettine-tool" id="colorF"></span>
-        <input type="button" value="&#x2194;" onClick="swapTools(0);">
-        <span class="palettine-tool" id="colorB"></span>
-        Цвет: <input type="color" value="#000000" id="color" onChange="updateColor();">
         <div id="palette"></div>
+        HEX: <input type="text" value="#000000" id="color" onChange="updateColor();"><br />
       </div>
       <br />
       <form method="post" id="send" action="">
-        <input type="button" value="PNG" id="buttonSP" onClick="savePic(2);">
-        <input type="button" value="JPEG" id="buttonSJ" onClick="savePic(1);">
-        <input type="submit" value="На сервер" onClick="savePic(0);"><br />
-        <input type="button" value="Сделать back-up" onClick="savePic(-1);">
-        <input type="button" value="Извлечь back-up" onClick="savePic(-2);">
       </form>
     </div>
     <div>
-      <a title="Закрасить" onClick="clearScreen(0);">F</a>
-      <a title="Закрасить фоновым" onClick="clearScreen(1);">D</a>
-      <a title="Назад" id="buttonU" onClick="historyOperation(1);">&#x2190;</a>
-      <a title="Вперёд" id="buttonR" onClick="historyOperation(2);">&#x2192;</a>
-      <input type="checkbox" id="checkOM" onClick="switchMode(0);"> LQ-режим 
-      <input type="checkbox" id="checkPP" onClick="switchMode(1);"> Предпросмотр кисти
-      <p id="help">Хоткеи: Z — назад, X — вперёд, C/MOUSE3 - пипетка, F/D — закрасить, I — инверсия. Колёсико/Q/W — изменение толщины. Ctrl+колёсико/E/R — изменение прозрачности. Всё работает только при наведении на холст.</p>
+      <span class="button" title="Назад (Z)" id="buttonU" onClick="historyOperation(1);">&#x2190;</span>
+      <span class="button" title="Вперёд (X)" id="buttonR" onClick="historyOperation(2);">&#x2192;</span>
+      <span class="vertical">&nbsp;</span>
+      <span class="button" id="colorF" title="Закрасить полотно основным цветом (F)" onClick="clearScreen(0);">&nbsp;</span>
+      <span class="button" title="Поменять инструменты местами (S)" onClick="swapTools(0);">&#x2194;</span>
+      <span class="button" id="colorB" title="Закрасить полотно фоновым цветом (D)" onClick="clearScreen(1);">&nbsp;</span>
+      <span class="button" title="Инверсия полотна (I)" onClick="invertColors();">&#x25D0;</span>
+      <span class="vertical">&nbsp;</span>
+      <span class="button" title="Режим низкого качества" id="checkOM" onClick="switchMode(0);">&#x25A0;</span>
+      <span class="button" title="Предпросмотр кисти" id="checkPP" onClick="switchMode(1);">&#x25CF;</span>
+      <span class="vertical">&nbsp;</span>
+      <span class="button" title="Сделать back-up" onClick="savePic(-1);">&#x22C1;</span>
+      <span class="button" title="Извлечь back-up" onClick="savePic(-2);">&#x22C0;</span>
+      <span class="button" title="Сохранить в PNG" id="buttonSP" onClick="savePic(2);">P</span>
+      <span class="button" title="Сохранить в JPEG" id="buttonSJ" onClick="savePic(1);">J</span>
+      <span class="button" title="На сервер" onClick="savePic(0);">&#x21B5;</span>
+      <p id="help">Хоткеи: C/MOUSE3 - пипетка. Колёсико/Q/W — изменение толщины. Ctrl+колёсико/E/R — изменение прозрачности. Shift+колёсико/T/Y — изменение тени. Всё работает только при наведении на холст.</p>
       <p>Feijoa Sketch <span id="version"></span> by Genius, <span id="date"></span></p>
     </div>
     <div id="debug"></div>
