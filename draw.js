@@ -1,9 +1,10 @@
-var infoVersion = "v1.4.4";
+var infoVersion = "v1.4.5";
 var infoDate = "April 15, 2013"
 
 var canvas, dc;
 var x = 0, y = 0,
 	globalOffset = 0.5, //pixel offset
+	globalOffs_1 = globalOffset - 0.01,
 	angle = 0; //previous angle
 
 var activeDrawing = false;
@@ -20,9 +21,9 @@ var cWidth = 600,
 	cHeight = 360;
 
 var tools = [
-	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "Color" : "0,   0,   0  ", "TurnLimit" : 360} //Fore
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255", "TurnLimit" : 360} //Back
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255", "TurnLimit" : 360} //Earaser
+	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "TurnLimit" : 360, "Color" : "0, 0, 0"      } //Fore
+,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Back
+,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Earaser
 ], tool = tools[0];
 
 var debugMode = false,
@@ -45,8 +46,8 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		"#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "@b",
 		"#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"];
 	palette["gray"] = ["#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"];
-	palette["feijoa"] = [];	
-	generatePalette("feijoa",85,0);
+	palette["feijoa"] = [];
+	generatePalette("feijoa", 85, 0);
 	palette["touhou"] = ["@r", "Generic", "#fcefe2", "#000000"
 		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
 		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
@@ -60,10 +61,9 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "Рейсен", "#000000", "#ffffff", "#dcc3ff", "#2e228c", "#e94b6d"
 		];
 	palette["safe"] = [];
-	generatePalette("safe",51,3);
-	
+	generatePalette("safe", 51, 6);
 
-var currentPalette = "classic";
+var currentPalette = localStorage.lastPalette ? localStorage.lastPalette : "classic";
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -96,7 +96,6 @@ function init()
 	document.getElementById("version").innerHTML = infoVersion;
 	document.getElementById("date").innerHTML = infoDate;
 
-	document.getElementById("color").value = "#000000";
 	document.getElementById("checkOM").checked = lowQMode;
 	document.getElementById("checkPP").checked = precisePreview;
 
@@ -107,9 +106,6 @@ function init()
 		if (tPalette == currentPalette)
 			paletteSelect.options[paletteSelect.options.length - 1].selected = true;
 	}
-
-	document.getElementById("colorF").style.background = "rgb(" + tools[0].Color + ")";
-	document.getElementById("colorB").style.background = "rgb(" + tools[1].Color + ")";
 
 	var e = document.getElementById("rangeW"),
 		a = ["B", "O", "W"], //, "T"
@@ -124,6 +120,8 @@ function init()
 		document.getElementById("range" + a [i]).type = "text";
 	}
 
+	for (i in tools)
+		updateColor(tools[i].Color, i);
 	updateDebugScreen();
 	updatePalette();
 	updateButtons();
@@ -135,7 +133,7 @@ function init()
 
 function generatePalette(name, step, slice) { //safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
 	var letters = [0, 0, 0];
-	while (letters[0]<=255 ) { 
+	while (letters[0]<=255 ) {
 		var l = palette[name].length;
 		palette[name][l] = "#";
 		for (var i = 0; i < 3; i++)	{
@@ -153,13 +151,14 @@ function generatePalette(name, step, slice) { //safe palette constructor, step r
 			letters[1] = 0;
 			letters[0] += step;
 		}
-		if (((letters[1] == step * slice) || letters[1] == 0) && letters[2] == 0)			
+		if (((letters[1] == step * slice) || letters[1] == 0) && letters[2] == 0)
 			palette[name][l+1] = "@b";
 	}
 }
 
 function updatePalette() {
 	currentPalette = document.getElementById("palette-select").value;
+	localStorage.lastPalette = currentPalette;
 	paletteElem = document.getElementById("palette");
 
 	while (paletteElem.childNodes.length) {
@@ -171,25 +170,29 @@ function updatePalette() {
 	var paletteTable = document.createElement("table");
 	paletteElem.appendChild(paletteTable);
 	var paletteRow = document.createElement("tr");
+	var colorDesc = "";
 
 	for (tColor in palette[currentPalette]) {
 		var c = palette[currentPalette][tColor];
 		var paletteCell;
 		if (c == "@r") {
 			paletteCell = document.createElement("td");
-			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1];;
+			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1];
 			paletteRow.appendChild(paletteCell);
 			colCount = -2;
+			colorDesc = palette[currentPalette][parseInt(tColor) + 1];;
 		}
 		if (c == "@b") {
 			paletteTable.appendChild(paletteRow);
 			paletteRow = document.createElement("tr");
 			colCount = -1;
+			colorDesc = "";
 		}
 		if (colCount >= 0) {
 			paletteCell = document.createElement("td");
 			var palettine = document.createElement("div");
 			palettine.className = "palettine";
+			palettine.title = palette[currentPalette][parseInt(tColor)] + (colorDesc != "" ? (" (" + colorDesc + ")") : "");
 			palettine.style.background = c;
 			palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
 			palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
@@ -224,25 +227,18 @@ function drawCursor () {
 		}
 		dc.arc(x, y, tool.Width / 2, 0, Math.PI*2, false);
 		dc.closePath();
-		if (precisePreview)
-			dc.fill();
-		else
-			dc.stroke();
+		precisePreview ? dc.fill() : dc.stroke();
 		if (!neverFlushCursor)
 			flushCursor = true;
 	}
 }
 
 function cDraw(event) {
-	var pX = x;
-	var pY = y;
-	var halfW = Math.floor(tool.Width / 2);
 	updatePosition(event);
 	updateDebugScreen();
 
-	if (flushCursor || neverFlushCursor) {
-		if (!(lowQMode && activeDrawing))
-			dc.putImageData(history[historyPosition], 0, 0);
+	if ((flushCursor || neverFlushCursor) && !(lowQMode && activeDrawing)) {
+		dc.putImageData(history[historyPosition], 0, 0);
 	}
 
 	if (activeDrawing) {
@@ -276,7 +272,7 @@ function cDrawStart(event) {
 		dc.lineCap = "round";
 		dc.beginPath();
 		dc.moveTo(x + globalOffset, y + globalOffset);
-		dc.lineTo(x + globalOffset - 0.01, y + globalOffset - 0.01);
+		dc.lineTo(x + globalOffs_1, y + globalOffs_1);
 		dc.stroke();
 	}
 	return false;
@@ -310,12 +306,12 @@ function cDrawCancel() {
 }
 
 function cCopyColor() {
-	var tCol = dc.getImageData(x, y, 1, 1).data;
-	var tTex = (tCol[0] * 65536 + tCol[1] * 256 + tCol[2]).toString(16);
-	while (tTex.length < 6) {
-		tTex = "0" + tTex;
+	var rgba = history[historyPosition].data, i = (x+y*cWidth)*4;
+	var hex = (rgba[i] * 65536 + rgba[i+1] * 256 + rgba[i+2]).toString(16);
+	while (hex.length < 6) {
+		hex = "0" + hex;
 	}
-	updateColor("#" + tTex);
+	updateColor("#" + hex);
 }
 
 function cLWChange(event) {
@@ -406,17 +402,17 @@ function updateSliders(initiator) {
 }
 
 function swapTools(earaser) {
-	if(earaser)	{
+	if(earaser) {
 		for (i in tool)
 			tool[i] = tools[2][i];
 	}
-	else { //* looks messy when multiline
+	else {
 		var back = tools[0];
 		tool = tools[0] = tools[1];
-		tools[1] = back;	
+		tools[1] = back;
+		updateColor(0,1);
 	}
-	updateColor(tool.Color, 0);
-	updateColor(tools[1].Color, 1);
+	updateColor(tool.Color);
 	updateSliders();
 }
 
@@ -426,7 +422,7 @@ function updateColor(value, toolIndex) {
 	var v = value || c.value;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
-	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/;	
+	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/;
 	if (regRGB.test(v))
 	{
 		var a = (t.Color = v).split(", ");
@@ -444,8 +440,10 @@ function updateColor(value, toolIndex) {
 				+ parseInt(v.substr(5,2), 16);
 		}
 	}
+	if (t == tool) {
+		c.value = v;
+	}
 	document.getElementById((t == tool) ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
-	c.value = v;
 }
 
 function historyOperation(opid) {
@@ -470,10 +468,13 @@ function historyOperation(opid) {
 		else
 			for(i = 0; i < historyStorage - 1; i ++)
 				history[i] = history[i + 1];
-		history[historyPosition] = canvas.getContext("2d").getImageData(0, 0, cWidth, cHeight);
-		if (new Date().getTime() - lastAutoSave > 60000 && enableAutoSave) {
-			savePic(-1,true);
-			lastAutoSave = new Date().getTime()
+		history[historyPosition] = dc.getImageData(0, 0, cWidth, cHeight);
+		if (enableAutoSave) {
+			var dt = new Date().getTime();
+			if (dt - lastAutoSave > 60000) {
+				savePic(-1,true);
+				lastAutoSave = dt;
+			}
 		}
 	}
 	updateDebugScreen();
@@ -543,7 +544,7 @@ function savePic(value, auto) {
 		break;
 		case -2:
 			var image = new Image();
-	        image.src = localStorage.recovery;
+			image.src = localStorage.recovery;
 			dc.drawImage(image, 0, 0);
 			historyOperation(0);
 		break;
