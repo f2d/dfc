@@ -1,4 +1,4 @@
-var infoVersion = "v1.4.5";
+var infoVersion = "v1.4.6";
 var infoDate = "April 15, 2013"
 
 var canvas, dc;
@@ -63,7 +63,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
 
-var currentPalette = localStorage.lastPalette ? localStorage.lastPalette : "classic";
+var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "classic";
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -158,7 +158,8 @@ function generatePalette(name, step, slice) { //safe palette constructor, step r
 
 function updatePalette() {
 	currentPalette = document.getElementById("palette-select").value;
-	localStorage.lastPalette = currentPalette;
+	if(!!window.localStorage) //ie-ie
+		window.localStorage.lastPalette = currentPalette;
 	paletteElem = document.getElementById("palette");
 
 	while (paletteElem.childNodes.length) {
@@ -539,12 +540,18 @@ function savePic(value, auto) {
 			if (a || confirm("Вы уверены, что хотите загрузить данные в Local Storage?")) {
 				var jpgData = canvas.toDataURL("image/jpeg");
 				var pngData = canvas.toDataURL();
-				localStorage.recovery = (jpgData.length < pngData.length ? jpgData : pngData);
+				if(!!window.localStorage)
+					window.localStorage.recovery = (jpgData.length < pngData.length ? jpgData : pngData);
+				else if (!a)
+					alert("Local Storage не поддерживается.");
 			}
 		break;
 		case -2:
 			var image = new Image();
-			image.src = localStorage.recovery;
+			if(!!window.localStorage)
+				image.src = window.localStorage.recovery;
+			else if (!a)
+				alert("Local Storage не поддерживается.");
 			dc.drawImage(image, 0, 0);
 			historyOperation(0);
 		break;
