@@ -1,8 +1,10 @@
-var infoVersion = "v1.4.2";
-var infoDate = "April 13, 2013"
+var infoVersion = "v1.4.3";
+var infoDate = "April 15, 2013"
 
 var canvas, dc;
-var x = 0, y = 0;
+var x = 0, y = 0,
+	globalOffset = 0.5, //pixel offset
+	angle = 0; //previous angle
 
 var activeDrawing = false;
 
@@ -18,9 +20,9 @@ var cWidth = 600,
 	cHeight = 360;
 
 var tools = [
-	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "Color" : "0, 0, 0"}       //Fore
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255"} //Back
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255"} //Earaser
+	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "Color" : "0,   0,   0  ", "TurnLimit" : 360} //Fore
+,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255", "TurnLimit" : 360} //Back
+,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "Color" : "255, 255, 255", "TurnLimit" : 360} //Earaser
 ], tool = tools[0];
 
 var debugMode = false,
@@ -33,7 +35,7 @@ var lowQMode = false,
 	precisePreview = false;
 
 var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки"};
-var palette = new Array(); //"@b" breaks the line, "@r" gives name to the new row
+var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["classic"] = [
 		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0", "@b",
 		"#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"];
@@ -45,21 +47,23 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to the new ro
 	palette["gray"] = ["#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"];
 	palette["feijoa"] = [];	
 	generatePalette("feijoa",85,0);
-	palette["touhou"] = [
-		"@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41", "@b",
-		"@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8", "@b",
-		"@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae", "@b",
-		"@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456", "@b",
-		"@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646", "@b",
-		"@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f", "@b",
-		"@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0", "@b",
-		"@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646", "@b",
-		"@r", "Generic", "#fcefe2", "#000000"];
+	palette["touhou"] = ["@r", "Generic", "#fcefe2", "#000000"
+		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
+		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
+		, "@b", "@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae"
+		, "@b", "@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456"
+		, "@b", "@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646"
+		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#f2dcc6", "#888888"
+		, "@b", "@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f"
+		, "@b", "@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0"
+		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
+		, "@b", "@r", "Рейсен", "#000000", "#ffffff", "#dcc3ff", "#2e228c", "#e94b6d"
+		];
 	palette["safe"] = [];
 	generatePalette("safe",51,3);
 	
 
-var currentPalette = "touhou";
+var currentPalette = "classic";
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -108,7 +112,7 @@ function init()
 	document.getElementById("colorB").style.background = "rgb(" + tools[1].Color + ")";
 
 	var e = document.getElementById("rangeW"),
-		a = ["B", "O", "W"],
+		a = ["B", "O", "W"], //, "T"
 		i = a.length;
 	if (e.type == "range") while (i--) {
 		e = document.createElement("input");
@@ -242,7 +246,7 @@ function cDraw(event) {
 	}
 
 	if (activeDrawing) {
-		dc.lineTo(x + 0.5, y + 0.5);
+		dc.lineTo(x + globalOffset, y + globalOffset);
 		dc.stroke();
 	}
 	else
@@ -271,8 +275,8 @@ function cDrawStart(event) {
 		dc.lineJoin = "round";
 		dc.lineCap = "round";
 		dc.beginPath();
-		dc.moveTo(x + 0.5, y + 0.5);
-		dc.lineTo(x + 0.49, y + 0.49);
+		dc.moveTo(x + globalOffset, y + globalOffset);
+		dc.lineTo(x + globalOffset - 0.01, y + globalOffset - 0.01);
 		dc.stroke();
 	}
 	return false;
@@ -292,7 +296,7 @@ function cDrawEnd(event) {
 
 function cDrawRestore(event) {
 	if (activeDrawing)
-		dc.moveTo(x + 0.5, y + 0.5);
+		dc.moveTo(x + globalOffset, y + globalOffset);
 	updatePosition(event);
 }
 
@@ -369,25 +373,31 @@ function updateSliders(initiator) {
 		tool.Blur	= document.getElementById("rangeB" + s).value;
 		tool.Width	= document.getElementById("rangeW" + s).value;
 		tool.Opacity	= document.getElementById("rangeO" + s).value;
+		//tool.TurnLimit	= document.getElementById("rangeT" + s).value;
 	}
 
 	if (tool.Opacity <= 0.1) tool.Opacity = "0.10"; else
 	if (tool.Opacity >=   1) tool.Opacity = "1.00";
 
 	if (tool.Width <=   1) tool.Width = 1; else
-	if (tool.Width >= 123) tool.Width = 123;
+	if (tool.Width >= 128) tool.Width = 128;
 
 	if (tool.Blur <=   0) tool.Blur = 0; else
 	if (tool.Blur >= 123) tool.Blur = 123;
 
+	if (tool.TurnLimit <=   1) tool.TurnLimit = 1; else
+	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
+
 	document.getElementById("rangeB").value = tool.Blur;
 	document.getElementById("rangeW").value = tool.Width;
 	document.getElementById("rangeO").value = tool.Opacity;
+	//document.getElementById("rangeT").value = tool.TurnLimit;
 
 	if (document.getElementById("rangeWS")) {
 		document.getElementById("rangeBS").value = tool.Blur;
 		document.getElementById("rangeWS").value = tool.Width;
 		document.getElementById("rangeOS").value = tool.Opacity;
+		//document.getElementById("rangeTS").value = tool.TurnLimit;
 	}
 
 	cDrawEnd();
@@ -475,8 +485,8 @@ function updateButtons() {
 	document.getElementById("buttonSJ").value = "JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)";
 	document.getElementById("buttonSP").value = "PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)";
 
-	document.getElementById("buttonR").disabled = (historyPosition == historyPositionMax);
-	document.getElementById("buttonU").disabled = (historyPosition == 0);
+	document.getElementById("buttonR").style.display = (historyPosition == historyPositionMax ? "none" : "inline-block");
+	document.getElementById("buttonU").style.display = (historyPosition == 0 ? "none" : "inline-block");
 
 }
 
@@ -498,6 +508,8 @@ function cHotkeys(event) {
 			case "R".charCodeAt(0): tool.Opacity = (parseFloat(tool.Opacity) + 0.05).toFixed(2); break;
 			case "T".charCodeAt(0): tool.Blur--; break;
 			case "Y".charCodeAt(0): tool.Blur++; break;
+			case "-".charCodeAt(0): tool.TurnLimit--; break;
+			case "=".charCodeAt(0): tool.TurnLimit++; break;
 		}
 		updateSliders();
 	}

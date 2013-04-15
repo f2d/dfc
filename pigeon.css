@@ -1,5 +1,4 @@
 * {
-	margin: 0px;
 	padding: 0px;
 }
 
@@ -75,4 +74,19 @@ input, select {
 
 input[type="text"] {
 	width: 64px;
+}
+
+a {
+	cursor: pointer;
+	background-color: #ddd;
+	padding: 2px;
+	display: inline-block;
+	margin-top: 2px;
+	border: 1px solid black;
+	width: 24px;
+	text-align: center;
+}
+
+a:hover {
+	background-color: #eee;
 }
