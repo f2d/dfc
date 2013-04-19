@@ -53,12 +53,11 @@ canvas {
 #palette {
 	overflow-y: scroll;
 	height: 200px;
-	width: 300px;
+	width: 340px;
 }
 
 #palette table {
 	border-collapse: collapse;
-	width: 100%;
 }
 
 #palette table tr td{

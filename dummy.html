@@ -19,15 +19,14 @@
       <span id="slidersB">
         <input type="range" min="0" max="20" step="1" value="0" id="rangeB" onChange="updateSliders(1);">
       </span> Тень <br />
-      <!--span id="slidersT">
-        <input type="range" min="1" max="360" step="1" value="360" id="rangeT" onChange="updateSliders(1);">
-      </span> Минимальный угол <br /-->
+      <span id="slidersT">
+        <input type="range" min="0" max="360" step="1" value="360" id="rangeT" onChange="updateSliders(1);">
+      </span> Минимальный угол <br />
       <div class="palette">
         Палитра: <select id="palette-select" onChange="updatePalette();"></select>
         <div id="palette"></div>
-        HEX: <input type="text" value="#000000" id="color" onChange="updateColor();"><br />
+        Код: <input type="text" value="#000000" id="color" onChange="updateColor();"><br />
       </div>
-      <br />
       <form method="post" id="send" action="">
       </form>
     </div>

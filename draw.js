@@ -1,8 +1,9 @@
-var infoVersion = "v1.4.6";
+var infoVersion = "v1.5.0 BETA";
 var infoDate = "April 15, 2013"
 
 var canvas, dc;
 var x = 0, y = 0,
+	vX = 0, vY = 0,
 	globalOffset = 0.5, //pixel offset
 	globalOffs_1 = globalOffset - 0.01,
 	angle = 0; //previous angle
@@ -26,7 +27,7 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Earaser
 ], tool = tools[0];
 
-var debugMode = false,
+var debugMode = true,
 	fps = 0,
 	ticks = 0;
 
@@ -35,7 +36,7 @@ var flushCursor = false,
 var lowQMode = false,
 	precisePreview = false;
 
-var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки"};
+var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["classic"] = [
 		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0", "@b",
@@ -54,7 +55,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae"
 		, "@b", "@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456"
 		, "@b", "@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646"
-		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#f2dcc6", "#888888"
+		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#888888"
 		, "@b", "@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f"
 		, "@b", "@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0"
 		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
@@ -62,6 +63,8 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		];
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
+
+	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
 
 var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "classic";
 
@@ -108,7 +111,7 @@ function init()
 	}
 
 	var e = document.getElementById("rangeW"),
-		a = ["B", "O", "W"], //, "T"
+		a = ["B", "O", "W", "T"], 
 		i = a.length;
 	if (e.type == "range") while (i--) {
 		e = document.createElement("input");
@@ -189,6 +192,11 @@ function updatePalette() {
 			colCount = -1;
 			colorDesc = "";
 		}
+		if (currentPalette == "history" && colCount == 16) {
+			paletteTable.appendChild(paletteRow);
+			paletteRow = document.createElement("tr");
+			colCount = 0
+		}
 		if (colCount >= 0) {
 			paletteCell = document.createElement("td");
 			var palettine = document.createElement("div");
@@ -213,7 +221,6 @@ function updatePosition(event) {
 }
 
 function drawCursor () {
-	//Отрисовка курсора:
 	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
 		dc.beginPath();
 		dc.lineWidth = 1;
@@ -235,8 +242,20 @@ function drawCursor () {
 }
 
 function cDraw(event) {
+	var pX = x, pY = y;
+
 	updatePosition(event);
+
+	var r = Math.sqrt(Math.pow(x - pX, 2) + Math.pow(y - pY, 2)); //distance
+	var a = Math.atan2(pY - y, x - pX) * (180 / Math.PI); //angle
+	var dA = angle-a;
+
 	updateDebugScreen();
+
+	vX = pX + Math.cos(a * Math.PI / 4) * r;
+	vY = pY - Math.sin(a * Math.PI / 4) * r;
+
+	angle = a;
 
 	if ((flushCursor || neverFlushCursor) && !(lowQMode && activeDrawing)) {
 		dc.putImageData(history[historyPosition], 0, 0);
@@ -275,6 +294,8 @@ function cDrawStart(event) {
 		dc.moveTo(x + globalOffset, y + globalOffset);
 		dc.lineTo(x + globalOffs_1, y + globalOffs_1);
 		dc.stroke();
+		vX = x;
+		vY = y;
 	}
 	return false;
 }
@@ -342,7 +363,7 @@ function cLWChange(event) {
 function updateDebugScreen() {
 	if (debugMode) {
 		var debug = document.getElementById("debug");
-		debug.innerHTML = "Cursor @" + x + ":" + y + " FPS: " + fps;
+		debug.innerHTML = "Cursor @" + x + ":" + y + " Angle: " + angle + " FPS: " + fps;
 		ticks ++;
 	}
 }
@@ -370,7 +391,7 @@ function updateSliders(initiator) {
 		tool.Blur	= document.getElementById("rangeB" + s).value;
 		tool.Width	= document.getElementById("rangeW" + s).value;
 		tool.Opacity	= document.getElementById("rangeO" + s).value;
-		//tool.TurnLimit	= document.getElementById("rangeT" + s).value;
+		tool.TurnLimit	= document.getElementById("rangeT" + s).value;
 	}
 
 	if (tool.Opacity <= 0.1) tool.Opacity = "0.10"; else
@@ -382,19 +403,19 @@ function updateSliders(initiator) {
 	if (tool.Blur <=  0) tool.Blur = 0; else
 	if (tool.Blur >= 20) tool.Blur = 20;
 
-	if (tool.TurnLimit <=   1) tool.TurnLimit = 1; else
+	if (tool.TurnLimit <=   0) tool.TurnLimit = 0; else
 	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
 
 	document.getElementById("rangeB").value = tool.Blur;
 	document.getElementById("rangeW").value = tool.Width;
 	document.getElementById("rangeO").value = tool.Opacity;
-	//document.getElementById("rangeT").value = tool.TurnLimit;
+	document.getElementById("rangeT").value = tool.TurnLimit;
 
 	if (document.getElementById("rangeWS")) {
 		document.getElementById("rangeBS").value = tool.Blur;
 		document.getElementById("rangeWS").value = tool.Width;
 		document.getElementById("rangeOS").value = tool.Opacity;
-		//document.getElementById("rangeTS").value = tool.TurnLimit;
+		document.getElementById("rangeTS").value = tool.TurnLimit;
 	}
 
 	cDrawEnd();
@@ -423,13 +444,15 @@ function updateColor(value, toolIndex) {
 	var v = value || c.value;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
-	var regRGB = /^([0-9]{1,3}), ([0-9]{1,3}), ([0-9]{1,3})/;
+	var regRGB = /^([0-9]{1,3}),\s*([0-9]{1,3}),\s*([0-9]{1,3})/;
 	if (regRGB.test(v))
 	{
-		var a = (t.Color = v).split(", ");
+		var a = (t.Color = v).split(new RegExp(",\s*"));
 		v = "#";
-		for (i in a)
+		for (i in a) {
+			a[i] = Math.max(Math.min(parseInt(a[i]), 255), 0);
 			v += ((a[i] = parseInt(a[i]).toString(16)).length == 1) ? "0" + a[i] : a[i];
+		}
 	} else {
 		if (regShort.test(v))
 			v = v.replace(regShort, "#$1$1$2$2$3$3");
@@ -445,6 +468,22 @@ function updateColor(value, toolIndex) {
 		c.value = v;
 	}
 	document.getElementById((t == tool) ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
+
+	//adding to history palette:
+	var found = palette["history"].length;
+	for (i = 0; i < found; i ++)
+		if (palette["history"][i] == v)
+			found = i;
+
+	for (i = Math.min(found, 64 - 1); i > 0; i --) //stores only limited count of specimens
+		palette["history"][i] = palette["history"][i - 1];
+	palette["history"][0] = v;
+
+	if (currentPalette == "history")
+		updatePalette();
+
+	if (!!window.localStorage)
+		window.localStorage.historyPalette = JSON.stringify(palette["history"]);
 }
 
 function historyOperation(opid) {
