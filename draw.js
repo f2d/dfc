@@ -1,4 +1,4 @@
-var infoVersion = "v1.5.5";
+var infoVersion = "v1.5.6";
 var infoDate = "April 21, 2013"
 
 var canvas, dc;
@@ -54,6 +54,8 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		];
 	palette["feijoa"] = [];
 	generatePalette("feijoa", 85, 0);
+	palette["safe"] = [];
+	generatePalette("safe", 51, 6);
 	palette["touhou"] = ["@r", "Generic", "#fcefe2", "#000000"
 		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
 		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
@@ -66,8 +68,6 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
 		, "@b", "@r", "Рейсен", "#000000", "#ffffff", "#dcc3ff", "#2e228c", "#e94b6d"
 		];
-	palette["safe"] = [];
-	generatePalette("safe", 51, 6);
 
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
 
@@ -106,8 +106,10 @@ var kbLayout = {
 	, "tool.turn-" :				c_ + s_ + "Q".charCodeAt(0)
 	, "tool.turn+" :				c_ + s_ + "W".charCodeAt(0)
 
-	, "debug.test" :				c_ + a_ + "T".charCodeAt(0)
+	, "debug.mode" :				115
 };
+
+	kbLayout = (!!window.localStorage && !!window.localStorage.layout) ? JSON.parse(window.localStorage.layout) : kbLayout;
 
 for (i = 1; i <= 10; i ++) {
 	kbLayout["tool.opacity." + i] = (i == 10 ? 0 : i) + 48 + c_; 
@@ -141,7 +143,7 @@ var actLayout = {
 	, "tool.turn-" :				"toolModify(0, 3, -1)"
 	, "tool.turn+" :				"toolModify(0, 3, +1)"
 
-	, "debug.test" :				"alert('success')"
+	, "debug.mode" :				"switchMode(-1)"
 };
 
 for (i = 1; i <= 10; i ++) {
@@ -682,8 +684,9 @@ function toolModify(id, param, inc, value) {
 }
 
 function switchMode(id) {
-	id ?	(document.getElementById("checkPP").className = (precisePreview = !precisePreview) ? "button-active" : "button")
-	:	(document.getElementById("checkOM").className = (lowQMode = !lowQMode) ? "button-active" : "button");
+	id == 1 ? (document.getElementById("checkPP").className = (precisePreview = !precisePreview) ? "button-active" : "button") : (
+	id == 0 ? (document.getElementById("checkOM").className = (lowQMode = !lowQMode) ? "button-active" : "button") : (debugMode =! debugMode));
+	debug.innerHTML="";
 }
 
 function savePic(value, auto) {
