@@ -1,5 +1,5 @@
-var infoVersion = "v1.5.0 BETA";
-var infoDate = "April 15, 2013"
+var infoVersion = "v1.5.0";
+var infoDate = "April 20, 2013"
 
 var canvas, dc;
 var x = 0, y = 0,
