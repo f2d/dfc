@@ -1,5 +1,5 @@
-var infoVersion = "v1.5.0";
-var infoDate = "April 20, 2013"
+var infoVersion = "v1.5.5";
+var infoDate = "April 21, 2013"
 
 var canvas, dc;
 var x = 0, y = 0,
@@ -24,10 +24,11 @@ var cWidth = 600,
 var tools = [
 	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "TurnLimit" : 360, "Color" : "0, 0, 0"      } //Fore
 ,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Back
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Earaser
+,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
-var debugMode = true,
+
+var debugMode = false,
 	fps = 0,
 	ticks = 0;
 
@@ -36,17 +37,21 @@ var flushCursor = false,
 var lowQMode = false,
 	precisePreview = false;
 
-var paletteDesc = {"classic" : "Classic", "cga" : "CGA", "win7" : "Шindoшs", "gray" : "Post-Rock", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
+var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
-	palette["classic"] = [
-		"#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0", "@b",
-		"#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"];
-	palette["cga"] = ["#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa", "@b",
-		"#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"];
-	palette["win7"] = [
-		"#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4", "@b",
-		"#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"];
-	palette["gray"] = ["#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"];
+	palette["combo"] = [
+		        "@r", "Classic", "#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0"
+		, "@b", "@r", "", "#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"
+
+		, "@b", "@r", "CGA", "#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa"
+		, "@b", "@r", "", "#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"
+
+		, "@b", "@r", "Windows 7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
+		, "@b", "@r", "", "#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"
+
+		, "@b", "@r", "ЧБ-оттенки", "#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888",
+		, "@b", "@r", "", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"
+		];
 	palette["feijoa"] = [];
 	generatePalette("feijoa", 85, 0);
 	palette["touhou"] = ["@r", "Generic", "#fcefe2", "#000000"
@@ -67,6 +72,96 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
 
 var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "classic";
+
+//KEY MODIFIERS
+var c_ = 0x0100, 
+	s_ = 0x0200,
+	a_ = 0x0400;
+	m_ = 0x0800;
+
+var kbLayout = { 
+	  "history.undo" :				"Z".charCodeAt(0)
+	, "history.redo" :				"X".charCodeAt(0)
+	, "history.store" :				119 //F8
+	, "history.extract" :			120 //F9
+
+	, "canva.fill" :				"F".charCodeAt(0)
+	, "canva.delete" :				"G".charCodeAt(0)
+	, "canva.invert" :				"I".charCodeAt(0)
+	, "canva.jpeg" :				c_ + "J".charCodeAt(0)
+	, "canva.png" :					c_ + "P".charCodeAt(0)
+	, "canva.send" :				c_ + 13 //ENTER
+
+	, "tool.lowquality" :			59 //;
+	, "tool.preview" :				222 //'
+	, "tool.colorpick" :			"C".charCodeAt(0)
+	, "tool.swap" :					"S".charCodeAt(0)
+	, "tool.eraser" :				"E".charCodeAt(0)
+	, "tool.width-" :				"Q".charCodeAt(0)
+	, "tool.width+" :				"W".charCodeAt(0)
+	, "tool.opacity-" :				c_ + "Q".charCodeAt(0)
+	, "tool.opacity+" :				c_ + "W".charCodeAt(0)
+	, "tool.shadow-" :				s_ + "Q".charCodeAt(0)
+	, "tool.shadow+" :				s_ + "W".charCodeAt(0)
+	, "tool.turn-" :				c_ + s_ + "Q".charCodeAt(0)
+	, "tool.turn+" :				c_ + s_ + "W".charCodeAt(0)
+
+	, "debug.test" :				c_ + a_ + "T".charCodeAt(0)
+};
+
+for (i = 1; i <= 10; i ++) {
+	kbLayout["tool.opacity." + i] = (i == 10 ? 0 : i) + 48 + c_; 
+	kbLayout["tool.width." + i] = (i == 10 ? 0 : i) + 48; 
+}
+
+var actLayout = { 
+	  "history.undo" :				"historyOperation(1)"
+	, "history.redo" :				"historyOperation(2)"
+	, "history.store" :				"savePic(-1)"
+	, "history.extract" :			"savePic(-2)"
+
+	, "canva.fill" :				"clearScreen(0)"
+	, "canva.delete" :				"clearScreen(1)"
+	, "canva.invert" :				"invertColors()"
+	, "canva.jpeg" :				"savePic(1)"
+	, "canva.png" :					"savePic(2)"
+	, "canva.send" :				"savePic(0)"
+
+	, "tool.preview" :				"switchMode(1)"
+	, "tool.lowquality" :			"switchMode(0)"
+	, "tool.colorpick" :			"cCopyColor()"
+	, "tool.swap" :					"swapTools(0)"
+	, "tool.eraser" :				"swapTools(1)"
+	, "tool.width-" :				"toolModify(0, 1, -1)"
+	, "tool.width+" :				"toolModify(0, 1, +1)"
+	, "tool.opacity-" :				"toolModify(0, 0, -0.05)"
+	, "tool.opacity+" :				"toolModify(0, 0, +0.05)"
+	, "tool.shadow-" :				"toolModify(0, 2, -1)"
+	, "tool.shadow+" :				"toolModify(0, 2, +1)"
+	, "tool.turn-" :				"toolModify(0, 3, -1)"
+	, "tool.turn+" :				"toolModify(0, 3, +1)"
+
+	, "debug.test" :				"alert('success')"
+};
+
+for (i = 1; i <= 10; i ++) {
+	actLayout["tool.opacity." + i] = "toolModify(0, 0, 0, " + (i / 10) + ")"; 
+	actLayout["tool.width." + i] = "toolModify(0, 1, 0, " + Math.ceil(Math.pow(1.7, i-1)) + ")"; 
+}
+
+var kbDesc = {
+	  13 : "Enter"
+	, 45 : "Insert"
+	, 46 : "Delete"
+	, 186 : ";"
+	, 187 : "Plus"
+	, 189 : "Minus"
+	, 222 : "'"
+}
+
+for (i = 1; i <= 15; i ++) {
+	kbDesc[111 + i] = "F" + i;
+}
 
 document.addEventListener("DOMContentLoaded", init, false);
 
@@ -102,6 +197,24 @@ function init()
 	document.getElementById("checkOM").checked = lowQMode;
 	document.getElementById("checkPP").checked = precisePreview;
 
+	setElemTitle("buttonU", "Назад", "history.undo");
+	setElemTitle("buttonR", "Вперёд", "history.redo");
+
+	setElemTitle("colorF", "Закрасить полотно основным цветом", "canva.fill");
+	setElemTitle("colorB", "Закрасить полотно фоновым цветом", "canva.delete");
+	setElemTitle("buttonI", "Инверсия полотна", "canva.invert");
+
+	setElemTitle("buttonTS", "Поменять инструменты местами", "tool.swap");
+	setElemTitle("buttonTE", "Заменить инструмент на стандартный ластик", "tool.eraser");
+	setElemTitle("checkOM", "Режим низкого качества", "tool.lowquality");
+	setElemTitle("checkPP", "Предпросмотр кисти", "tool.preview");
+
+	setElemTitle("buttonSB", "Сделать back-up", "history.store");
+	setElemTitle("buttonSX", "Извлечь back-up", "history.extract");
+	setElemTitle("buttonSJ", "Сохранить в JPEG", "canva.jpeg");
+	setElemTitle("buttonSP", "Сохранить в PNG", "canva.png");
+	setElemTitle("buttonS", "Отправить на сервер", "canva.send");
+
 	paletteSelect = document.getElementById("palette-select");
 
 	for (tPalette in paletteDesc) {
@@ -132,6 +245,16 @@ function init()
 
 	if (debugMode)
 		setInterval("fpsCount()", 1000);
+}
+
+function setElemTitle(elem, title, hotkey) {
+	var k = kbLayout[hotkey];
+	document.getElementById(elem).title = title + (hotkey ?  (" (" + 
+		(k & c_ ? "Ctrl + ":"") + 
+		(k & a_ ? "Alt + ":"") + 
+		(k & m_ ? "Meta + ":"") + 
+		(k & s_ ? "Shift + ":"") + 
+		(kbDesc[k % 256] ? kbDesc[k % 256] : String.fromCharCode(k % 256)) + ")") : "");
 }
 
 function generatePalette(name, step, slice) { //safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
@@ -423,8 +546,8 @@ function updateSliders(initiator) {
 	drawCursor();
 }
 
-function swapTools(earaser) {
-	if(earaser) {
+function swapTools(eraser) {
+	if(eraser) {
 		for (i in tool)
 			tool[i] = tools[2][i];
 	}
@@ -522,8 +645,8 @@ function historyOperation(opid) {
 }
 
 function updateButtons() {
-	document.getElementById("buttonSJ").title = "Сохранить в JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)";
-	document.getElementById("buttonSP").title = "Сохранить в PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)";
+	setElemTitle("buttonSJ", "Сохранить в JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
+	setElemTitle("buttonSP", "Сохранить в PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
 
 	document.getElementById("buttonR").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
 	document.getElementById("buttonU").className = (historyPosition == 0 ? "button-disabled" : "button");
@@ -531,28 +654,31 @@ function updateButtons() {
 }
 
 function cHotkeys(event) {
-	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-		switch (event.keyCode) {
-			case "Z".charCodeAt(0): historyOperation(1); return;
-			case "X".charCodeAt(0): historyOperation(2); return;
-			case "C".charCodeAt(0): cCopyColor(); return;
-			case "F".charCodeAt(0): clearScreen(0); return;
-			case "D".charCodeAt(0): clearScreen(1); return;
-			case "I".charCodeAt(0): invertColors(); return;
-			case "S".charCodeAt(0): swapTools(0); return;
-			case "A".charCodeAt(0): swapTools(1); return;
 
-			case "Q".charCodeAt(0): tool.Width--; break;
-			case "W".charCodeAt(0): tool.Width++; break;
-			case "E".charCodeAt(0): tool.Opacity = (parseFloat(tool.Opacity) - 0.05).toFixed(2); break;
-			case "R".charCodeAt(0): tool.Opacity = (parseFloat(tool.Opacity) + 0.05).toFixed(2); break;
-			case "T".charCodeAt(0): tool.Blur--; break;
-			case "Y".charCodeAt(0): tool.Blur++; break;
-			case "-".charCodeAt(0): tool.TurnLimit--; break;
-			case "=".charCodeAt(0): tool.TurnLimit++; break;
+	var k = event.keyCode
+		+ (event.ctrlKey ? c_ : 0)
+		+ (event.shiftKey ? s_ : 0)
+		+ (event.altKey ? a_ : 0)
+		+ (event.metaKey ? m_ : 0)
+
+	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+		event.preventDefault();
+		for (kbk in kbLayout) {
+			if(kbLayout[kbk] == k) {
+				eval(actLayout[kbk]);
+			}
 		}
-		updateSliders();
 	}
+}
+
+function toolModify(id, param, inc, value) {
+	switch (param) {
+		case 0: tools[id].Opacity = (inc == 0 ? value : (tools[id].Opacity + inc)).toFixed(2); break;
+		case 1: tools[id].Width = (inc == 0 ? value : (tools[id].Width + inc)); break;
+		case 2: tools[id].Blur = (inc == 0 ? value : (tools[id].Blur + inc)); break;
+		case 3: tools[id].TurnLimit = (inc == 0 ? value : (tools[id].TurnLimit + inc)); break;
+	}
+	updateSliders();
 }
 
 function switchMode(id) {
@@ -564,14 +690,16 @@ function savePic(value, auto) {
 	var a = auto || false;
 	switch (value) {
 		case 0:
-			var imageToSend = document.createElement("input");
-			var jpgData = canvas.toDataURL("image/jpeg");
-			var pngData = canvas.toDataURL();
-			imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
-			imageToSend.name = "content";
-			imageToSend.type = "hidden";
-			document.getElementById("send").appendChild(imageToSend);
-			document.getElementById("send").submit();
+			if (a || confirm("Вы уверены, что хотите загрузить изображение на сервер?")) {
+				var imageToSend = document.createElement("input");
+				var jpgData = canvas.toDataURL("image/jpeg");
+				var pngData = canvas.toDataURL();
+				imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
+				imageToSend.name = "content";
+				imageToSend.type = "hidden";
+				document.getElementById("send").appendChild(imageToSend);
+				document.getElementById("send").submit();
+			}
 		break;
 		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
 		case 2: picTab = window.open(canvas.toDataURL(), "_blank"); break;

@@ -134,3 +134,7 @@ input[type="text"] {
 #color {
 	width: 80px;
 }
+
+#slidersT {
+	display: none; /*TBD*/
+}
