@@ -65,7 +65,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646"
 		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#888888"
 		, "@b", "@r", "Ёму", "#2c8e7d", "#382d3a", "#ffffff", "#004457"
-		, "@b", "@r", "Ююко", "#9eb2dc", "#ffffff", "#10009a", "#f60000"
+		, "@b", "@r", "Ююко", "#9eb2dc", "#ffffff", "#fba7b8", "#10009a", "#f60000"
 		, "@b", "@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f"
 		, "@b", "@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0"
 		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
