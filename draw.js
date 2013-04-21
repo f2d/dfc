@@ -1,5 +1,5 @@
-var infoVersion = "v1.5.7";
-var infoDate = "April 21, 2013"
+var infoVersion = "v1.5.8";
+var infoDate = "April 22, 2013"
 
 var canvas, dc;
 var x = 0, y = 0,
@@ -40,24 +40,24 @@ var lowQMode = false,
 var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["combo"] = [
-		        "@r", "Classic", "#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0"
+		        "@r", "Классическая", "#000000", "#000080", "#008000", "#008080", "#800000", "#800080", "#808000", "#c0c0c0"
 		, "@b", "@r", "", "#808080", "#0000ff", "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#ffffff"
 
 		, "@b", "@r", "CGA", "#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa"
 		, "@b", "@r", "", "#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"
 
-		, "@b", "@r", "Windows&nbsp;7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
-		, "@b", "@r", "", "#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"
-
 		, "@b", "@r", "ЧБ", "#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888",
 		, "@b", "@r", "", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"
+
+		, "@b", "@r", "Windows&nbsp;7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
+		, "@b", "@r", "", "#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"
 		];
 	palette["feijoa"] = [];
 	generatePalette("feijoa", 85, 0);
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
 	palette["touhou"] = ["@c", "основной цвет", "вторичный цвет", "волосы", "глаза/аксессуары", "аксессуары"
-	    , "@b", "@r", "Generic", "#fcefe2", "#000000"
+	    , "@b", "@r", "Общее", "#fcefe2", "#000000"
 		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
 		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
 		, "@b", "@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae"
@@ -76,6 +76,9 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
 
 var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "classic";
+
+var hki = 0; //Hotkey interval for Opera
+var hkPressed = false;
 
 //KEY MODIFIERS
 var c_ = 0x0100, 
@@ -109,6 +112,8 @@ var kbLayout = {
 	, "tool.shadow+" :				s_ + "W".charCodeAt(0)
 	, "tool.turn-" :				c_ + s_ + "Q".charCodeAt(0)
 	, "tool.turn+" :				c_ + s_ + "W".charCodeAt(0)
+
+	, "app.help" :					112
 
 	, "debug.mode" :				115
 };
@@ -147,6 +152,8 @@ var actLayout = {
 	, "tool.turn-" :				"toolModify(0, 3, -1)"
 	, "tool.turn+" :				"toolModify(0, 3, +1)"
 
+	, "app.help" :					"showHelp()"
+
 	, "debug.mode" :				"switchMode(-1)"
 };
 
@@ -181,7 +188,8 @@ function init()
 	canvas.addEventListener("mouseout", cDraw, false);
 	canvas.addEventListener("mouseover", cDrawRestore, false);
 	document.addEventListener("mousemove", updatePosition, false);
-	document.addEventListener("keydown", cHotkeys, false);
+	document.addEventListener("keydown", cHotkeysStart, false);
+	document.addEventListener("keyup", cHotkeysEnd, false);
 
 	canvas.setAttribute("oncontextmenu", "return false;");
 	canvas.setAttribute("onscroll", "return false;");
@@ -197,11 +205,11 @@ function init()
 	dc.fillStyle = "white";
 	dc.fillRect(0, 0, cWidth, cHeight);
 	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
-	document.getElementById("version").innerHTML = infoVersion;
-	document.getElementById("date").innerHTML = infoDate;
 
 	document.getElementById("checkOM").checked = lowQMode;
 	document.getElementById("checkPP").checked = precisePreview;
+
+	setElemTitle("buttonH", "Помощь", "app.help");
 
 	setElemTitle("buttonU", "Назад", "history.undo");
 	setElemTitle("buttonR", "Вперёд", "history.redo");
@@ -256,11 +264,7 @@ function init()
 function setElemTitle(elem, title, hotkey) {
 	var k = kbLayout[hotkey];
 	document.getElementById(elem).title = title + (hotkey ?  (" (" + 
-		(k & c_ ? "Ctrl + ":"") + 
-		(k & a_ ? "Alt + ":"") + 
-		(k & m_ ? "Meta + ":"") + 
-		(k & s_ ? "Shift + ":"") + 
-		(kbDesc[k % 256] ? kbDesc[k % 256] : String.fromCharCode(k % 256)) + ")") : "");
+		descKeyCode(k) + ")") : "");
 }
 
 function generatePalette(name, step, slice) { //safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
@@ -671,25 +675,39 @@ function updateButtons() {
 
 }
 
-function cHotkeys(event, param) {
-	var k = event.keyCode
-		+ (event.ctrlKey ? c_ : 0)
-		+ (event.shiftKey ? s_ : 0)
-		+ (event.altKey ? a_ : 0)
-		+ (event.metaKey ? m_ : 0)
-
-	if (param) {
-		//TODO: change hotkey
-	}
-	else
-		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-			event.preventDefault();
-			for (kbk in kbLayout) {
-				if(kbLayout[kbk] == k) {
-					eval(actLayout[kbk]);
-				}
+function cHotkeys(k) {
+	if (hki != 0)
+		for (kbk in kbLayout) {
+			if(kbLayout[kbk] == k) {
+				eval(actLayout[kbk]);
+				return;
 			}
 		}
+	clearInterval(hki);
+}
+
+function cHotkeysStart(event) {
+	if (!hkPressed) {		
+		var k = event.keyCode
+			+ (event.ctrlKey ? c_ : 0)
+			+ (event.shiftKey ? s_ : 0)
+			+ (event.altKey ? a_ : 0)
+			+ (event.metaKey ? m_ : 0)
+		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+			event.preventDefault();
+			cHotkeys(k);
+			hki = setInterval('cHotkeys(' + k +')', 100);
+		}
+		if(event.keyCode < 16 || event.keyCode > 18)
+			hkPressed = true;
+	}	
+	event.returnValue = false;
+}
+
+function cHotkeysEnd(event) {
+	clearInterval(hki);
+	hkPressed = false;
+	event.returnValue = false;
 }
 
 function toolModify(id, param, inc, value) {
@@ -751,4 +769,21 @@ function savePic(value, auto) {
 function fpsCount() {
 	fps = ticks;
 	ticks = 0;
+}
+
+function descKeyCode(k) {
+	return (k & c_ ? "Ctrl + ":"") + 
+		(k & a_ ? "Alt + ":"") + 
+		(k & m_ ? "Meta + ":"") + 
+		(k & s_ ? "Shift + ":"") + 
+		(kbDesc[k % 256] ? kbDesc[k % 256] : String.fromCharCode(k % 256));
+}
+
+function showHelp() {
+	alert("Управление:\nЛевая кнопка мыши — рисовать основным инструментом.\nПравая кнопка мыши — рисовать вторичным инструментом.\nСредняя кнопка мыши (или клавиша " + descKeyCode(kbLayout["tool.colorpick"]) + ") — выбор цвета из холста\n" +
+		"Колёсико / " + descKeyCode(kbLayout["tool.width-"]) + " / " + descKeyCode(kbLayout["tool.width+"]) + " / " + descKeyCode(kbLayout["tool.width.10"]) + "—" + descKeyCode(kbLayout["tool.width.9"]) +
+		" — изменение толщины.\n" +	"Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.\n" +
+		"Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.\n" +
+		"Курсор обязательно должен находиться над холстом!\n\n" +
+        "Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate);
 }
