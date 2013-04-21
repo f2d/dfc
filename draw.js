@@ -1,4 +1,4 @@
-var infoVersion = "v1.5.6";
+var infoVersion = "v1.5.7";
 var infoDate = "April 21, 2013"
 
 var canvas, dc;
@@ -46,27 +46,31 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "CGA", "#000", "#00a", "#0a0", "#0aa", "#a00", "#a0a", "#aa0", "#aaa"
 		, "@b", "@r", "", "#555", "#55f", "#5f5", "#5ff", "#f55", "#f5f", "#ff5", "#fff"
 
-		, "@b", "@r", "Windows 7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
+		, "@b", "@r", "Windows&nbsp;7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
 		, "@b", "@r", "", "#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"
 
-		, "@b", "@r", "ЧБ-оттенки", "#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888",
+		, "@b", "@r", "ЧБ", "#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888",
 		, "@b", "@r", "", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"
 		];
 	palette["feijoa"] = [];
 	generatePalette("feijoa", 85, 0);
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
-	palette["touhou"] = ["@r", "Generic", "#fcefe2", "#000000"
+	palette["touhou"] = ["@c", "основной цвет", "вторичный цвет", "волосы", "глаза/аксессуары", "аксессуары"
+	    , "@b", "@r", "Generic", "#fcefe2", "#000000"
 		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
 		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
 		, "@b", "@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae"
 		, "@b", "@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456"
 		, "@b", "@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646"
 		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#888888"
+		, "@b", "@r", "Ёму", "#2c8e7d", "#382d3a", "#ffffff", "#004457"
+		, "@b", "@r", "Ююко", "#9eb2dc", "#ffffff", "#10009a", "#f60000"
 		, "@b", "@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f"
 		, "@b", "@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0"
 		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
 		, "@b", "@r", "Рейсен", "#000000", "#ffffff", "#dcc3ff", "#2e228c", "#e94b6d"
+		, "@b", "@r", "Комачи", "#ffffff", "#257ed4", "#ed145b", "#4f352e", "#e7962d"
 		];
 
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
@@ -294,7 +298,9 @@ function updatePalette() {
 		paletteElem.removeChild(paletteElem.childNodes[0])
 	}
 
-	var colCount = 0;
+	var colCount = 0,
+		rowCount = 0;
+	var colDesc = new Array();
 
 	var paletteTable = document.createElement("table");
 	paletteElem.appendChild(paletteTable);
@@ -311,22 +317,32 @@ function updatePalette() {
 			colCount = -2;
 			colorDesc = palette[currentPalette][parseInt(tColor) + 1];;
 		}
+		if (c == "@c") {
+			rowCount = -1;
+			colCount = -1;
+		}
 		if (c == "@b") {
 			paletteTable.appendChild(paletteRow);
 			paletteRow = document.createElement("tr");
 			colCount = -1;
+			rowCount ++;
 			colorDesc = "";
 		}
 		if (currentPalette == "history" && colCount == 16) {
 			paletteTable.appendChild(paletteRow);
 			paletteRow = document.createElement("tr");
-			colCount = 0
+			colCount = 0;
 		}
-		if (colCount >= 0) {
+		if (rowCount == -1) {
+			if(colCount >= 0) {
+				colDesc[colCount] = c;
+			}
+		}
+		if (colCount >= 0 && rowCount >= 0) {
 			paletteCell = document.createElement("td");
 			var palettine = document.createElement("div");
 			palettine.className = "palettine";
-			palettine.title = palette[currentPalette][parseInt(tColor)] + (colorDesc != "" ? (" (" + colorDesc + ")") : "");
+			palettine.title = palette[currentPalette][parseInt(tColor)] + (colorDesc != "" ? (" (" + colorDesc + (colDesc[colCount] ? (", " + colDesc[colCount]) : "" ) + ")") : "");
 			palettine.style.background = c;
 			palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
 			palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
@@ -655,22 +671,25 @@ function updateButtons() {
 
 }
 
-function cHotkeys(event) {
-
+function cHotkeys(event, param) {
 	var k = event.keyCode
 		+ (event.ctrlKey ? c_ : 0)
 		+ (event.shiftKey ? s_ : 0)
 		+ (event.altKey ? a_ : 0)
 		+ (event.metaKey ? m_ : 0)
 
-	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-		event.preventDefault();
-		for (kbk in kbLayout) {
-			if(kbLayout[kbk] == k) {
-				eval(actLayout[kbk]);
+	if (param) {
+		//TODO: change hotkey
+	}
+	else
+		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+			event.preventDefault();
+			for (kbk in kbLayout) {
+				if(kbLayout[kbk] == k) {
+					eval(actLayout[kbk]);
+				}
 			}
 		}
-	}
 }
 
 function toolModify(id, param, inc, value) {
