@@ -1,4 +1,4 @@
-var infoVersion = "v1.5.8";
+var infoVersion = "v1.5.9";
 var infoDate = "April 22, 2013"
 
 var canvas, dc;
@@ -417,8 +417,9 @@ function cDraw(event) {
 
 function cDrawStart(event) {
 	updatePosition(event);
-	canvas.focus();
+	//canvas.focus();
 	event.preventDefault();
+	event.returnValue = false;
 	if (event.which == 2) {
 		cCopyColor();
 	} else
@@ -483,7 +484,8 @@ function cCopyColor() {
 
 function cLWChange(event) {
 	var delta = event.deltaY || event.detail || event.wheelDelta;
-	event.preventDefault();
+	event.preventDefault();	
+	event.returnValue = false;
 	if (delta > 0) {
 		if (event.ctrlKey)
 			tool.Opacity = (parseFloat(tool.Opacity) - 0.05).toFixed(2);
@@ -678,12 +680,14 @@ function updateButtons() {
 function cHotkeys(k) {
 	if (hki != 0)
 		for (kbk in kbLayout) {
-			if(kbLayout[kbk] == k) {
+			if (kbLayout[kbk] == k) {
 				eval(actLayout[kbk]);
-				return;
+				hkPressed = true;
+				return true;
 			}
 		}
 	clearInterval(hki);
+	return false;
 }
 
 function cHotkeysStart(event) {
@@ -694,19 +698,23 @@ function cHotkeysStart(event) {
 			+ (event.altKey ? a_ : 0)
 			+ (event.metaKey ? m_ : 0)
 		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-			event.preventDefault();
-			cHotkeys(k);
-			hki = setInterval('cHotkeys(' + k +')', 100);
+			if (cHotkeys(k)) {				
+				event.preventDefault();
+				event.returnValue = false;
+			}
+			hki = setInterval('cHotkeys(' + k +')', 100); //TODO: 1st interval: 1s.
 		}
-		if(event.keyCode < 16 || event.keyCode > 18)
-			hkPressed = true;
-	}	
-	event.returnValue = false;
+	}
+	else {
+		event.preventDefault();
+		event.returnValue = false;
+	}
 }
 
 function cHotkeysEnd(event) {
 	clearInterval(hki);
 	hkPressed = false;
+	event.preventDefault();
 	event.returnValue = false;
 }
 
@@ -785,5 +793,6 @@ function showHelp() {
 		" — изменение толщины.\n" +	"Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.\n" +
 		"Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.\n" +
 		"Курсор обязательно должен находиться над холстом!\n\n" +
+		"В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.\n\n" +
         "Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate);
 }
