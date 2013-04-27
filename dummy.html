@@ -5,52 +5,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <link rel="stylesheet" href="pigeon.css">
     <script src="draw.js"></script>
-    <title>Feijoa Sketch</title>
+    <title>Feijoa Sketch Dummy Page</title>
   </head>
   <body>
-    <canvas id="draw" tabindex="0"></canvas>
-    <div id="tools">
-      <span id="slidersW">
-        <input type="range" min="1" max="128" step="1" value="4" id="rangeW" onChange="updateSliders(1);"> 
-      </span> Толщина <br />
-      <span id="slidersO">
-        <input type="range" min="0.05" max="1" step="0.05" value="1.00" id="rangeO" onChange="updateSliders(1);"> 
-      </span> Непрозрачность <br />
-      <span id="slidersB">
-        <input type="range" min="0" max="20" step="1" value="0" id="rangeB" onChange="updateSliders(1);">
-      </span> Тень <br />
-      <span id="slidersT">
-        <input type="range" min="0" max="360" step="1" value="360" id="rangeT" onChange="updateSliders(1);">
-      </span> <br />
-      <div class="palette">
-        Палитра: <select id="palette-select" onChange="updatePalette();"></select>
-        <div id="palette"></div>
-        Код: <input type="text" value="#000000" id="color" onChange="updateColor();"><br />
-      </div>
-      <form method="post" id="send" action="">
-      </form>
-    </div>
-    <div>
-      <span class="button" id="buttonU" onClick="historyOperation(1);">&#x2190;</span>
-      <span class="button" id="buttonR" onClick="historyOperation(2);">&#x2192;</span>
-      <span class="vertical">&nbsp;</span>
-      <span class="button" id="colorF" onClick="clearScreen(0);">&nbsp;</span>
-      <span class="button" id="buttonTS" onClick="swapTools(0);">&#x2194;</span>
-      <span class="button" id="colorB" onClick="clearScreen(1);">&nbsp;</span>
-      <span class="button" id="buttonTE" onClick="swapTools(1);">&#x25A1;</span>
-      <span class="button" id="buttonI" onClick="invertColors();">&#x25D0;</span>
-      <span class="vertical">&nbsp;</span>
-      <span class="button" id="checkOM" onClick="switchMode(0);">&#x25A0;</span>
-      <span class="button" id="checkPP" onClick="switchMode(1);">&#x25CF;</span>
-      <span class="vertical">&nbsp;</span>
-      <span class="button" id="buttonSB" onClick="savePic(-1);">&#x22C1;</span>
-      <span class="button" id="buttonSX" onClick="savePic(-2);">&#x22C0;</span>
-      <span class="button" id="buttonSP" onClick="savePic(2);">P</span>
-      <span class="button" id="buttonSJ" onClick="savePic(1);">J</span>
-      <span class="button" id="buttonS" onClick="savePic(0);">&#x21B5;</span>
-      <span class="vertical">&nbsp;</span>
-      <span class="button" id="buttonH" onClick="showHelp();">?</span>
-    </div>
-    <div id="debug"></div>
+    <div id="sketcher"><!--MAGIC HERE--></div>
   </body>
 </html>

@@ -1,7 +1,12 @@
-var infoVersion = "v1.5.9";
-var infoDate = "April 22, 2013"
+var infoVersion = "v1.6.0";
+var infoDate = "April 27/28, 2013"
 
-var canvas, dc;
+var sketcher, canvas, dc, sendForm,
+	bar, sidebar,
+	paletteElem, cElem; //main elements
+
+var sliders = [];
+
 var x = 0, y = 0,
 	vX = 0, vY = 0,
 	globalOffset = 0.5, //pixel offset
@@ -22,11 +27,12 @@ var cWidth = 600,
 	cHeight = 360;
 
 var tools = [
-	{"Opacity" : 1.00, "Width" :  4, "Blur" : 0, "TurnLimit" : 360, "Color" : "0, 0, 0"      } //Fore
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Back
-,	{"Opacity" : 1.00, "Width" : 20, "Blur" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
+	{"Opacity" : 1.00, "Width" :  4, "Shadow" : 0, "TurnLimit" : 360, "Color" : "0, 0, 0"      } //Fore
+,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Back
+,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
+var toolLimits = {"Opacity": [0, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
 
 var debugMode = false,
 	fps = 0,
@@ -35,7 +41,8 @@ var debugMode = false,
 var flushCursor = false,
 	neverFlushCursor = true;
 var lowQMode = false,
-	precisePreview = false;
+	precisePreview = false,
+	antiAliasing = true;
 
 var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
@@ -87,88 +94,103 @@ var c_ = 0x0100,
 	m_ = 0x0800;
 
 var kbLayout = { 
-	  "history.undo" :				"Z".charCodeAt(0)
-	, "history.redo" :				"X".charCodeAt(0)
-	, "history.store" :				119 //F8
-	, "history.extract" :			120 //F9
+	  "history-undo" :				"Z".charCodeAt(0)
+	, "history-redo" :				"X".charCodeAt(0)
+	, "history-store" :				119 //F8
+	, "history-extract" :			120 //F9
 
-	, "canva.fill" :				"F".charCodeAt(0)
-	, "canva.delete" :				"G".charCodeAt(0)
-	, "canva.invert" :				"I".charCodeAt(0)
-	, "canva.jpeg" :				c_ + "J".charCodeAt(0)
-	, "canva.png" :					c_ + "P".charCodeAt(0)
-	, "canva.send" :				c_ + 13 //ENTER
+	, "canva-fill" :				"F".charCodeAt(0)
+	, "canva-delete" :				"G".charCodeAt(0)
+	, "canva-invert" :				"I".charCodeAt(0)
+	, "canva-jpeg" :				c_ + "J".charCodeAt(0)
+	, "canva-png" :					c_ + "P".charCodeAt(0)
+	, "canva-send" :				c_ + 13 //ENTER
 
-	, "tool.lowquality" :			59 //;
-	, "tool.preview" :				222 //'
-	, "tool.colorpick" :			"C".charCodeAt(0)
-	, "tool.swap" :					"S".charCodeAt(0)
-	, "tool.eraser" :				"E".charCodeAt(0)
-	, "tool.width-" :				"Q".charCodeAt(0)
-	, "tool.width+" :				"W".charCodeAt(0)
-	, "tool.opacity-" :				c_ + "Q".charCodeAt(0)
-	, "tool.opacity+" :				c_ + "W".charCodeAt(0)
-	, "tool.shadow-" :				s_ + "Q".charCodeAt(0)
-	, "tool.shadow+" :				s_ + "W".charCodeAt(0)
-	, "tool.turn-" :				c_ + s_ + "Q".charCodeAt(0)
-	, "tool.turn+" :				c_ + s_ + "W".charCodeAt(0)
+	, "tool-antialiasing" :			190 //.
+	, "tool-lowquality" :			59 //;
+	, "tool-preview" :				222 //'
+	, "tool-colorpick" :			"C".charCodeAt(0)
+	, "tool-swap" :					"S".charCodeAt(0)
+	, "tool-eraser" :				"E".charCodeAt(0)
+	, "tool-width-" :				"Q".charCodeAt(0)
+	, "tool-width+" :				"W".charCodeAt(0)
+	, "tool-opacity-" :				c_ + "Q".charCodeAt(0)
+	, "tool-opacity+" :				c_ + "W".charCodeAt(0)
+	, "tool-shadow-" :				s_ + "Q".charCodeAt(0)
+	, "tool-shadow+" :				s_ + "W".charCodeAt(0)
+	, "tool-turn-" :				c_ + s_ + "Q".charCodeAt(0)
+	, "tool-turn+" :				c_ + s_ + "W".charCodeAt(0)
 
-	, "app.help" :					112
+	, "app-help" :					112
 
-	, "debug.mode" :				115
+	, "debug-mode" :				115
 };
 
 	kbLayout = (!!window.localStorage && !!window.localStorage.layout) ? JSON.parse(window.localStorage.layout) : kbLayout;
 
 for (i = 1; i <= 10; i ++) {
-	kbLayout["tool.opacity." + i] = (i == 10 ? 0 : i) + 48 + c_; 
-	kbLayout["tool.width." + i] = (i == 10 ? 0 : i) + 48; 
+	kbLayout["tool-opacity." + i] = (i == 10 ? 0 : i) + 48 + c_; 
+	kbLayout["tool-width." + i] = (i == 10 ? 0 : i) + 48; 
 }
 
 var actLayout = { 
-	  "history.undo" :				"historyOperation(1)"
-	, "history.redo" :				"historyOperation(2)"
-	, "history.store" :				"savePic(-1)"
-	, "history.extract" :			"savePic(-2)"
+	  "history-undo" :				{"Operation" :	"historyOperation(1)",	"Title" : "&#x2190;",	"Description" : "Назад"}
+	, "history-redo" :				{"Operation" :	"historyOperation(2)",	"Title" : "&#x2192;",	"Description" : "Вперёд"}
+	, "history-store" :				{"Operation" :	"savePic(-1)",			"Title" : "&#x22C1;",	"Description" : "Сделать back-up"}
+	, "history-extract" :			{"Operation" :	"savePic(-2)",			"Title" : "&#x22C0;",	"Description" : "Извлечь back-up"}
 
-	, "canva.fill" :				"clearScreen(0)"
-	, "canva.delete" :				"clearScreen(1)"
-	, "canva.invert" :				"invertColors()"
-	, "canva.jpeg" :				"savePic(1)"
-	, "canva.png" :					"savePic(2)"
-	, "canva.send" :				"savePic(0)"
+	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "1",			"Description" : "Закрасить полотно основным цветом"}
+	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "2",			"Description" : "Закрасить полотно фоновым цветом"}
+	, "canva-invert" :				{"Operation" :	"invertColors()",		"Title" : "&#x25D0;",	"Description" : "Инверсия полотна"}
+	, "canva-jpeg" :				{"Operation" :	"savePic(1)",			"Title" : "J",			"Description" : "Сохранить в JPEG"}
+	, "canva-png" :					{"Operation" :	"savePic(2)",			"Title" : "P",			"Description" : "Сохранить в PNG"}
+	, "canva-send" :				{"Operation" :	"savePic(0)",			"Title" : "&#x21B5;",	"Description" : "Отправить на сервер"}
 
-	, "tool.preview" :				"switchMode(1)"
-	, "tool.lowquality" :			"switchMode(0)"
-	, "tool.colorpick" :			"cCopyColor()"
-	, "tool.swap" :					"swapTools(0)"
-	, "tool.eraser" :				"swapTools(1)"
-	, "tool.width-" :				"toolModify(0, 1, -1)"
-	, "tool.width+" :				"toolModify(0, 1, +1)"
-	, "tool.opacity-" :				"toolModify(0, 0, -0.05)"
-	, "tool.opacity+" :				"toolModify(0, 0, +0.05)"
-	, "tool.shadow-" :				"toolModify(0, 2, -1)"
-	, "tool.shadow+" :				"toolModify(0, 2, +1)"
-	, "tool.turn-" :				"toolModify(0, 3, -1)"
-	, "tool.turn+" :				"toolModify(0, 3, +1)"
+	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "&nbsp;",		"Description" : "Не сглаживать"}
+	, "tool-preview" :				{"Operation" :	"switchMode(1)",		"Title" : "&#x25CF;",	"Description" : "Предпросмотр кисти"}
+	, "tool-lowquality" :			{"Operation" :	"switchMode(0)",		"Title" : "&#x25A0;",	"Description" : "Режим низкого качества"}
+	, "tool-colorpick" :			{"Operation" :	"cCopyColor()"}
+	, "tool-swap" :					{"Operation" :	"swapTools(0)",			"Title" : "&#x2194;",	"Description" : "Поменять инструменты местами"}
+	, "tool-eraser" :				{"Operation" :	"swapTools(1)",			"Title" : "&#x25A1;",	"Description" : "Заменить инструмент на стандартный ластик"}
+	, "tool-width-" :				{"Operation" :	"toolModify(0, 1, -1)"}
+	, "tool-width+" :				{"Operation" :	"toolModify(0, 1, +1)"}
+	, "tool-opacity-" :				{"Operation" :	"toolModify(0, 0, -0.05)"}
+	, "tool-opacity+" :				{"Operation" :	"toolModify(0, 0, +0.05)"}
+	, "tool-shadow-" :				{"Operation" :	"toolModify(0, 2, -1)"}
+	, "tool-shadow+" :				{"Operation" :	"toolModify(0, 2, +1)"}
+	, "tool-turn-" :				{"Operation" :	"toolModify(0, 3, -1)"}
+	, "tool-turn+" :				{"Operation" :	"toolModify(0, 3, +1)"}
 
-	, "app.help" :					"showHelp()"
+	, "tool-width" : 				{"Title" : "Толщина"}
+	, "tool-opacity" : 				{"Title" : "Непрозрачность"}
+	, "tool-shadow" : 				{"Title" : "Тень"}
+	, "tool-color" : 				{"Title" : "Код цвета"}
+	, "tool-palette" : 				{"Title" : "Палитра"}
 
-	, "debug.mode" :				"switchMode(-1)"
+	, "app-help" :					{"Operation" :	"showHelp()",			"Title" : "?",			"Description" : "Помощь"}
+
+	, "debug-mode" :				{"Operation" :	"switchMode(-1)"}
 };
 
+//List of buttons to display
+var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "tool-eraser", "canva-invert", "|", "tool-preview", "tool-lowquality", "|",
+					"history-store", "history-extract", "canva-jpeg", "canva-png", "canva-send", "|", "app-help"];
+
 for (i = 1; i <= 10; i ++) {
-	actLayout["tool.opacity." + i] = "toolModify(0, 0, 0, " + (i / 10) + ")"; 
-	actLayout["tool.width." + i] = "toolModify(0, 1, 0, " + Math.ceil(Math.pow(1.7, i-1)) + ")"; 
+	actLayout["tool-opacity." + i] = {"Operation" : "toolModify(0, 0, 0, " + (i / 10) + ")"}; 
+	actLayout["tool-width." + i] = {"Operation" : "toolModify(0, 1, 0, " + Math.ceil(Math.pow(1.7, i-1)) + ")"}; 
 }
 
 var kbDesc = {
-	  13 : "Enter"
+	  8 : "Backspace"
+	, 9 : "Tab"
+	, 13 : "Enter"
 	, 45 : "Insert"
 	, 46 : "Delete"
 	, 186 : ";"
 	, 187 : "Plus"
 	, 189 : "Minus"
+	, 190 : "."
 	, 222 : "'"
 }
 
@@ -180,8 +202,16 @@ document.addEventListener("DOMContentLoaded", init, false);
 
 function init()
 {
-	canvas = document.getElementById("draw");
-	dc = canvas.getContext("2d");
+	sketcher = document.getElementById("sketcher");
+
+	canvas = document.createElement("canvas");	
+	sketcher.appendChild(canvas);
+
+	sendForm = document.createElement("form");
+	sendForm.method = "post";
+	sendForm.action = "";
+	sketcher.appendChild(sendForm);
+
 	canvas.addEventListener("mousedown", cDrawStart, false);
 	canvas.addEventListener("mousemove", cDraw, false);
 	document.addEventListener("mouseup", cDrawEnd, false);
@@ -194,42 +224,64 @@ function init()
 	canvas.setAttribute("oncontextmenu", "return false;");
 	canvas.setAttribute("onscroll", "return false;");
 
-	//canvas.addEventListener("contextmenu", cDrawCancel, false);
-
 	canvas.addEventListener("wheel", cLWChange, false);
 	canvas.width = cWidth;
 	canvas.height = cHeight;
 
-	//document.getElementById("tools").style.width = cWidth + "px";
+	dc = canvas.getContext("2d");
 
 	dc.fillStyle = "white";
 	dc.fillRect(0, 0, cWidth, cHeight);
 	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
 
-	document.getElementById("checkOM").checked = lowQMode;
-	document.getElementById("checkPP").checked = precisePreview;
+	sidebar = document.createElement("div");
+	sidebar.id = "tools";
+	sketcher.appendChild(sidebar);
 
-	setElemTitle("buttonH", "Помощь", "app.help");
+	var e = document.createElement("input"),
+		a = ["shadow", "opacity", "width"], 
+		i = a.length;
+	while (i--) { 
+		var et;
+		var uLetter = a[i].charAt(0).toUpperCase() + a[i].substr(1);
+		if ((e.type = "range") == e.type) {
+			et = document.createElement("input");
+			et.id = "tool-" + a[i];
+			et.value = eval("tool." + uLetter);
+			et.setAttribute("onchange", "updateSliders(1);");
+			sidebar.appendChild(et);
+			sliders[et.id] = et;
+		}
+		et = document.createElement("input");
+		et.id = "tool-" + a[i] + "-text";
+		et.value = eval("tool." + uLetter);
+		et.min = toolLimits[uLetter][0];
+		et.max = toolLimits[uLetter][1];
+		et.step = toolLimits[uLetter][2];
+		et.type = "text";
+		et.setAttribute("onchange", "updateSliders(2);");
+		sidebar.appendChild(et);
+		sliders[et.id] = et;
 
-	setElemTitle("buttonU", "Назад", "history.undo");
-	setElemTitle("buttonR", "Вперёд", "history.redo");
+		et = document.createElement("span");
+		et.innerHTML = " " + actLayout["tool-" + a[i]].Title;
+		sidebar.appendChild(et);
 
-	setElemTitle("colorF", "Закрасить полотно основным цветом", "canva.fill");
-	setElemTitle("colorB", "Закрасить полотно фоновым цветом", "canva.delete");
-	setElemTitle("buttonI", "Инверсия полотна", "canva.invert");
+		sidebar.appendChild(document.createElement("br"));
+	};
 
-	setElemTitle("buttonTS", "Поменять инструменты местами", "tool.swap");
-	setElemTitle("buttonTE", "Заменить инструмент на стандартный ластик", "tool.eraser");
-	setElemTitle("checkOM", "Режим низкого качества", "tool.lowquality");
-	setElemTitle("checkPP", "Предпросмотр кисти", "tool.preview");
+	e = document.createElement("span");
+	e.innerHTML = actLayout["tool-palette"].Title + ": ";
+	sidebar.appendChild(e);
 
-	setElemTitle("buttonSB", "Сделать back-up", "history.store");
-	setElemTitle("buttonSX", "Извлечь back-up", "history.extract");
-	setElemTitle("buttonSJ", "Сохранить в JPEG", "canva.jpeg");
-	setElemTitle("buttonSP", "Сохранить в PNG", "canva.png");
-	setElemTitle("buttonS", "Отправить на сервер", "canva.send");
+	paletteSelect = document.createElement("select");
+	paletteSelect.id = "palette-select";
+	paletteSelect.setAttribute("onchange", "updatePalette();");
+	sidebar.appendChild(paletteSelect);
 
-	paletteSelect = document.getElementById("palette-select");
+	paletteElem = document.createElement("div");
+	paletteElem.id = "palette";
+	sidebar.appendChild(paletteElem);
 
 	for (tPalette in paletteDesc) {
 		paletteSelect.options[paletteSelect.options.length] = new Option(paletteDesc[tPalette], tPalette);
@@ -237,21 +289,37 @@ function init()
 			paletteSelect.options[paletteSelect.options.length - 1].selected = true;
 	}
 
-	var e = document.getElementById("rangeW"),
-		a = ["B", "O", "W", "T"], 
-		i = a.length;
-	if (e.type == "range") while (i--) {
-		e = document.createElement("input");
-		e.id = "range" + a[i] + "S";
-		e.type = "text";
-		e.setAttribute("onchange", "updateSliders(2);");
-		document.getElementById("sliders" + a[i]).appendChild(e);
-	} else while (i--) {
-		document.getElementById("range" + a [i]).type = "text";
+	e = document.createElement("span");
+	e.innerHTML = actLayout["tool-color"].Title + ": ";
+	sidebar.appendChild(e);
+
+	cElem = document.createElement("input");
+	cElem.type = "text";
+	cElem.id = "color"
+	sidebar.appendChild(cElem);
+
+	bar = document.createElement("div");	
+	sketcher.appendChild(bar);
+
+	for(i in guiButtons) {
+		var tElem = document.createElement("span");	
+		if(guiButtons[i] != "|") {
+			tElem.id = guiButtons[i];
+			tElem.className = "button";
+			tElem.innerHTML = actLayout[guiButtons[i]].Title;
+			tElem.setAttribute("onclick", actLayout[guiButtons[i]].Operation);
+			bar.appendChild(tElem);	
+			setElemDesc(guiButtons[i]);
+		} else {
+			tElem.className = "vertical";	
+			tElem.innerHTML = "&nbsp;";
+			bar.appendChild(tElem);	
+		}
 	}
 
 	for (i in tools)
 		updateColor(tools[i].Color, i);
+
 	updateDebugScreen();
 	updatePalette();
 	updateButtons();
@@ -261,9 +329,10 @@ function init()
 		setInterval("fpsCount()", 1000);
 }
 
-function setElemTitle(elem, title, hotkey) {
-	var k = kbLayout[hotkey];
-	document.getElementById(elem).title = title + (hotkey ?  (" (" + 
+function setElemDesc(elem, desc) {
+	desc = desc || actLayout[elem].Description;
+	var k = kbLayout[elem];
+	document.getElementById(elem).title = desc + (elem ?  (" (" + 
 		descKeyCode(k) + ")") : "");
 }
 
@@ -293,10 +362,9 @@ function generatePalette(name, step, slice) { //safe palette constructor, step r
 }
 
 function updatePalette() {
-	currentPalette = document.getElementById("palette-select").value;
+	currentPalette = paletteSelect.value;
 	if(!!window.localStorage) //ie-ie
 		window.localStorage.lastPalette = currentPalette;
-	paletteElem = document.getElementById("palette");
 
 	while (paletteElem.childNodes.length) {
 		paletteElem.removeChild(paletteElem.childNodes[0])
@@ -316,10 +384,10 @@ function updatePalette() {
 		var paletteCell;
 		if (c == "@r") {
 			paletteCell = document.createElement("td");
-			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1];
+			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1] + "&nbsp;";
 			paletteRow.appendChild(paletteCell);
 			colCount = -2;
-			colorDesc = palette[currentPalette][parseInt(tColor) + 1];;
+			colorDesc = palette[currentPalette][parseInt(tColor) + 1];
 		}
 		if (c == "@c") {
 			rowCount = -1;
@@ -371,7 +439,7 @@ function drawCursor () {
 		dc.lineWidth = 1;
 		if (precisePreview) {
 			dc.fillStyle = "rgba(" + tool.Color + ", " + tool.Opacity + ")";
-			dc.shadowBlur = tool.Blur;
+			dc.shadowBlur = tool.Shadow;
 			dc.shadowColor = "rgb(" + tool.Color + ")";
 		}
 		else {
@@ -407,10 +475,15 @@ function cDraw(event) {
 	}
 
 	if (activeDrawing) {
-		dc.lineTo(x + globalOffset, y + globalOffset);
-		dc.stroke();
-	}
-	else
+		if(antiAliasing) {
+			dc.lineTo(x + globalOffset, y + globalOffset);
+			dc.stroke();
+		} else {
+			dc.moveTo(x + globalOffs_1, y + globalOffs_1);
+			dc.lineTo(x + globalOffset, y + globalOffset);
+			dc.stroke();
+		}
+	} else
 		if (neverFlushCursor && !lowQMode)
 			drawCursor();
 }
@@ -431,15 +504,17 @@ function cDrawStart(event) {
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
 		dc.lineWidth = t.Width;
-		dc.shadowBlur = t.Blur;
+		dc.shadowBlur = t.Shadow;
 		dc.strokeStyle = "rgba(" + t.Color + ", " + t.Opacity + ")";
 		dc.shadowColor = "rgb(" + t.Color + ")";
 		dc.lineJoin = "round";
 		dc.lineCap = "round";
-		dc.beginPath();
-		dc.moveTo(x + globalOffset, y + globalOffset);
-		dc.lineTo(x + globalOffs_1, y + globalOffs_1);
-		dc.stroke();
+		if(antiAliasing) {
+			dc.beginPath();
+			dc.moveTo(x + globalOffset, y + globalOffset);
+			dc.lineTo(x + globalOffs_1, y + globalOffs_1);
+			dc.stroke();
+		}
 		vX = x;
 		vY = y;
 	}
@@ -449,9 +524,11 @@ function cDrawStart(event) {
 function cDrawEnd(event) {
 	//Saving in history:
 	if (activeDrawing) {
-		dc.putImageData(history[historyPosition], 0, 0);
-		dc.stroke();
-		dc.closePath();
+		if(antiAliasing) {
+			dc.putImageData(history[historyPosition], 0, 0);
+			dc.stroke();
+			dc.closePath();
+		}
 		historyOperation(0);
 	}
 	activeDrawing=false;
@@ -490,7 +567,7 @@ function cLWChange(event) {
 		if (event.ctrlKey)
 			tool.Opacity = (parseFloat(tool.Opacity) - 0.05).toFixed(2);
 		else if (event.shiftKey)
-			tool.Blur --;
+			tool.Shadow --;
 		else
 			tool.Width --;
 	}
@@ -498,7 +575,7 @@ function cLWChange(event) {
 		if (event.ctrlKey)
 			tool.Opacity = (parseFloat(tool.Opacity) + 0.05).toFixed(2);
 		else if (event.shiftKey)
-			tool.Blur ++;
+			tool.Shadow ++;
 		else
 			tool.Width ++;
 	}
@@ -510,7 +587,7 @@ function cLWChange(event) {
 function updateDebugScreen() {
 	if (debugMode) {
 		var debug = document.getElementById("debug");
-		debug.innerHTML = "Cursor @" + x + ":" + y + " Angle: " + angle + " FPS: " + fps;
+		debug.innerHTML = "Cursor @" + x + ":" + y + "<br />Angle: " + angle + "<br />FPS: " + fps;
 		ticks ++;
 	}
 }
@@ -534,11 +611,11 @@ function updateSliders(initiator) {
 	var m = initiator || 0;
 
 	if (m > 0) {
-		var s = (m == 2 ? "S" : "");
-		tool.Blur	= document.getElementById("rangeB" + s).value;
-		tool.Width	= document.getElementById("rangeW" + s).value;
-		tool.Opacity	= document.getElementById("rangeO" + s).value;
-		tool.TurnLimit	= document.getElementById("rangeT" + s).value;
+		var s = (m == 2 ? "-text" : "");
+		tool.Shadow	= document.getElementById("tool-shadow" + s).value;
+		tool.Width	= document.getElementById("tool-width" + s).value;
+		tool.Opacity	= document.getElementById("tool-opacity" + s).value;
+		//tool.TurnLimit	= document.getElementById("tool-turnlimit" + s).value;
 	}
 
 	if (tool.Opacity <= 0.1) tool.Opacity = "0.10"; else
@@ -547,26 +624,28 @@ function updateSliders(initiator) {
 	if (tool.Width <=   1) tool.Width = 1; else
 	if (tool.Width >= 128) tool.Width = 128;
 
-	if (tool.Blur <=  0) tool.Blur = 0; else
-	if (tool.Blur >= 20) tool.Blur = 20;
+	if (tool.Shadow <=  0) tool.Shadow = 0; else
+	if (tool.Shadow >= 20) tool.Shadow = 20;
 
 	if (tool.TurnLimit <=   0) tool.TurnLimit = 0; else
 	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
 
-	document.getElementById("rangeB").value = tool.Blur;
-	document.getElementById("rangeW").value = tool.Width;
-	document.getElementById("rangeO").value = tool.Opacity;
-	document.getElementById("rangeT").value = tool.TurnLimit;
+	document.getElementById("tool-shadow-text").value = tool.Shadow;
+	document.getElementById("tool-width-text").value = tool.Width;
+	document.getElementById("tool-opacity-text").value = tool.Opacity;
+	//document.getElementById("rangeT").value = tool.TurnLimit;
 
-	if (document.getElementById("rangeWS")) {
-		document.getElementById("rangeBS").value = tool.Blur;
-		document.getElementById("rangeWS").value = tool.Width;
-		document.getElementById("rangeOS").value = tool.Opacity;
-		document.getElementById("rangeTS").value = tool.TurnLimit;
+	if (document.getElementById("tool-width")) {
+		document.getElementById("tool-shadow").value = tool.Shadow;
+		document.getElementById("tool-width").value = tool.Width;
+		document.getElementById("tool-opacity").value = tool.Opacity;
+		//document.getElementById("rangeTS").value = tool.TurnLimit;
 	}
 
 	cDrawEnd();
-	dc.putImageData(history[historyPosition], 0, 0, parseInt(x) - 64, parseInt(y) - 64, 128, 128);
+	dc.putImageData(history[historyPosition], 0, 0,
+		parseInt(x) - tool.Width/ 2 - tool.Shadow * 1.25 - 3, parseInt(y) -tool.Width/ 2 - tool.Shadow * 1.25 - 3,
+		tool.Width + tool.Shadow * 2.5 + 7, tool.Width + tool.Shadow * 2.5 + 7);
 	drawCursor();
 }
 
@@ -587,7 +666,7 @@ function swapTools(eraser) {
 
 function updateColor(value, toolIndex) {
 	var t = tools[toolIndex || 0];
-	var c = document.getElementById("color");
+	var c = cElem;
 	var v = value || c.value;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
@@ -614,7 +693,7 @@ function updateColor(value, toolIndex) {
 	if (t == tool) {
 		c.value = v;
 	}
-	document.getElementById((t == tool) ? "colorF" : "colorB").style.background = "rgb(" + t.Color + ")";
+	document.getElementById((t == tool) ? "canva-fill" : "canva-delete").style.background = "rgb(" + t.Color + ")";
 
 	//adding to history palette:
 	var found = palette["history"].length;
@@ -669,11 +748,11 @@ function historyOperation(opid) {
 }
 
 function updateButtons() {
-	setElemTitle("buttonSJ", "Сохранить в JPEG (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
-	setElemTitle("buttonSP", "Сохранить в PNG (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
+	setElemDesc("canva-jpeg", actLayout["canva-jpeg"].Description + " (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
+	setElemDesc("canva-png", actLayout["canva-png"].Description + " (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
 
-	document.getElementById("buttonR").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
-	document.getElementById("buttonU").className = (historyPosition == 0 ? "button-disabled" : "button");
+	document.getElementById("history-undo").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
+	document.getElementById("history-redo").className = (historyPosition == 0 ? "button-disabled" : "button");
 
 }
 
@@ -681,7 +760,7 @@ function cHotkeys(k) {
 	if (hki != 0)
 		for (kbk in kbLayout) {
 			if (kbLayout[kbk] == k) {
-				eval(actLayout[kbk]);
+				eval(actLayout[kbk].Operation);
 				hkPressed = true;
 				return true;
 			}
@@ -722,16 +801,31 @@ function toolModify(id, param, inc, value) {
 	switch (param) {
 		case 0: tools[id].Opacity = (inc == 0 ? value : (tools[id].Opacity + inc)).toFixed(2); break;
 		case 1: tools[id].Width = (inc == 0 ? value : (tools[id].Width + inc)); break;
-		case 2: tools[id].Blur = (inc == 0 ? value : (tools[id].Blur + inc)); break;
+		case 2: tools[id].Shadow = (inc == 0 ? value : (tools[id].Shadow + inc)); break;
 		case 3: tools[id].TurnLimit = (inc == 0 ? value : (tools[id].TurnLimit + inc)); break;
 	}
 	updateSliders();
 }
 
 function switchMode(id) {
-	id == 1 ? (document.getElementById("checkPP").className = (precisePreview = !precisePreview) ? "button-active" : "button") : (
-	id == 0 ? (document.getElementById("checkOM").className = (lowQMode = !lowQMode) ? "button-active" : "button") : (debugMode =! debugMode));
-	debug.innerHTML="";
+	switch (id) {
+		case -1: debugMode =! debugMode; debug.innerHTML=""; break;
+		case 0: document.getElementById("tool-lowquality").className = (lowQMode = !lowQMode) ? "button-active" : "button"; break;
+		case 1: document.getElementById("tool-preview").className = (precisePreview = !precisePreview) ? "button-active" : "button"; break;
+		case 2: document.getElementById("tool-antialiasing").className = (antiAliasing = !antiAliasing) ? "button" : "button-active";
+			updateSmoothing(antiAliasing);
+			break;
+	}
+}
+
+function updateSmoothing(value) {
+	dc.imageSmoothingEnabled = value;
+	dc.mozImageSmoothingEnabled = value;
+	dc.webkitImageSmoothingEnabled = value;
+	//canvas.style.imageRendering = "optimizeSpeed";
+	//canvas.style.imageRendering = "-o-crisp-edges";
+	//canvas.style.imageRendering = "-webkit-optimize-contrast";
+
 }
 
 function savePic(value, auto) {
@@ -745,8 +839,8 @@ function savePic(value, auto) {
 				imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
 				imageToSend.name = "content";
 				imageToSend.type = "hidden";
-				document.getElementById("send").appendChild(imageToSend);
-				document.getElementById("send").submit();
+				sendForm.appendChild(imageToSend);
+				sendForm.submit();
 			}
 		break;
 		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
@@ -788,11 +882,15 @@ function descKeyCode(k) {
 }
 
 function showHelp() {
-	alert("Управление:\nЛевая кнопка мыши — рисовать основным инструментом.\nПравая кнопка мыши — рисовать вторичным инструментом.\nСредняя кнопка мыши (или клавиша " + descKeyCode(kbLayout["tool.colorpick"]) + ") — выбор цвета из холста\n" +
-		"Колёсико / " + descKeyCode(kbLayout["tool.width-"]) + " / " + descKeyCode(kbLayout["tool.width+"]) + " / " + descKeyCode(kbLayout["tool.width.10"]) + "—" + descKeyCode(kbLayout["tool.width.9"]) +
-		" — изменение толщины.\n" +	"Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.\n" +
-		"Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.\n" +
-		"Курсор обязательно должен находиться над холстом!\n\n" +
-		"В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.\n\n" +
-        "Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate);
+	alert("Управление:\n\
+Левая кнопка мыши — рисовать основным инструментом.\nПравая кнопка мыши — рисовать вторичным инструментом.\n\
+Средняя кнопка мыши (или клавиша " + descKeyCode(kbLayout["tool-colorpick"]) + ") — выбор цвета из холста\n\
+Колёсико / " + descKeyCode(kbLayout["tool-width-"]) + " / " + 
+descKeyCode(kbLayout["tool-width+"]) + " / " + 
+descKeyCode(kbLayout["tool-width.10"]) + "—" + descKeyCode(kbLayout["tool-width.9"]) + " — изменение толщины.\n\
+Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.\n\
+Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.\n\
+Курсор обязательно должен находиться над холстом!\n\n\
+В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.\n\n\
+Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate);
 }

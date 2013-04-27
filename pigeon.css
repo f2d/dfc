@@ -90,6 +90,8 @@ input[type="text"] {
 	height: 32px;
 	text-align: center;
 	font-family: "Arial Unicode MS";
+	margin-left: 2px;
+	margin-right: 2px;
 
 	-webkit-user-select: none;
 	-moz-user-select: none;
@@ -129,6 +131,13 @@ input[type="text"] {
 	padding-top: 2px;
 	padding-bottom: 2px;
 	font-family: "Arial Unicode MS";
+	color: transparent;
+
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	-o-user-select: none;
+	user-select: none;
 }
 
 #color {
