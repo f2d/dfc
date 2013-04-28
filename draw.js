@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.2";
+var infoVersion = "v1.6.3";
 var infoDate = "April 29, 2013"
 
 var sketcher, canvas, dc, sendForm,
@@ -32,7 +32,7 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
-var toolLimits = {"Opacity": [0, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
+var toolLimits = {"Opacity": [0.1, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
 
 var debugMode = false,
 	fps = 0,
@@ -249,6 +249,9 @@ function init()
 			et.id = "tool-" + a[i];
 			et.type = "range";
 			et.value = eval("tool." + uLetter);
+			et.min = toolLimits[uLetter][0];
+			et.max = toolLimits[uLetter][1];
+			et.step = toolLimits[uLetter][2];
 			et.setAttribute("onchange", "updateSliders(1);");
 			sidebar.appendChild(et);
 			sliders[et.id] = et;
@@ -256,9 +259,6 @@ function init()
 		et = document.createElement("input");
 		et.id = "tool-" + a[i] + "-text";
 		et.value = eval("tool." + uLetter);
-		et.min = toolLimits[uLetter][0];
-		et.max = toolLimits[uLetter][1];
-		et.step = toolLimits[uLetter][2];
 		et.type = "text";
 		et.setAttribute("onchange", "updateSliders(2);");
 		sidebar.appendChild(et);
