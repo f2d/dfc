@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.0";
-var infoDate = "April 27/28, 2013"
+var infoVersion = "v1.6.1";
+var infoDate = "April 28, 2013"
 
 var sketcher, canvas, dc, sendForm,
 	bar, sidebar,
@@ -56,7 +56,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 		, "@b", "@r", "ЧБ", "#fff", "#eee", "#ddd", "#ccc", "#bbb", "#aaa", "#999", "#888",
 		, "@b", "@r", "", "#777", "#666", "#555", "#444", "#333", "#222", "#111", "#000"
 
-		, "@b", "@r", "Windows&nbsp;7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
+		, "@b", "@r", "Windows 7", "#000000", "#7f7f7f", "#880015", "#ed1c24", "#ff7f27", "#fff200", "#22b14c", "#00a2e8", "#3f48cc", "#a349a4"
 		, "@b", "@r", "", "#ffffff", "#c3c3c3", "#b97a57", "#ffaec9", "#ffc90e", "#efe4b0", "#b5e61d", "#99d9ea", "#7092be", "#c8bfe7"
 		];
 	palette["feijoa"] = [];
@@ -204,13 +204,13 @@ function init()
 {
 	sketcher = document.getElementById("sketcher");
 
-	canvas = document.createElement("canvas");	
-	sketcher.appendChild(canvas);
-
 	sendForm = document.createElement("form");
 	sendForm.method = "post";
 	sendForm.action = "";
 	sketcher.appendChild(sendForm);
+
+	canvas = document.createElement("canvas");	
+	sketcher.appendChild(canvas);
 
 	canvas.addEventListener("mousedown", cDrawStart, false);
 	canvas.addEventListener("mousemove", cDraw, false);
@@ -234,7 +234,7 @@ function init()
 	dc.fillRect(0, 0, cWidth, cHeight);
 	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
 
-	sidebar = document.createElement("div");
+	sidebar = document.createElement("span");
 	sidebar.id = "tools";
 	sketcher.appendChild(sidebar);
 
@@ -387,7 +387,8 @@ function updatePalette() {
 			paletteCell.innerHTML = palette[currentPalette][parseInt(tColor) + 1] + "&nbsp;";
 			paletteRow.appendChild(paletteCell);
 			colCount = -2;
-			colorDesc = palette[currentPalette][parseInt(tColor) + 1];
+			if(palette[currentPalette][parseInt(tColor) + 1] != "")
+				colorDesc = palette[currentPalette][parseInt(tColor) + 1];
 		}
 		if (c == "@c") {
 			rowCount = -1;
@@ -398,7 +399,6 @@ function updatePalette() {
 			paletteRow = document.createElement("tr");
 			colCount = -1;
 			rowCount ++;
-			colorDesc = "";
 		}
 		if (currentPalette == "history" && colCount == 16) {
 			paletteTable.appendChild(paletteRow);

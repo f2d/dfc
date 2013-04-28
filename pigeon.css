@@ -3,16 +3,18 @@
 	font-size: 14pt;
 	background-color: #f8f8f8;
 	text-align: center;
+	margin: 0;
+	padding: 4px;
 }
 
 #sketcher canvas {
-	margin: 0;
-
 	-webkit-user-select: none;
 	-moz-user-select: none;
 	-ms-user-select: none;
 	-o-user-select: none;
 	user-select: none;
+	display: inline-block;
+	margin: 4px;
 }
 
 #sketcher #tools {
@@ -20,10 +22,6 @@
 	text-align: left;	
 	display: inline-block;
 	vertical-align: top;
-}
-
-#sketcher #help {
-	font-size: small;
 }
 
 #sketcher .palettine-tool {	
@@ -44,7 +42,7 @@
 #sketcher #palette {
 	overflow-y: scroll;
 	height: 200px;
-	width: 340px;
+	width: 360px;
 }
 
 #sketcher #palette table {
