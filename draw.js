@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.1";
-var infoDate = "April 28, 2013"
+var infoVersion = "v1.6.2";
+var infoDate = "April 29, 2013"
 
 var sketcher, canvas, dc, sendForm,
 	bar, sidebar,
@@ -247,6 +247,7 @@ function init()
 		if ((e.type = "range") == e.type) {
 			et = document.createElement("input");
 			et.id = "tool-" + a[i];
+			et.type = "range";
 			et.value = eval("tool." + uLetter);
 			et.setAttribute("onchange", "updateSliders(1);");
 			sidebar.appendChild(et);
