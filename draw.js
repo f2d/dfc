@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.3";
+var infoVersion = "v1.6.4";
 var infoDate = "April 29, 2013"
 
 var sketcher, canvas, dc, sendForm,
@@ -136,22 +136,22 @@ for (i = 1; i <= 10; i ++) {
 var actLayout = { 
 	  "history-undo" :				{"Operation" :	"historyOperation(1)",	"Title" : "&#x2190;",	"Description" : "Назад"}
 	, "history-redo" :				{"Operation" :	"historyOperation(2)",	"Title" : "&#x2192;",	"Description" : "Вперёд"}
-	, "history-store" :				{"Operation" :	"savePic(-1)",			"Title" : "&#x22C1;",	"Description" : "Сделать back-up"}
-	, "history-extract" :			{"Operation" :	"savePic(-2)",			"Title" : "&#x22C0;",	"Description" : "Извлечь back-up"}
+	, "history-store" :				{"Operation" :	"savePic(-1)",			"Title" : "&#x22C1;",	"Description" : "Сделать back-up",	"Once" : true}
+	, "history-extract" :			{"Operation" :	"savePic(-2)",			"Title" : "&#x22C0;",	"Description" : "Извлечь back-up",	"Once" : true}
 
-	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "1",			"Description" : "Закрасить полотно основным цветом"}
-	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "2",			"Description" : "Закрасить полотно фоновым цветом"}
-	, "canva-invert" :				{"Operation" :	"invertColors()",		"Title" : "&#x25D0;",	"Description" : "Инверсия полотна"}
-	, "canva-jpeg" :				{"Operation" :	"savePic(1)",			"Title" : "J",			"Description" : "Сохранить в JPEG"}
-	, "canva-png" :					{"Operation" :	"savePic(2)",			"Title" : "P",			"Description" : "Сохранить в PNG"}
-	, "canva-send" :				{"Operation" :	"savePic(0)",			"Title" : "&#x21B5;",	"Description" : "Отправить на сервер"}
+	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "1",			"Description" : "Закрасить полотно основным цветом",	"Once" : true}
+	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "2",			"Description" : "Закрасить полотно фоновым цветом",		"Once" : true}
+	, "canva-invert" :				{"Operation" :	"invertColors()",		"Title" : "&#x25D0;",	"Description" : "Инверсия полотна",		"Once" : true}
+	, "canva-jpeg" :				{"Operation" :	"savePic(1)",			"Title" : "J",			"Description" : "Сохранить в JPEG",		"Once" : true}
+	, "canva-png" :					{"Operation" :	"savePic(2)",			"Title" : "P",			"Description" : "Сохранить в PNG",		"Once" : true}
+	, "canva-send" :				{"Operation" :	"savePic(0)",			"Title" : "&#x21B5;",	"Description" : "Отправить на сервер",	"Once" : true}
 
-	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "&nbsp;",		"Description" : "Не сглаживать"}
-	, "tool-preview" :				{"Operation" :	"switchMode(1)",		"Title" : "&#x25CF;",	"Description" : "Предпросмотр кисти"}
-	, "tool-lowquality" :			{"Operation" :	"switchMode(0)",		"Title" : "&#x25A0;",	"Description" : "Режим низкого качества"}
+	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "&nbsp;",		"Description" : "Не сглаживать",			"Once" : true}
+	, "tool-preview" :				{"Operation" :	"switchMode(1)",		"Title" : "&#x25CF;",	"Description" : "Предпросмотр кисти",		"Once" : true}
+	, "tool-lowquality" :			{"Operation" :	"switchMode(0)",		"Title" : "&#x25A0;",	"Description" : "Режим низкого качества",	"Once" : true}
 	, "tool-colorpick" :			{"Operation" :	"cCopyColor()"}
-	, "tool-swap" :					{"Operation" :	"swapTools(0)",			"Title" : "&#x2194;",	"Description" : "Поменять инструменты местами"}
-	, "tool-eraser" :				{"Operation" :	"swapTools(1)",			"Title" : "&#x25A1;",	"Description" : "Заменить инструмент на стандартный ластик"}
+	, "tool-swap" :					{"Operation" :	"swapTools(0)",			"Title" : "&#x2194;",	"Description" : "Поменять инструменты местами",					"Once" : true}
+	, "tool-eraser" :				{"Operation" :	"swapTools(1)",			"Title" : "&#x25A1;",	"Description" : "Заменить инструмент на стандартный ластик",	"Once" : true}
 	, "tool-width-" :				{"Operation" :	"toolModify(0, 1, -1)"}
 	, "tool-width+" :				{"Operation" :	"toolModify(0, 1, +1)"}
 	, "tool-opacity-" :				{"Operation" :	"toolModify(0, 0, -0.05)"}
@@ -167,7 +167,7 @@ var actLayout = {
 	, "tool-color" : 				{"Title" : "Код цвета"}
 	, "tool-palette" : 				{"Title" : "Палитра"}
 
-	, "app-help" :					{"Operation" :	"showHelp()",			"Title" : "?",			"Description" : "Помощь"}
+	, "app-help" :					{"Operation" :	"showHelp()",			"Title" : "?",			"Description" : "Помощь",	"Once" : true}
 
 	, "debug-mode" :				{"Operation" :	"switchMode(-1)"}
 };
@@ -644,9 +644,9 @@ function updateSliders(initiator) {
 	}
 
 	cDrawEnd();
+	var w = Math.max(tool.Width, tools[1].Width) + Math.max(tool.Shadow, tools[1].Shadow) * 2.5 + 7;
 	dc.putImageData(history[historyPosition], 0, 0,
-		parseInt(x) - tool.Width/ 2 - tool.Shadow * 1.25 - 3, parseInt(y) -tool.Width/ 2 - tool.Shadow * 1.25 - 3,
-		tool.Width + tool.Shadow * 2.5 + 7, tool.Width + tool.Shadow * 2.5 + 7);
+		parseInt(x) - w / 2, parseInt(y) - w / 2, w, w);
 	drawCursor();
 }
 
@@ -758,12 +758,14 @@ function updateButtons() {
 }
 
 function cHotkeys(k) {
-	if (hki != 0)
-		for (kbk in kbLayout) {
+	//if (hki != 0)
+		for (kbk in kbLayout) {			
 			if (kbLayout[kbk] == k) {
 				eval(actLayout[kbk].Operation);
-				hkPressed = true;
-				return true;
+				if(!(actLayout[kbk].Once || false)) {
+					hkPressed = true;
+					return true;
+				}
 			}
 		}
 	clearInterval(hki);
@@ -781,8 +783,8 @@ function cHotkeysStart(event) {
 			if (cHotkeys(k)) {				
 				event.preventDefault();
 				event.returnValue = false;
+				hki = setInterval('cHotkeys(' + k +')', 100); //TODO: 1st interval: 1s.
 			}
-			hki = setInterval('cHotkeys(' + k +')', 100); //TODO: 1st interval: 1s.
 		}
 	}
 	else {
