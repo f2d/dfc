@@ -24,15 +24,6 @@
 	vertical-align: top;
 }
 
-#sketcher .palettine-tool {	
-	width: 32px;
-	height: 32px;
-	border: 1px solid black;
-	margin: 1px;
-	display: inline-block;
-	vertical-align: middle;
-}
-
 #sketcher .palettine {
 	cursor: pointer;
 	width: 100%;
@@ -70,11 +61,13 @@
 	cursor: pointer;
 	padding: 2px;
 	display: inline-block;
-	border: 1px solid black;
+	border: 1px solid #acacac;
 	width: 32px;
-	height: 32px;
+	height: 24px;
 	text-align: center;
 	font-family: "Arial Unicode MS";
+	font-size: 11pt;
+	font-weight: bold;
 	margin-left: 2px;
 	margin-right: 2px;
 
@@ -86,36 +79,46 @@
 }
 
 #sketcher .button {
-	background-color: #ddd;
+	background-color: #f0f0f0;
+	background: -moz-linear-gradient(top, #f0f0f0, #e5e5e5);
 }
 
 #sketcher .button-active {
-	background-color: #0cf;
+	background-color: #c4e0fc;
+	background: -moz-linear-gradient(top, #c4e0fc, #daecfc);
+	border-color: #569de5;
 }
 
 #sketcher .button-disabled {
-	color: gray;
+	color: #d9d9d9;
+	border-color: #d9d9d9;
 	cursor: default;
 }
 
 #sketcher .button:hover {
-	background-color: #eee;
+	background-color: #ecf4fc;
+	background: -moz-linear-gradient(top, #ecf4fc, #dcecfc);
+	border-color: #7eb4ea;
+	
 }
 
 #sketcher .button-active:hover {
-	background-color: #bef;
+	background-color: #daecfc;
+	background: -moz-linear-gradient(top, #daecfc, #c4e0fc);
+	border-color: #7eb4ea;
 }
 
 #sketcher .vertical {
 	display: inline-block;
 	margin-left: 8px;
 	margin-right: 8px;
-	height: 32px;
-	border-left: 1px solid black;
+	height: 24px;
+	border-left: 1px solid #acacac;
 	width: 0px;
 	padding-top: 2px;
 	padding-bottom: 2px;
 	font-family: "Arial Unicode MS";
+	font-size: 11pt;
 	color: transparent;
 
 	-webkit-user-select: none;

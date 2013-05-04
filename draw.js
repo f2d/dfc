@@ -1,17 +1,16 @@
-var infoVersion = "v1.6.4";
-var infoDate = "April 29, 2013"
+var infoVersion = "v1.6.5";
+var infoDate = "May 4, 2013"
 
 var sketcher, canvas, dc, sendForm,
-	bar, sidebar,
+	bar, sidebar, dbg,
 	paletteElem, cElem; //main elements
 
 var sliders = [];
 
-var x = 0, y = 0,
-	vX = 0, vY = 0,
+var x = -5, y = -5,
+	pX = -5, pY = -5,
 	globalOffset = 0.5, //pixel offset
-	globalOffs_1 = globalOffset - 0.01,
-	angle = 0; //previous angle
+	globalOffs_1 = globalOffset - 0.01;
 
 var activeDrawing = false;
 
@@ -32,7 +31,7 @@ var tools = [
 ,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
-var toolLimits = {"Opacity": [0.1, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
+var toolLimits = {"Opacity": [0.05, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
 
 var debugMode = false,
 	fps = 0,
@@ -43,6 +42,7 @@ var flushCursor = false,
 var lowQMode = false,
 	precisePreview = false,
 	antiAliasing = true;
+	smoothMode = false;
 
 var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
@@ -63,21 +63,47 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	generatePalette("feijoa", 85, 0);
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
+var sana = ["е", "э", "я", "ѣ"];
 	palette["touhou"] = ["@c", "основной цвет", "вторичный цвет", "волосы", "глаза/аксессуары", "аксессуары"
 	    , "@b", "@r", "Общее", "#fcefe2", "#000000"
+
 		, "@b", "@r", "Рейму", "#fa5946", "#ffffff", "#000000", "#e5ff41"
 		, "@b", "@r", "Мариса", "#000000", "#ffffff", "#fff87d", "#a864a8"
+
 		, "@b", "@r", "Сырно", "#1760f3", "#ffffff", "#97ddfd", "#fd3727", "#00d4ae"
+		, "@b", "@r", "Китай", "#a39942", "#ffffff", "#f37e75", "#82a6b6", "#4a4b4d"
+		, "@b", "@r", "Пачули", "#ffffff", "#af69B9", "#7f4787", "#f36470", "#fdff7b", "#807ffe"
 		, "@b", "@r", "Сакуя", "#ffffff", "#59428b", "#bcbccc", "#fe3030", "#00c2c6", "#585456"
 		, "@b", "@r", "Ремилия", "#ffffff", "#cf052f", "#cbc9fd", "#f22c42", "#f2dcc6", "#464646"
+		, "@b", "@r", "Фланя", "#ffffff", "#f52525", "#fff869", "#211930", "#56292c", "#6adc62", "#60d2d2", "#2f4dd6"
+
 		, "@b", "@r", "Алиса", "#ffffff", "#8787f7", "#fafab0", "#fabad2", "#888888"
 		, "@b", "@r", "Ёму", "#2c8e7d", "#382d3a", "#ffffff", "#004457"
 		, "@b", "@r", "Ююко", "#9eb2dc", "#ffffff", "#fba7b8", "#10009a", "#f60000"
 		, "@b", "@r", "Чен", "#fa5946", "#ffffff", "#6b473b", "#339886", "#464646", "#ffdb4f"
 		, "@b", "@r", "Ран", "#393c90", "#ffffff", "#ffff6e", "#c096c0"
 		, "@b", "@r", "Юкари", "#c096c0", "#ffffff", "#ffff6e", "#fa0000", "#464646"
+
+		, "@b", "@r", "Суйка", "#ffffff", "#6421a5", "#f3c183", "#90403d", "#eb3740", "#d9c39a"
+
 		, "@b", "@r", "Рейсен", "#000000", "#ffffff", "#dcc3ff", "#2e228c", "#e94b6d"
+		, "@b", "@r", "Эйрин", "#e12710", "#4c336a", "#ffffff"
+		, "@b", "@r", "Кагуя", "#fcabba", "#ed453c", "#2d2926", "#ffffff"
+		, "@b", "@r", "Моко", "#ffffff", "#da003a"
+
+		, "@b", "@r", "Ая", "#ffffff", "#f33f45", "#1b1b1b"
+		, "@b", "@r", "Юка", "#ec2c29", "#ffffff", "#64ad53", "#fff05f", "#ffe3e2"
 		, "@b", "@r", "Комачи", "#ffffff", "#257ed4", "#ed145b", "#4f352e", "#e7962d"
+		, "@b", "@r", "Шикиеки", "#ffffff", "#3a2430", "#26655a", "#432e71", "#a32139", "#ffe059"
+
+		, "@b", "@r", "Нитори", "#257dd3", "#0cb473", "#7ec8f9", "#312f83", "#ffffff", "#f1f62e", "#ad2032"
+		, "@b", "@r", "Сана" + sana[Math.floor(Math.random() * sana.length)], "#16168a", "#ffffff", "#13f356", "#9476f5", "#31cacc", "#e7962d"
+		, "@b", "@r", "Канако", "#fa5041", "#43334d", "#7360dd", "#ffffff", "#cda277"
+		, "@b", "@r", "Сувако", "#623fbd", "#ffffff", "#f6f3ac", "#bcb67a", "#ea0001", "#fbe4a1", "#000000"
+
+		, "@b", "@r", "Ику", "#000000", "#ffffff", "#5940c0", "#ee0501"
+		, "@b", "@r", "Тенши", "#ffffff", "#6dcef6", "#0073c1", "#f90b0b", "#405231", "#000000", "#f5d498", "#7cc074"
+
 		];
 
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
@@ -100,15 +126,16 @@ var kbLayout = {
 	, "history-extract" :			120 //F9
 
 	, "canva-fill" :				"F".charCodeAt(0)
-	, "canva-delete" :				"G".charCodeAt(0)
+	, "canva-delete" :				"B".charCodeAt(0)
 	, "canva-invert" :				"I".charCodeAt(0)
 	, "canva-jpeg" :				c_ + "J".charCodeAt(0)
 	, "canva-png" :					c_ + "P".charCodeAt(0)
 	, "canva-send" :				c_ + 13 //ENTER
 
-	, "tool-antialiasing" :			190 //.
-	, "tool-lowquality" :			59 //;
-	, "tool-preview" :				222 //'
+	, "tool-antialiasing" :			"O".charCodeAt(0)
+	, "tool-smooth" :				"K".charCodeAt(0)
+	, "tool-lowquality" :			"L".charCodeAt(0)
+	, "tool-preview" :				"P".charCodeAt(0)
 	, "tool-colorpick" :			"C".charCodeAt(0)
 	, "tool-swap" :					"S".charCodeAt(0)
 	, "tool-eraser" :				"E".charCodeAt(0)
@@ -123,7 +150,7 @@ var kbLayout = {
 
 	, "app-help" :					112
 
-	, "debug-mode" :				115
+	, "debug-mode" :				12 //SEECRET KEY !
 };
 
 	kbLayout = (!!window.localStorage && !!window.localStorage.layout) ? JSON.parse(window.localStorage.layout) : kbLayout;
@@ -139,16 +166,17 @@ var actLayout = {
 	, "history-store" :				{"Operation" :	"savePic(-1)",			"Title" : "&#x22C1;",	"Description" : "Сделать back-up",	"Once" : true}
 	, "history-extract" :			{"Operation" :	"savePic(-2)",			"Title" : "&#x22C0;",	"Description" : "Извлечь back-up",	"Once" : true}
 
-	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "1",			"Description" : "Закрасить полотно основным цветом",	"Once" : true}
-	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "2",			"Description" : "Закрасить полотно фоновым цветом",		"Once" : true}
+	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "F",			"Description" : "Закрасить полотно основным цветом",	"Once" : true}
+	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "B",			"Description" : "Закрасить полотно фоновым цветом",		"Once" : true}
 	, "canva-invert" :				{"Operation" :	"invertColors()",		"Title" : "&#x25D0;",	"Description" : "Инверсия полотна",		"Once" : true}
 	, "canva-jpeg" :				{"Operation" :	"savePic(1)",			"Title" : "J",			"Description" : "Сохранить в JPEG",		"Once" : true}
 	, "canva-png" :					{"Operation" :	"savePic(2)",			"Title" : "P",			"Description" : "Сохранить в PNG",		"Once" : true}
 	, "canva-send" :				{"Operation" :	"savePic(0)",			"Title" : "&#x21B5;",	"Description" : "Отправить на сервер",	"Once" : true}
 
-	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "&nbsp;",		"Description" : "Не сглаживать",			"Once" : true}
+	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "AA",			"Description" : "Anti-Aliasing",			"Once" : true}
 	, "tool-preview" :				{"Operation" :	"switchMode(1)",		"Title" : "&#x25CF;",	"Description" : "Предпросмотр кисти",		"Once" : true}
 	, "tool-lowquality" :			{"Operation" :	"switchMode(0)",		"Title" : "&#x25A0;",	"Description" : "Режим низкого качества",	"Once" : true}
+	, "tool-smooth" :				{"Operation" :	"switchMode(3)",		"Title" : "Ω",			"Description" : "Режим сглаживания линии",	"Once" : true}
 	, "tool-colorpick" :			{"Operation" :	"cCopyColor()"}
 	, "tool-swap" :					{"Operation" :	"swapTools(0)",			"Title" : "&#x2194;",	"Description" : "Поменять инструменты местами",					"Once" : true}
 	, "tool-eraser" :				{"Operation" :	"swapTools(1)",			"Title" : "&#x25A1;",	"Description" : "Заменить инструмент на стандартный ластик",	"Once" : true}
@@ -173,7 +201,8 @@ var actLayout = {
 };
 
 //List of buttons to display
-var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "tool-eraser", "canva-invert", "|", "tool-preview", "tool-lowquality", "|",
+var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "tool-eraser", "canva-invert", "|",
+					"tool-antialiasing", "tool-preview", "tool-smooth", "tool-lowquality", "|",
 					"history-store", "history-extract", "canva-jpeg", "canva-png", "canva-send", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
@@ -184,6 +213,7 @@ for (i = 1; i <= 10; i ++) {
 var kbDesc = {
 	  8 : "Backspace"
 	, 9 : "Tab"
+	, 12 : "Secret Key"
 	, 13 : "Enter"
 	, 45 : "Insert"
 	, 46 : "Delete"
@@ -295,8 +325,9 @@ function init()
 	sidebar.appendChild(e);
 
 	cElem = document.createElement("input");
-	cElem.type = "text";
+	cElem.type = "color";
 	cElem.id = "color"
+	cElem.setAttribute("onchange", "updateColor()");
 	sidebar.appendChild(cElem);
 
 	bar = document.createElement("div");	
@@ -306,7 +337,7 @@ function init()
 		var tElem = document.createElement("span");	
 		if(guiButtons[i] != "|") {
 			tElem.id = guiButtons[i];
-			tElem.className = "button";
+			tElem.className = (guiButtons[i] =="tool-antialiasing" && antiAliasing) ? "button-active" : "button";
 			tElem.innerHTML = actLayout[guiButtons[i]].Title;
 			tElem.setAttribute("onclick", actLayout[guiButtons[i]].Operation);
 			bar.appendChild(tElem);	
@@ -321,13 +352,13 @@ function init()
 	for (i in tools)
 		updateColor(tools[i].Color, i);
 
+	dbg = document.createElement("div");	
+	sketcher.appendChild(dbg);
+
 	updateDebugScreen();
 	updatePalette();
 	updateButtons();
 	updateSliders();
-
-	if (debugMode)
-		setInterval("fpsCount()", 1000);
 }
 
 function setElemDesc(elem, desc) {
@@ -456,40 +487,44 @@ function drawCursor () {
 }
 
 function cDraw(event) {
-	var pX = x, pY = y;
 
 	updatePosition(event);
 
-	var r = Math.sqrt(Math.pow(x - pX, 2) + Math.pow(y - pY, 2)); //distance
-	var a = Math.atan2(pY - y, x - pX) * (180 / Math.PI); //angle
-	var dA = angle-a;
-
 	updateDebugScreen();
-
-	vX = pX + Math.cos(a * Math.PI / 4) * r;
-	vY = pY - Math.sin(a * Math.PI / 4) * r;
-
-	angle = a;
 
 	if ((flushCursor || neverFlushCursor) && !(lowQMode && activeDrawing)) {
 		dc.putImageData(history[historyPosition], 0, 0);
 	}
 
 	if (activeDrawing) {
-		if(antiAliasing) {
-			dc.lineTo(x + globalOffset, y + globalOffset);
-			dc.stroke();
-		} else {
-			dc.moveTo(x + globalOffs_1, y + globalOffs_1);
-			dc.lineTo(x + globalOffset, y + globalOffset);
-			dc.stroke();
+		var tX = pX, tY = pY;
+		pX = smoothMode ? parseInt(x * 0.08 + pX * 0.92) : x;
+		pY = smoothMode ? parseInt(y * 0.08 + pY * 0.92) : y;
+		if(!antiAliasing) { //This probably would require massive optimization. Blame W3C.
+			while(1) {
+				for (i = 0; i < tool.Width; i++) {
+					var rC = Math.sqrt(1 - Math.pow(-1 + (i + 0.5) / tool.Width * 2, 2));
+					dc.moveTo(parseInt(tX - tool.Width * rC / 2) + globalOffs_1, tY + globalOffset - parseInt(tool.Width / 2) + i);
+					dc.lineTo(parseInt(tX + tool.Width * rC / 2) - globalOffset, tY + globalOffset - parseInt(tool.Width / 2) + i);
+				}
+				tX = parseInt((pX + tX) / 2);
+				tY = parseInt((pY + tY) / 2);
+				//if(tX == pX && tY == pY) //Uncomment this and your system will suddenly crash.
+					break;
+			}
 		}
+		else
+			dc.lineTo(pX + globalOffset, pY + globalOffset);
+		dc.stroke();
 	} else
 		if (neverFlushCursor && !lowQMode)
 			drawCursor();
 }
 
 function cDrawStart(event) {
+	pX = x;
+	pY = y;
+
 	updatePosition(event);
 	//canvas.focus();
 	event.preventDefault();
@@ -504,18 +539,20 @@ function cDrawStart(event) {
 		var t = tools[(event.which == 1) ? 0 : 1];
 		dc.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
-		dc.lineWidth = t.Width;
+		dc.lineWidth = antiAliasing ? t.Width : 1;
 		dc.shadowBlur = t.Shadow;
 		dc.strokeStyle = "rgba(" + t.Color + ", " + t.Opacity + ")";
 		dc.shadowColor = "rgb(" + t.Color + ")";
 		dc.lineJoin = "round";
 		dc.lineCap = "round";
+		dc.beginPath();
 		if(antiAliasing) {
-			dc.beginPath();
 			dc.moveTo(x + globalOffset, y + globalOffset);
 			dc.lineTo(x + globalOffs_1, y + globalOffs_1);
 			dc.stroke();
 		}
+		else
+			cDraw(event);
 		vX = x;
 		vY = y;
 	}
@@ -525,11 +562,9 @@ function cDrawStart(event) {
 function cDrawEnd(event) {
 	//Saving in history:
 	if (activeDrawing) {
-		if(antiAliasing) {
-			dc.putImageData(history[historyPosition], 0, 0);
-			dc.stroke();
-			dc.closePath();
-		}
+		dc.putImageData(history[historyPosition], 0, 0);
+		dc.stroke();
+		dc.closePath();
 		historyOperation(0);
 	}
 	activeDrawing=false;
@@ -540,6 +575,9 @@ function cDrawRestore(event) {
 	if (activeDrawing)
 		dc.moveTo(x + globalOffset, y + globalOffset);
 	updatePosition(event);
+	pX = x;
+	pY = y;
+
 }
 
 function cDrawCancel() {
@@ -587,8 +625,7 @@ function cLWChange(event) {
 
 function updateDebugScreen() {
 	if (debugMode) {
-		var debug = document.getElementById("debug");
-		debug.innerHTML = "Cursor @" + x + ":" + y + "<br />Angle: " + angle + "<br />FPS: " + fps;
+		dbg.innerHTML = "Cursor @" + x + ":" + y + "<br />Diff: " + (x - pX) + ":" + (y - pY) + "<br />FPS: " + fps;
 		ticks ++;
 	}
 }
@@ -619,14 +656,14 @@ function updateSliders(initiator) {
 		//tool.TurnLimit	= document.getElementById("tool-turnlimit" + s).value;
 	}
 
-	if (tool.Opacity <= 0.1) tool.Opacity = "0.10"; else
-	if (tool.Opacity >=   1) tool.Opacity = "1.00";
+	if (tool.Opacity <= toolLimits.Opacity[0]) tool.Opacity = toolLimits.Opacity[0].toFixed(2); else
+	if (tool.Opacity >= toolLimits.Opacity[1]) tool.Opacity = toolLimits.Opacity[1].toFixed(2);
 
-	if (tool.Width <=   1) tool.Width = 1; else
-	if (tool.Width >= 128) tool.Width = 128;
+	if (tool.Width <= toolLimits.Width[0]) tool.Width = toolLimits.Width[0]; else
+	if (tool.Width >= toolLimits.Width[1]) tool.Width = toolLimits.Width[1];
 
-	if (tool.Shadow <=  0) tool.Shadow = 0; else
-	if (tool.Shadow >= 20) tool.Shadow = 20;
+	if (tool.Shadow <= toolLimits.Shadow[0]) tool.Shadow = toolLimits.Shadow[0]; else
+	if (tool.Shadow >= toolLimits.Shadow[1]) tool.Shadow = toolLimits.Shadow[1];
 
 	if (tool.TurnLimit <=   0) tool.TurnLimit = 0; else
 	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
@@ -696,6 +733,11 @@ function updateColor(value, toolIndex) {
 	}
 	document.getElementById((t == tool) ? "canva-fill" : "canva-delete").style.background = "rgb(" + t.Color + ")";
 
+	//inverted color
+	var m = parseInt(v.substr(1), 16);
+	var b = parseInt(m / 65536) + parseInt(m / 256) % 256 + parseInt(m % 256);
+	document.getElementById((t == tool) ? "canva-fill" : "canva-delete").style.color = b > 380 ? "black" : "white";
+
 	//adding to history palette:
 	var found = palette["history"].length;
 	for (i = 0; i < found; i ++)
@@ -712,6 +754,7 @@ function updateColor(value, toolIndex) {
 	if (!!window.localStorage)
 		window.localStorage.historyPalette = JSON.stringify(palette["history"]);
 }
+
 
 function historyOperation(opid) {
 	//0: Write: Refresh
@@ -752,8 +795,8 @@ function updateButtons() {
 	setElemDesc("canva-jpeg", actLayout["canva-jpeg"].Description + " (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
 	setElemDesc("canva-png", actLayout["canva-png"].Description + " (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
 
-	document.getElementById("history-undo").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
-	document.getElementById("history-redo").className = (historyPosition == 0 ? "button-disabled" : "button");
+	document.getElementById("history-redo").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
+	document.getElementById("history-undo").className = (historyPosition == 0 ? "button-disabled" : "button");
 
 }
 
@@ -774,16 +817,16 @@ function cHotkeys(k) {
 
 function cHotkeysStart(event) {
 	if (!hkPressed) {		
-		var k = event.keyCode
+		var k = Math.min(event.keyCode, 255) //preventing from some bad things, that can happen
 			+ (event.ctrlKey ? c_ : 0)
 			+ (event.shiftKey ? s_ : 0)
 			+ (event.altKey ? a_ : 0)
 			+ (event.metaKey ? m_ : 0)
 		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+			event.preventDefault();
+			event.returnValue = false;
 			if (cHotkeys(k)) {				
-				event.preventDefault();
-				event.returnValue = false;
-				hki = setInterval('cHotkeys(' + k +')', 100); //TODO: 1st interval: 1s.
+				hki = setInterval('cHotkeys(' + k +')', 100);
 			}
 		}
 	}
@@ -812,23 +855,12 @@ function toolModify(id, param, inc, value) {
 
 function switchMode(id) {
 	switch (id) {
-		case -1: debugMode =! debugMode; debug.innerHTML=""; break;
+		case -1: debugMode =! debugMode; dbg.innerHTML=""; break;
 		case 0: document.getElementById("tool-lowquality").className = (lowQMode = !lowQMode) ? "button-active" : "button"; break;
 		case 1: document.getElementById("tool-preview").className = (precisePreview = !precisePreview) ? "button-active" : "button"; break;
-		case 2: document.getElementById("tool-antialiasing").className = (antiAliasing = !antiAliasing) ? "button" : "button-active";
-			updateSmoothing(antiAliasing);
-			break;
+		case 2: document.getElementById("tool-antialiasing").className = (antiAliasing = !antiAliasing) ? "button-active" : "button"; break;
+		case 3: document.getElementById("tool-smooth").className = (smoothMode = !smoothMode) ? "button-active" : "button"; break;
 	}
-}
-
-function updateSmoothing(value) {
-	dc.imageSmoothingEnabled = value;
-	dc.mozImageSmoothingEnabled = value;
-	dc.webkitImageSmoothingEnabled = value;
-	//canvas.style.imageRendering = "optimizeSpeed";
-	//canvas.style.imageRendering = "-o-crisp-edges";
-	//canvas.style.imageRendering = "-webkit-optimize-contrast";
-
 }
 
 function savePic(value, auto) {
