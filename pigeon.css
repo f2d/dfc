@@ -81,11 +81,19 @@
 #sketcher .button {
 	background-color: #f0f0f0;
 	background: -moz-linear-gradient(top, #f0f0f0, #e5e5e5);
+	background: -webkit-linear-gradient(top, #f0f0f0, #e5e5e5);
+	background: -o-linear-gradient(top, #f0f0f0, #e5e5e5);
+	background: -ms-linear-gradient(top, #f0f0f0, #e5e5e5);
+	background: linear-gradient(top, #f0f0f0, #e5e5e5);
 }
 
 #sketcher .button-active {
 	background-color: #c4e0fc;
 	background: -moz-linear-gradient(top, #c4e0fc, #daecfc);
+	background: -webkit-linear-gradient(top, #c4e0fc, #daecfc);
+	background: -o-linear-gradient(top, #c4e0fc, #daecfc);
+	background: -ms-linear-gradient(top, #c4e0fc, #daecfc);
+	background: linear-gradient(top, #c4e0fc, #daecfc);
 	border-color: #569de5;
 }
 
@@ -98,6 +106,10 @@
 #sketcher .button:hover {
 	background-color: #ecf4fc;
 	background: -moz-linear-gradient(top, #ecf4fc, #dcecfc);
+	background: -webkit-linear-gradient(top, #ecf4fc, #dcecfc);
+	background: -o-linear-gradient(top, #ecf4fc, #dcecfc);
+	background: -ms-linear-gradient(top, #ecf4fc, #dcecfc);
+	background: linear-gradient(top, #ecf4fc, #dcecfc);
 	border-color: #7eb4ea;
 	
 }
@@ -105,6 +117,10 @@
 #sketcher .button-active:hover {
 	background-color: #daecfc;
 	background: -moz-linear-gradient(top, #daecfc, #c4e0fc);
+	background: -webkit-linear-gradient(top, #daecfc, #c4e0fc);
+	background: -o-linear-gradient(top, #daecfc, #c4e0fc);
+	background: -ms-linear-gradient(top, #daecfc, #c4e0fc);
+	background: linear-gradient(top, #daecfc, #c4e0fc);
 	border-color: #7eb4ea;
 }
 
