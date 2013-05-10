@@ -1,15 +1,15 @@
-var infoVersion = "v1.6.5";
-var infoDate = "May 4, 2013"
+var infoVersion = "v1.6.6";
+var infoDate = "May 10, 2013"
 
-var sketcher, canvas, dc, sendForm,
-	bar, sidebar, dbg,
-	paletteElem, cElem; //main elements
+var sketcher, canvas, context, sendForm,
+	bottomElem, sideElem, debugElem,
+	paletteElem, colorCodeElem; //main elements
 
 var sliders = [];
 
-var x = -5, y = -5,
-	pX = -5, pY = -5,
-	globalOffset = 0.5, //pixel offset
+var cursor = {"posX" : -5, "posY" : -5, "prevX" : -5, "prevY" : -5};
+
+var	globalOffset = 0.5, //pixel offset
 	globalOffs_1 = globalOffset - 0.01;
 
 var activeDrawing = false;
@@ -23,15 +23,15 @@ var lastAutoSave = new Date().getTime(),
 	enableAutoSave = true;
 
 var cWidth = 600,
-	cHeight = 360;
+	cHeight = 360; //may be not so constant in future
 
 var tools = [
-	{"Opacity" : 1.00, "Width" :  4, "Shadow" : 0, "TurnLimit" : 360, "Color" : "0, 0, 0"      } //Fore
-,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Back
-,	{"Opacity" : 1.00, "Width" : 20, "Shadow" : 0, "TurnLimit" : 360, "Color" : "255, 255, 255"} //Eraser
+	{"opacity" : 1.00, "width" :  4, "shadow" : 0, "color" : "0, 0, 0"		} //Fore
+,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Back
+,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
-var toolLimits = {"Opacity": [0.05, 1, 0.05], "Width": [1, 128, 1], "Shadow": [0, 20, 1], "TurnLimit": [0, 180, 1]};
+var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
 
 var debugMode = false,
 	fps = 0,
@@ -63,7 +63,6 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 	generatePalette("feijoa", 85, 0);
 	palette["safe"] = [];
 	generatePalette("safe", 51, 6);
-var sana = ["е", "э", "я", "ѣ"];
 	palette["touhou"] = ["@c", "основной цвет", "вторичный цвет", "волосы", "глаза/аксессуары", "аксессуары"
 	    , "@b", "@r", "Общее", "#fcefe2", "#000000"
 
@@ -97,7 +96,7 @@ var sana = ["е", "э", "я", "ѣ"];
 		, "@b", "@r", "Шикиеки", "#ffffff", "#3a2430", "#26655a", "#432e71", "#a32139", "#ffe059"
 
 		, "@b", "@r", "Нитори", "#257dd3", "#0cb473", "#7ec8f9", "#312f83", "#ffffff", "#f1f62e", "#ad2032"
-		, "@b", "@r", "Сана" + sana[Math.floor(Math.random() * sana.length)], "#16168a", "#ffffff", "#13f356", "#9476f5", "#31cacc", "#e7962d"
+		, "@b", "@r", "Сана" + "еэяѣ"[Math.floor(Math.random() * 4)], "#16168a", "#ffffff", "#13f356", "#9476f5", "#31cacc", "#e7962d"
 		, "@b", "@r", "Канако", "#fa5041", "#43334d", "#7360dd", "#ffffff", "#cda277"
 		, "@b", "@r", "Сувако", "#623fbd", "#ffffff", "#f6f3ac", "#bcb67a", "#ea0001", "#fbe4a1", "#000000"
 
@@ -114,10 +113,10 @@ var hki = 0; //Hotkey interval for Opera
 var hkPressed = false;
 
 //KEY MODIFIERS
-var c_ = 0x0100, 
-	s_ = 0x0200,
-	a_ = 0x0400;
-	m_ = 0x0800;
+var CTRL = 0x0100, 
+	SHIFT = 0x0200,
+	ALT = 0x0400;
+	META = 0x0800;
 
 var kbLayout = { 
 	  "history-undo" :				"Z".charCodeAt(0)
@@ -128,9 +127,9 @@ var kbLayout = {
 	, "canva-fill" :				"F".charCodeAt(0)
 	, "canva-delete" :				"B".charCodeAt(0)
 	, "canva-invert" :				"I".charCodeAt(0)
-	, "canva-jpeg" :				c_ + "J".charCodeAt(0)
-	, "canva-png" :					c_ + "P".charCodeAt(0)
-	, "canva-send" :				c_ + 13 //ENTER
+	, "canva-jpeg" :				CTRL + "J".charCodeAt(0)
+	, "canva-png" :					CTRL + "P".charCodeAt(0)
+	, "canva-send" :				CTRL + 13 //ENTER
 
 	, "tool-antialiasing" :			"O".charCodeAt(0)
 	, "tool-smooth" :				"K".charCodeAt(0)
@@ -141,63 +140,63 @@ var kbLayout = {
 	, "tool-eraser" :				"E".charCodeAt(0)
 	, "tool-width-" :				"Q".charCodeAt(0)
 	, "tool-width+" :				"W".charCodeAt(0)
-	, "tool-opacity-" :				c_ + "Q".charCodeAt(0)
-	, "tool-opacity+" :				c_ + "W".charCodeAt(0)
-	, "tool-shadow-" :				s_ + "Q".charCodeAt(0)
-	, "tool-shadow+" :				s_ + "W".charCodeAt(0)
-	, "tool-turn-" :				c_ + s_ + "Q".charCodeAt(0)
-	, "tool-turn+" :				c_ + s_ + "W".charCodeAt(0)
+	, "tool-opacity-" :				CTRL + "Q".charCodeAt(0)
+	, "tool-opacity+" :				CTRL + "W".charCodeAt(0)
+	, "tool-shadow-" :				SHIFT + "Q".charCodeAt(0)
+	, "tool-shadow+" :				SHIFT + "W".charCodeAt(0)
+	, "tool-turn-" :				CTRL + SHIFT + "Q".charCodeAt(0)
+	, "tool-turn+" :				CTRL + SHIFT + "W".charCodeAt(0)
 
 	, "app-help" :					112
 
-	, "debug-mode" :				12 //SEECRET KEY !
+	, "debug-mode" :				12 //CLEAR
 };
 
 	kbLayout = (!!window.localStorage && !!window.localStorage.layout) ? JSON.parse(window.localStorage.layout) : kbLayout;
 
 for (i = 1; i <= 10; i ++) {
-	kbLayout["tool-opacity." + i] = (i == 10 ? 0 : i) + 48 + c_; 
+	kbLayout["tool-opacity." + i] = (i == 10 ? 0 : i) + 48 + CTRL; 
 	kbLayout["tool-width." + i] = (i == 10 ? 0 : i) + 48; 
 }
 
 var actLayout = { 
-	  "history-undo" :				{"Operation" :	"historyOperation(1)",	"Title" : "&#x2190;",	"Description" : "Назад"}
-	, "history-redo" :				{"Operation" :	"historyOperation(2)",	"Title" : "&#x2192;",	"Description" : "Вперёд"}
-	, "history-store" :				{"Operation" :	"savePic(-1)",			"Title" : "&#x22C1;",	"Description" : "Сделать back-up",	"Once" : true}
-	, "history-extract" :			{"Operation" :	"savePic(-2)",			"Title" : "&#x22C0;",	"Description" : "Извлечь back-up",	"Once" : true}
+	  "history-undo" :				{"operation" :	"historyOperation(1)",	"title" : "&#x2190;",	"description" : "Назад"}
+	, "history-redo" :				{"operation" :	"historyOperation(2)",	"title" : "&#x2192;",	"description" : "Вперёд"}
+	, "history-store" :				{"operation" :	"savePic(-1)",			"title" : "&#x22C1;",	"description" : "Сделать back-up",	"once" : true}
+	, "history-extract" :			{"operation" :	"savePic(-2)",			"title" : "&#x22C0;",	"description" : "Извлечь back-up",	"once" : true}
 
-	, "canva-fill" :				{"Operation" :	"clearScreen(0)",		"Title" : "F",			"Description" : "Закрасить полотно основным цветом",	"Once" : true}
-	, "canva-delete" :				{"Operation" :	"clearScreen(1)",		"Title" : "B",			"Description" : "Закрасить полотно фоновым цветом",		"Once" : true}
-	, "canva-invert" :				{"Operation" :	"invertColors()",		"Title" : "&#x25D0;",	"Description" : "Инверсия полотна",		"Once" : true}
-	, "canva-jpeg" :				{"Operation" :	"savePic(1)",			"Title" : "J",			"Description" : "Сохранить в JPEG",		"Once" : true}
-	, "canva-png" :					{"Operation" :	"savePic(2)",			"Title" : "P",			"Description" : "Сохранить в PNG",		"Once" : true}
-	, "canva-send" :				{"Operation" :	"savePic(0)",			"Title" : "&#x21B5;",	"Description" : "Отправить на сервер",	"Once" : true}
+	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "F",			"description" : "Закрасить полотно основным цветом",	"once" : true}
+	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "B",			"description" : "Закрасить полотно фоновым цветом",		"once" : true}
+	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"description" : "Инверсия полотна",		"once" : true}
+	, "canva-jpeg" :				{"operation" :	"savePic(1)",			"title" : "J",			"description" : "Сохранить в JPEG",		"once" : true}
+	, "canva-png" :					{"operation" :	"savePic(2)",			"title" : "P",			"description" : "Сохранить в PNG",		"once" : true}
+	, "canva-send" :				{"operation" :	"savePic(0)",			"title" : "&#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
 
-	, "tool-antialiasing" :			{"Operation" :	"switchMode(2)",		"Title" : "AA",			"Description" : "Anti-Aliasing",			"Once" : true}
-	, "tool-preview" :				{"Operation" :	"switchMode(1)",		"Title" : "&#x25CF;",	"Description" : "Предпросмотр кисти",		"Once" : true}
-	, "tool-lowquality" :			{"Operation" :	"switchMode(0)",		"Title" : "&#x25A0;",	"Description" : "Режим низкого качества",	"Once" : true}
-	, "tool-smooth" :				{"Operation" :	"switchMode(3)",		"Title" : "Ω",			"Description" : "Режим сглаживания линии",	"Once" : true}
-	, "tool-colorpick" :			{"Operation" :	"cCopyColor()"}
-	, "tool-swap" :					{"Operation" :	"swapTools(0)",			"Title" : "&#x2194;",	"Description" : "Поменять инструменты местами",					"Once" : true}
-	, "tool-eraser" :				{"Operation" :	"swapTools(1)",			"Title" : "&#x25A1;",	"Description" : "Заменить инструмент на стандартный ластик",	"Once" : true}
-	, "tool-width-" :				{"Operation" :	"toolModify(0, 1, -1)"}
-	, "tool-width+" :				{"Operation" :	"toolModify(0, 1, +1)"}
-	, "tool-opacity-" :				{"Operation" :	"toolModify(0, 0, -0.05)"}
-	, "tool-opacity+" :				{"Operation" :	"toolModify(0, 0, +0.05)"}
-	, "tool-shadow-" :				{"Operation" :	"toolModify(0, 2, -1)"}
-	, "tool-shadow+" :				{"Operation" :	"toolModify(0, 2, +1)"}
-	, "tool-turn-" :				{"Operation" :	"toolModify(0, 3, -1)"}
-	, "tool-turn+" :				{"Operation" :	"toolModify(0, 3, +1)"}
+	, "tool-antialiasing" :			{"operation" :	"switchMode(2)",		"title" : "AA",			"description" : "Anti-Aliasing",			"once" : true}
+	, "tool-preview" :				{"operation" :	"switchMode(1)",		"title" : "&#x25CF;",	"description" : "Предпросмотр кисти",		"once" : true}
+	, "tool-lowquality" :			{"operation" :	"switchMode(0)",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
+	, "tool-smooth" :				{"operation" :	"switchMode(3)",		"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
+	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
+	, "tool-swap" :					{"operation" :	"swapTools(0)",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
+	, "tool-eraser" :				{"operation" :	"swapTools(1)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
+	, "tool-width-" :				{"operation" :	"toolModify(0, 1, -1)"}
+	, "tool-width+" :				{"operation" :	"toolModify(0, 1, +1)"}
+	, "tool-opacity-" :				{"operation" :	"toolModify(0, 0, -0.05)"}
+	, "tool-opacity+" :				{"operation" :	"toolModify(0, 0, +0.05)"}
+	, "tool-shadow-" :				{"operation" :	"toolModify(0, 2, -1)"}
+	, "tool-shadow+" :				{"operation" :	"toolModify(0, 2, +1)"}
+	, "tool-turn-" :				{"operation" :	"toolModify(0, 3, -1)"}
+	, "tool-turn+" :				{"operation" :	"toolModify(0, 3, +1)"}
 
-	, "tool-width" : 				{"Title" : "Толщина"}
-	, "tool-opacity" : 				{"Title" : "Непрозрачность"}
-	, "tool-shadow" : 				{"Title" : "Тень"}
-	, "tool-color" : 				{"Title" : "Код цвета"}
-	, "tool-palette" : 				{"Title" : "Палитра"}
+	, "tool-width" : 				{"title" : "Толщина"}
+	, "tool-opacity" : 				{"title" : "Непрозрачность"}
+	, "tool-shadow" : 				{"title" : "Тень"}
+	, "tool-color" : 				{"title" : "Код цвета"}
+	, "tool-palette" : 				{"title" : "Палитра"}
 
-	, "app-help" :					{"Operation" :	"showHelp()",			"Title" : "?",			"Description" : "Помощь",	"Once" : true}
+	, "app-help" :					{"operation" :	"showHelp()",			"title" : "?",			"description" : "Помощь",	"once" : true}
 
-	, "debug-mode" :				{"Operation" :	"switchMode(-1)"}
+	, "debug-mode" :				{"operation" :	"switchMode(-1)"}
 };
 
 //List of buttons to display
@@ -206,8 +205,8 @@ var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap"
 					"history-store", "history-extract", "canva-jpeg", "canva-png", "canva-send", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
-	actLayout["tool-opacity." + i] = {"Operation" : "toolModify(0, 0, 0, " + (i / 10) + ")"}; 
-	actLayout["tool-width." + i] = {"Operation" : "toolModify(0, 1, 0, " + Math.ceil(Math.pow(1.7, i-1)) + ")"}; 
+	actLayout["tool-opacity." + i] = {"operation" : "toolModify(0, 0, 0, " + (i / 10) + ")"}; 
+	actLayout["tool-width." + i] = {"operation" : "toolModify(0, 1, 0, " + Math.ceil(Math.pow(1.7, i-1)) + ")"}; 
 }
 
 var kbDesc = {
@@ -258,61 +257,60 @@ function init()
 	canvas.width = cWidth;
 	canvas.height = cHeight;
 
-	dc = canvas.getContext("2d");
+	context = canvas.getContext("2d");
 
-	dc.fillStyle = "white";
-	dc.fillRect(0, 0, cWidth, cHeight);
-	history[0] = dc.getImageData(0, 0, cWidth, cHeight);
+	context.fillStyle = "white";
+	context.fillRect(0, 0, cWidth, cHeight);
+	history[0] = context.getImageData(0, 0, cWidth, cHeight);
 
-	sidebar = document.createElement("span");
-	sidebar.id = "tools";
-	sketcher.appendChild(sidebar);
+	sideElem = document.createElement("span");
+	sideElem.id = "tools";
+	sketcher.appendChild(sideElem);
 
 	var e = document.createElement("input"),
 		a = ["shadow", "opacity", "width"], 
 		i = a.length;
 	while (i--) { 
 		var et;
-		var uLetter = a[i].charAt(0).toUpperCase() + a[i].substr(1);
 		if ((e.type = "range") == e.type) {
 			et = document.createElement("input");
 			et.id = "tool-" + a[i];
 			et.type = "range";
-			et.value = eval("tool." + uLetter);
-			et.min = toolLimits[uLetter][0];
-			et.max = toolLimits[uLetter][1];
-			et.step = toolLimits[uLetter][2];
+			et.value = eval("tool." + a);
+			et.min = toolLimits[a][0];
+			et.max = toolLimits[a][1];
+			et.step = toolLimits[a][2];
 			et.setAttribute("onchange", "updateSliders(1);");
-			sidebar.appendChild(et);
+			sideElem.appendChild(et);
 			sliders[et.id] = et;
 		}
 		et = document.createElement("input");
 		et.id = "tool-" + a[i] + "-text";
-		et.value = eval("tool." + uLetter);
+		et.value = eval("tool." + a[i]);
 		et.type = "text";
 		et.setAttribute("onchange", "updateSliders(2);");
-		sidebar.appendChild(et);
+		sideElem.appendChild(et);
 		sliders[et.id] = et;
 
 		et = document.createElement("span");
-		et.innerHTML = " " + actLayout["tool-" + a[i]].Title;
-		sidebar.appendChild(et);
+		et.innerHTML = " " + actLayout["tool-" + a[i]].title;
+		sideElem.appendChild(et);
 
-		sidebar.appendChild(document.createElement("br"));
+		sideElem.appendChild(document.createElement("br"));
 	};
 
 	e = document.createElement("span");
-	e.innerHTML = actLayout["tool-palette"].Title + ": ";
-	sidebar.appendChild(e);
+	e.innerHTML = actLayout["tool-palette"].title + ": ";
+	sideElem.appendChild(e);
 
 	paletteSelect = document.createElement("select");
 	paletteSelect.id = "palette-select";
 	paletteSelect.setAttribute("onchange", "updatePalette();");
-	sidebar.appendChild(paletteSelect);
+	sideElem.appendChild(paletteSelect);
 
 	paletteElem = document.createElement("div");
 	paletteElem.id = "palette";
-	sidebar.appendChild(paletteElem);
+	sideElem.appendChild(paletteElem);
 
 	for (tPalette in paletteDesc) {
 		paletteSelect.options[paletteSelect.options.length] = new Option(paletteDesc[tPalette], tPalette);
@@ -321,39 +319,39 @@ function init()
 	}
 
 	e = document.createElement("span");
-	e.innerHTML = actLayout["tool-color"].Title + ": ";
-	sidebar.appendChild(e);
+	e.innerHTML = actLayout["tool-color"].title + ": ";
+	sideElem.appendChild(e);
 
-	cElem = document.createElement("input");
-	cElem.type = "color";
-	cElem.id = "color"
-	cElem.setAttribute("onchange", "updateColor()");
-	sidebar.appendChild(cElem);
+	colorCodeElem = document.createElement("input");
+	colorCodeElem.type = "color";
+	colorCodeElem.id = "color";
+	colorCodeElem.setAttribute("onchange", "updateColor()");
+	sideElem.appendChild(colorCodeElem);
 
-	bar = document.createElement("div");	
-	sketcher.appendChild(bar);
+	bottomElem = document.createElement("div");	
+	sketcher.appendChild(bottomElem);
 
 	for(i in guiButtons) {
 		var tElem = document.createElement("span");	
 		if(guiButtons[i] != "|") {
 			tElem.id = guiButtons[i];
 			tElem.className = (guiButtons[i] =="tool-antialiasing" && antiAliasing) ? "button-active" : "button";
-			tElem.innerHTML = actLayout[guiButtons[i]].Title;
-			tElem.setAttribute("onclick", actLayout[guiButtons[i]].Operation);
-			bar.appendChild(tElem);	
+			tElem.innerHTML = actLayout[guiButtons[i]].title;
+			tElem.setAttribute("onclick", actLayout[guiButtons[i]].operation);
+			bottomElem.appendChild(tElem);	
 			setElemDesc(guiButtons[i]);
 		} else {
 			tElem.className = "vertical";	
 			tElem.innerHTML = "&nbsp;";
-			bar.appendChild(tElem);	
+			bottomElem.appendChild(tElem);	
 		}
 	}
 
-	for (i in tools)
-		updateColor(tools[i].Color, i);
+	updateColor(tools[0].color, 0);
+	updateColor(tools[1].color, 1);
 
-	dbg = document.createElement("div");	
-	sketcher.appendChild(dbg);
+	debugElem = document.createElement("div");	
+	sketcher.appendChild(debugElem);
 
 	updateDebugScreen();
 	updatePalette();
@@ -362,7 +360,7 @@ function init()
 }
 
 function setElemDesc(elem, desc) {
-	desc = desc || actLayout[elem].Description;
+	desc = desc || actLayout[elem].description;
 	var k = kbLayout[elem];
 	document.getElementById(elem).title = desc + (elem ?  (" (" + 
 		descKeyCode(k) + ")") : "");
@@ -448,8 +446,8 @@ function updatePalette() {
 			palettine.className = "palettine";
 			palettine.title = palette[currentPalette][parseInt(tColor)] + (colorDesc != "" ? (" (" + colorDesc + (colDesc[colCount] ? (", " + colDesc[colCount]) : "" ) + ")") : "");
 			palettine.style.background = c;
-			palettine.setAttribute("onclick", "updateColor('" + c + "',0);");
-			palettine.setAttribute("oncontextmenu", "updateColor('" + c + "',1); return false;");
+			palettine.setAttribute("onclick", "updateColor('" + c + "', 0);");
+			palettine.setAttribute("oncontextmenu", "updateColor('" + c + "', 1); return false;");
 			paletteCell.appendChild(palettine);
 			paletteRow.appendChild(paletteCell);
 		}
@@ -459,28 +457,29 @@ function updatePalette() {
 }
 
 function updatePosition(event) {
-	x = event.pageX;
-	y = event.pageY;
-	x -= canvas.offsetLeft;
-	y -= canvas.offsetTop;
+	cursor.posX = event.pageX;
+	cursor.posY = event.pageY;
+	cursor.posX -= canvas.offsetLeft;
+	cursor.posY -= canvas.offsetTop;
 }
 
 function drawCursor () {
-	if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
-		dc.beginPath();
-		dc.lineWidth = 1;
+	if (cursor.posX >= 0 && cursor.posX < cWidth &&
+		cursor.posY >= 0 && cursor.posY < cHeight) {
+		context.beginPath();
+		context.lineWidth = 1;
 		if (precisePreview) {
-			dc.fillStyle = "rgba(" + tool.Color + ", " + tool.Opacity + ")";
-			dc.shadowBlur = tool.Shadow;
-			dc.shadowColor = "rgb(" + tool.Color + ")";
+			context.fillStyle = "rgba(" + tool.color + ", " + tool.opacity + ")";
+			context.shadowBlur = tool.shadow;
+			context.shadowColor = "rgb(" + tool.color + ")";
 		}
 		else {
-			dc.strokeStyle = "rgb(" + tool.Color + ")";
-			dc.shadowBlur = 0;
+			context.strokeStyle = "rgb(" + tool.color + ")";
+			context.shadowBlur = 0;
 		}
-		dc.arc(x, y, tool.Width / 2, 0, Math.PI*2, false);
-		dc.closePath();
-		precisePreview ? dc.fill() : dc.stroke();
+		context.arc(cursor.posX, cursor.posY, tool.width / 2, 0, Math.PI*2, false);
+		context.closePath();
+		precisePreview ? context.fill() : context.stroke();
 		if (!neverFlushCursor)
 			flushCursor = true;
 	}
@@ -493,37 +492,37 @@ function cDraw(event) {
 	updateDebugScreen();
 
 	if ((flushCursor || neverFlushCursor) && !(lowQMode && activeDrawing)) {
-		dc.putImageData(history[historyPosition], 0, 0);
+		context.putImageData(history[historyPosition], 0, 0);
 	}
 
 	if (activeDrawing) {
-		var tX = pX, tY = pY;
-		pX = smoothMode ? parseInt(x * 0.08 + pX * 0.92) : x;
-		pY = smoothMode ? parseInt(y * 0.08 + pY * 0.92) : y;
+		var tX = cursor.prevX, tY = cursor.prevY;
+		cursor.prevX = smoothMode ? parseInt(x * 0.08 + cursor.prevX * 0.92) : cursor.posX;
+		cursor.prevY = smoothMode ? parseInt(y * 0.08 + cursor.prevY * 0.92) : cursor.posY;
 		if(!antiAliasing) { //This probably would require massive optimization. Blame W3C.
 			while(1) {
-				for (i = 0; i < tool.Width; i++) {
-					var rC = Math.sqrt(1 - Math.pow(-1 + (i + 0.5) / tool.Width * 2, 2));
-					dc.moveTo(parseInt(tX - tool.Width * rC / 2) + globalOffs_1, tY + globalOffset - parseInt(tool.Width / 2) + i);
-					dc.lineTo(parseInt(tX + tool.Width * rC / 2) - globalOffset, tY + globalOffset - parseInt(tool.Width / 2) + i);
+				for (i = 0; i < tool.width; i++) {
+					var rC = Math.sqrt(1 - Math.pow(-1 + (i + 0.5) / tool.width * 2, 2));
+					context.moveTo(parseInt(tX - tool.width * rC / 2) + globalOffs_1, tY + globalOffset - parseInt(tool.width / 2) + i);
+					context.lineTo(parseInt(tX + tool.width * rC / 2) - globalOffset, tY + globalOffset - parseInt(tool.width / 2) + i);
 				}
 				tX = parseInt((pX + tX) / 2);
 				tY = parseInt((pY + tY) / 2);
-				//if(tX == pX && tY == pY) //Uncomment this and your system will suddenly crash.
+				//if(tX == cursor.prevX && tY == cursor.prevY) //Uncomment this and your system will suddenly crash.
 					break;
 			}
 		}
 		else
-			dc.lineTo(pX + globalOffset, pY + globalOffset);
-		dc.stroke();
+			context.lineTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
+		context.stroke();
 	} else
 		if (neverFlushCursor && !lowQMode)
 			drawCursor();
 }
 
 function cDrawStart(event) {
-	pX = x;
-	pY = y;
+	cursor.prevX = cursor.posX;
+	cursor.prevY = cursor.posY;
 
 	updatePosition(event);
 	//canvas.focus();
@@ -537,24 +536,24 @@ function cDrawStart(event) {
 		event.cancelBubble = true;
 
 		var t = tools[(event.which == 1) ? 0 : 1];
-		dc.putImageData(history[historyPosition], 0, 0);
+		context.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
-		dc.lineWidth = antiAliasing ? t.Width : 1;
-		dc.shadowBlur = t.Shadow;
-		dc.strokeStyle = "rgba(" + t.Color + ", " + t.Opacity + ")";
-		dc.shadowColor = "rgb(" + t.Color + ")";
-		dc.lineJoin = "round";
-		dc.lineCap = "round";
-		dc.beginPath();
+		context.lineWidth = antiAliasing ? t.width : 1;
+		context.shadowBlur = t.shadow;
+		context.strokeStyle = "rgba(" + t.color + ", " + t.opacity + ")";
+		context.shadowColor = "rgb(" + t.color + ")";
+		context.lineJoin = "round";
+		context.lineCap = "round";
+		context.beginPath();
 		if(antiAliasing) {
-			dc.moveTo(x + globalOffset, y + globalOffset);
-			dc.lineTo(x + globalOffs_1, y + globalOffs_1);
-			dc.stroke();
+			context.moveTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
+			context.lineTo(cursor.posX + globalOffs_1, cursor.posY + globalOffs_1);
+			context.stroke();
 		}
 		else
 			cDraw(event);
-		vX = x;
-		vY = y;
+		vX = cursor.posX;
+		vY = cursor.posY;
 	}
 	return false;
 }
@@ -562,9 +561,9 @@ function cDrawStart(event) {
 function cDrawEnd(event) {
 	//Saving in history:
 	if (activeDrawing) {
-		dc.putImageData(history[historyPosition], 0, 0);
-		dc.stroke();
-		dc.closePath();
+		context.putImageData(history[historyPosition], 0, 0);
+		context.stroke();
+		context.closePath();
 		historyOperation(0);
 	}
 	activeDrawing=false;
@@ -573,11 +572,10 @@ function cDrawEnd(event) {
 
 function cDrawRestore(event) {
 	if (activeDrawing)
-		dc.moveTo(x + globalOffset, y + globalOffset);
+		context.moveTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
 	updatePosition(event);
-	pX = x;
-	pY = y;
-
+	cursor.prevX = cursor.posX;
+	cursor.prevY = cursor.posY;
 }
 
 function cDrawCancel() {
@@ -590,8 +588,8 @@ function cDrawCancel() {
 }
 
 function cCopyColor() {
-	var rgba = history[historyPosition].data, i = (x+y*cWidth)*4;
-	var hex = (rgba[i] * 65536 + rgba[i+1] * 256 + rgba[i+2]).toString(16);
+	var rgba = history[historyPosition].data, i = (x + y * cWidth) * 4;
+	var hex = (rgba[i] * 65536 + rgba[i + 1] * 256 + rgba[i + 2]).toString(16);
 	while (hex.length < 6) {
 		hex = "0" + hex;
 	}
@@ -604,19 +602,19 @@ function cLWChange(event) {
 	event.returnValue = false;
 	if (delta > 0) {
 		if (event.ctrlKey)
-			tool.Opacity = (parseFloat(tool.Opacity) - 0.05).toFixed(2);
+			tool.opacity = (parseFloat(tool.opacity) - 0.05).toFixed(2);
 		else if (event.shiftKey)
-			tool.Shadow --;
+			tool.shadow --;
 		else
-			tool.Width --;
+			tool.width --;
 	}
 	if (delta < 0) {
 		if (event.ctrlKey)
-			tool.Opacity = (parseFloat(tool.Opacity) + 0.05).toFixed(2);
+			tool.opacity = (parseFloat(tool.opacity) + 0.05).toFixed(2);
 		else if (event.shiftKey)
-			tool.Shadow ++;
+			tool.shadow ++;
 		else
-			tool.Width ++;
+			tool.width ++;
 	}
 
 	updateDebugScreen();
@@ -625,14 +623,14 @@ function cLWChange(event) {
 
 function updateDebugScreen() {
 	if (debugMode) {
-		dbg.innerHTML = "Cursor @" + x + ":" + y + "<br />Diff: " + (x - pX) + ":" + (y - pY) + "<br />FPS: " + fps;
+		debugElem.innerHTML = "Cursor @" + cursor.posX + ":" + cursor.posY + "<br />Diff: " + (cursor.posX - cursor.prevX) + ":" + (cursor.posY - cursor.prevY) + "<br />FPS: " + fps;
 		ticks ++;
 	}
 }
 
 function clearScreen(toolIndex) {
-	dc.fillStyle = "rgb(" + tools[toolIndex].Color + ")";
-	dc.fillRect(0, 0, cWidth, cHeight);
+	context.fillStyle = "rgb(" + tools[toolIndex].color + ")";
+	context.fillRect(0, 0, cWidth, cHeight);
 	historyOperation(0);
 }
 
@@ -641,7 +639,7 @@ function invertColors() {
 	for (var i = 0; i < buffer.data.length; i += 4)
 		for (var j = 0; j < 3; j++)
 			buffer.data[i + j] = 255 - buffer.data[i + j];
-	dc.putImageData(buffer, 0, 0);
+	context.putImageData(buffer, 0, 0);
 	historyOperation(0);
 }
 
@@ -650,47 +648,41 @@ function updateSliders(initiator) {
 
 	if (m > 0) {
 		var s = (m == 2 ? "-text" : "");
-		tool.Shadow	= document.getElementById("tool-shadow" + s).value;
-		tool.Width	= document.getElementById("tool-width" + s).value;
-		tool.Opacity	= document.getElementById("tool-opacity" + s).value;
-		//tool.TurnLimit	= document.getElementById("tool-turnlimit" + s).value;
+		tool.shadow	= document.getElementById("tool-shadow" + s).value;
+		tool.width	= document.getElementById("tool-width" + s).value;
+		tool.opacity	= document.getElementById("tool-opacity" + s).value;
 	}
 
-	if (tool.Opacity <= toolLimits.Opacity[0]) tool.Opacity = toolLimits.Opacity[0].toFixed(2); else
-	if (tool.Opacity >= toolLimits.Opacity[1]) tool.Opacity = toolLimits.Opacity[1].toFixed(2);
+	if (tool.opacity <= toolLimits.opacity[0]) tool.opacity = toolLimits.opacity[0].toFixed(2); else
+	if (tool.opacity >= toolLimits.opacity[1]) tool.opacity = toolLimits.opacity[1].toFixed(2);
 
-	if (tool.Width <= toolLimits.Width[0]) tool.Width = toolLimits.Width[0]; else
-	if (tool.Width >= toolLimits.Width[1]) tool.Width = toolLimits.Width[1];
+	if (tool.width <= toolLimits.width[0]) tool.width = toolLimits.width[0]; else
+	if (tool.width >= toolLimits.width[1]) tool.width = toolLimits.width[1];
 
-	if (tool.Shadow <= toolLimits.Shadow[0]) tool.Shadow = toolLimits.Shadow[0]; else
-	if (tool.Shadow >= toolLimits.Shadow[1]) tool.Shadow = toolLimits.Shadow[1];
+	if (tool.shadow <= toolLimits.shadow[0]) tool.shadow = toolLimits.shadow[0]; else
+	if (tool.shadow >= toolLimits.shadow[1]) tool.shadow = to
 
-	if (tool.TurnLimit <=   0) tool.TurnLimit = 0; else
-	if (tool.TurnLimit >= 360) tool.TurnLimit = 360;
-
-	document.getElementById("tool-shadow-text").value = tool.Shadow;
-	document.getElementById("tool-width-text").value = tool.Width;
-	document.getElementById("tool-opacity-text").value = tool.Opacity;
-	//document.getElementById("rangeT").value = tool.TurnLimit;
+	document.getElementById("tool-shadow-text").value = tool.shadow;
+	document.getElementById("tool-width-text").value = tool.width;
+	document.getElementById("tool-opacity-text").value = tool.opacity;
 
 	if (document.getElementById("tool-width")) {
-		document.getElementById("tool-shadow").value = tool.Shadow;
-		document.getElementById("tool-width").value = tool.Width;
-		document.getElementById("tool-opacity").value = tool.Opacity;
-		//document.getElementById("rangeTS").value = tool.TurnLimit;
+		document.getElementById("tool-shadow").value = tool.shadow;
+		document.getElementById("tool-width").value = tool.width;
+		document.getElementById("tool-opacity").value = tool.opacity;
 	}
 
 	cDrawEnd();
-	var w = Math.max(tool.Width, tools[1].Width) + Math.max(tool.Shadow, tools[1].Shadow) * 2.5 + 7;
-	dc.putImageData(history[historyPosition], 0, 0,
-		parseInt(x) - w / 2, parseInt(y) - w / 2, w, w);
+	var w = Math.max(tool.width, tools[1].width) + Math.max(tool.shadow, tools[1].shadow) * 2.5 + 7;
+	context.putImageData(history[historyPosition], 0, 0,
+		parseInt(cursor.posX) - w / 2, parseInt(cursor.posY) - w / 2, w, w);
 	drawCursor();
 }
 
 function swapTools(eraser) {
 	if(eraser) {
-		for (i in tool)
-			tool[i] = tools[2][i];
+		for (key in tool)
+			tool[key] = tools[2][key];
 	}
 	else {
 		var back = tools[0];
@@ -698,20 +690,20 @@ function swapTools(eraser) {
 		tools[1] = back;
 		updateColor(0,1);
 	}
-	updateColor(tool.Color);
+	updateColor(tool.color);
 	updateSliders();
 }
 
 function updateColor(value, toolIndex) {
 	var t = tools[toolIndex || 0];
-	var c = cElem;
+	var c = colorCodeElem;
 	var v = value || c.value;
 	var regShort = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/i;
 	var regLong = /^#[0-9a-fA-F]{6}$/i;
 	var regRGB = /^([0-9]{1,3}),\s*([0-9]{1,3}),\s*([0-9]{1,3})/;
 	if (regRGB.test(v))
 	{
-		var a = (t.Color = v).split(new RegExp(",\s*"));
+		var a = (t.color = v).split(new RegExp(",\s*"));
 		v = "#";
 		for (i in a) {
 			a[i] = Math.max(Math.min(parseInt(a[i]), 255), 0);
@@ -723,7 +715,7 @@ function updateColor(value, toolIndex) {
 		if (!regLong.test(v))
 			return;
 		if (value != "") {
-			t.Color = parseInt(v.substr(1,2), 16) + ", "
+			t.color = parseInt(v.substr(1,2), 16) + ", "
 				+ parseInt(v.substr(3,2), 16) + ", "
 				+ parseInt(v.substr(5,2), 16);
 		}
@@ -731,7 +723,7 @@ function updateColor(value, toolIndex) {
 	if (t == tool) {
 		c.value = v;
 	}
-	document.getElementById((t == tool) ? "canva-fill" : "canva-delete").style.background = "rgb(" + t.Color + ")";
+	document.getElementById((t == tool) ? "canva-fill" : "canva-delete").style.background = "rgb(" + t.color + ")";
 
 	//inverted color
 	var m = parseInt(v.substr(1), 16);
@@ -755,7 +747,6 @@ function updateColor(value, toolIndex) {
 		window.localStorage.historyPalette = JSON.stringify(palette["history"]);
 }
 
-
 function historyOperation(opid) {
 	//0: Write: Refresh
 	//1: Read: Backward
@@ -768,7 +759,7 @@ function historyOperation(opid) {
 		historyPosition ++;
 	}
 	if (opid == 1 || opid == 2) {
-		dc.putImageData(history[historyPosition], 0, 0);
+		context.putImageData(history[historyPosition], 0, 0);
 	}
 	if (opid == 0) {
 		if (historyPosition < historyStorage - 1) {
@@ -778,7 +769,7 @@ function historyOperation(opid) {
 		else
 			for(i = 0; i < historyStorage - 1; i ++)
 				history[i] = history[i + 1];
-		history[historyPosition] = dc.getImageData(0, 0, cWidth, cHeight);
+		history[historyPosition] = context.getImageData(0, 0, cWidth, cHeight);
 		if (enableAutoSave) {
 			var dt = new Date().getTime();
 			if (dt - lastAutoSave > 60000) {
@@ -792,8 +783,8 @@ function historyOperation(opid) {
 }
 
 function updateButtons() {
-	setElemDesc("canva-jpeg", actLayout["canva-jpeg"].Description + " (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
-	setElemDesc("canva-png", actLayout["canva-png"].Description + " (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
+	setElemDesc("canva-jpeg", actLayout["canva-jpeg"].description + " (≈" + (canvas.toDataURL("image/jpeg").length / 1300).toFixed(0) + " kb)", "canva.jpeg");
+	setElemDesc("canva-png", actLayout["canva-png"].description + " (≈" + (canvas.toDataURL().length / 1300).toFixed(0) + " kb)", "canva.png");
 
 	document.getElementById("history-redo").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
 	document.getElementById("history-undo").className = (historyPosition == 0 ? "button-disabled" : "button");
@@ -804,8 +795,8 @@ function cHotkeys(k) {
 	//if (hki != 0)
 		for (kbk in kbLayout) {			
 			if (kbLayout[kbk] == k) {
-				eval(actLayout[kbk].Operation);
-				if(!(actLayout[kbk].Once || false)) {
+				eval(actLayout[kbk].operation);
+				if(!(actLayout[kbk].once || false)) {
 					hkPressed = true;
 					return true;
 				}
@@ -818,11 +809,12 @@ function cHotkeys(k) {
 function cHotkeysStart(event) {
 	if (!hkPressed) {		
 		var k = Math.min(event.keyCode, 255) //preventing from some bad things, that can happen
-			+ (event.ctrlKey ? c_ : 0)
-			+ (event.shiftKey ? s_ : 0)
-			+ (event.altKey ? a_ : 0)
-			+ (event.metaKey ? m_ : 0)
-		if (x >= 0 && x < cWidth && y >= 0 && y < cHeight) {
+			+ (event.ctrlKey ? CTRL : 0)
+			+ (event.shiftKey ? SHIFT : 0)
+			+ (event.altKey ? ALT : 0)
+			+ (event.metaKey ? META : 0)
+		if (cursor.posX >= 0 && cursor.posX < cWidth &&
+			cursor.posY >= 0 && cursor.posY < cHeight) {
 			event.preventDefault();
 			event.returnValue = false;
 			if (cHotkeys(k)) {				
@@ -845,17 +837,16 @@ function cHotkeysEnd(event) {
 
 function toolModify(id, param, inc, value) {
 	switch (param) {
-		case 0: tools[id].Opacity = (inc == 0 ? value : (tools[id].Opacity + inc)).toFixed(2); break;
-		case 1: tools[id].Width = (inc == 0 ? value : (tools[id].Width + inc)); break;
-		case 2: tools[id].Shadow = (inc == 0 ? value : (tools[id].Shadow + inc)); break;
-		case 3: tools[id].TurnLimit = (inc == 0 ? value : (tools[id].TurnLimit + inc)); break;
+		case 0: tools[id].opacity = (inc == 0 ? value : (tools[id].opacity + inc)).toFixed(2); break;
+		case 1: tools[id].width = (inc == 0 ? value : (tools[id].width + inc)); break;
+		case 2: tools[id].shadow = (inc == 0 ? value : (tools[id].shadow + inc)); break;
 	}
 	updateSliders();
 }
 
 function switchMode(id) {
 	switch (id) {
-		case -1: debugMode =! debugMode; dbg.innerHTML=""; break;
+		case -1: debugMode =! debugMode; debugElem.innerHTML=""; break;
 		case 0: document.getElementById("tool-lowquality").className = (lowQMode = !lowQMode) ? "button-active" : "button"; break;
 		case 1: document.getElementById("tool-preview").className = (precisePreview = !precisePreview) ? "button-active" : "button"; break;
 		case 2: document.getElementById("tool-antialiasing").className = (antiAliasing = !antiAliasing) ? "button-active" : "button"; break;
@@ -896,7 +887,7 @@ function savePic(value, auto) {
 				image.src = window.localStorage.recovery;
 			else if (!a)
 				alert("Local Storage не поддерживается.");
-			dc.drawImage(image, 0, 0);
+			context.drawImage(image, 0, 0);
 			historyOperation(0);
 		break;
 		default: alert("Недопустимое значение (обновите кэш).");
@@ -909,10 +900,10 @@ function fpsCount() {
 }
 
 function descKeyCode(k) {
-	return (k & c_ ? "Ctrl + ":"") + 
-		(k & a_ ? "Alt + ":"") + 
-		(k & m_ ? "Meta + ":"") + 
-		(k & s_ ? "Shift + ":"") + 
+	return (k & CTRL ? "Ctrl + ":"") + 
+		(k & ALT ? "Alt + ":"") + 
+		(k & META ? "Meta + ":"") + 
+		(k & SHIFT ? "Shift + ":"") + 
 		(kbDesc[k % 256] ? kbDesc[k % 256] : String.fromCharCode(k % 256));
 }
 
