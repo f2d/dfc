@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.6";
+var infoVersion = "v1.6.7";
 var infoDate = "May 10, 2013"
 
 var sketcher, canvas, context, sendForm,
@@ -25,10 +25,16 @@ var lastAutoSave = new Date().getTime(),
 var cWidth = 600,
 	cHeight = 360; //may be not so constant in future
 
+var toolPresets = [
+	{"opacity" : 1.00, "width" :  4, "shadow" : 0, "color" : "0, 0, 0"		} //Fore Default
+,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Back Default
+,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Eraser
+,	{"opacity" : 1.00, "width" :  1, "shadow" : 0, "color" : "0, 0, 0"		} //Pencil
+];
+
 var tools = [
 	{"opacity" : 1.00, "width" :  4, "shadow" : 0, "color" : "0, 0, 0"		} //Fore
 ,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Back
-,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Eraser
 ], tool = tools[0];
 
 var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
@@ -138,6 +144,7 @@ var kbLayout = {
 	, "tool-colorpick" :			"C".charCodeAt(0)
 	, "tool-swap" :					"S".charCodeAt(0)
 	, "tool-eraser" :				"E".charCodeAt(0)
+	, "tool-default" :				"R".charCodeAt(0)
 	, "tool-width-" :				"Q".charCodeAt(0)
 	, "tool-width+" :				"W".charCodeAt(0)
 	, "tool-opacity-" :				CTRL + "Q".charCodeAt(0)
@@ -177,8 +184,10 @@ var actLayout = {
 	, "tool-lowquality" :			{"operation" :	"switchMode(0)",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
 	, "tool-smooth" :				{"operation" :	"switchMode(3)",		"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
 	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
-	, "tool-swap" :					{"operation" :	"swapTools(0)",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
-	, "tool-eraser" :				{"operation" :	"swapTools(1)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
+	, "tool-swap" :					{"operation" :	"setTool(-1)",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
+	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
+	, "tool-pencil" :				{"operation" :	"setTool(3)",			"title" : "i",			"description" : "Заменить инструмент на стандартный карандаш",	"once" : true}
+	, "tool-default" :				{"operation" :	"setTool(-2)",			"title" : "Ø",			"description" : "Восстановить значения по умолчанию",	"once" : true}
 	, "tool-width-" :				{"operation" :	"toolModify(0, 1, -1)"}
 	, "tool-width+" :				{"operation" :	"toolModify(0, 1, +1)"}
 	, "tool-opacity-" :				{"operation" :	"toolModify(0, 0, -0.05)"}
@@ -200,7 +209,7 @@ var actLayout = {
 };
 
 //List of buttons to display
-var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "tool-eraser", "canva-invert", "|",
+var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-pencil", "tool-eraser", "tool-default", "|",
 					"tool-antialiasing", "tool-preview", "tool-smooth", "tool-lowquality", "|",
 					"history-store", "history-extract", "canva-jpeg", "canva-png", "canva-send", "|", "app-help"];
 
@@ -362,7 +371,7 @@ function init()
 function setElemDesc(elem, desc) {
 	desc = desc || actLayout[elem].description;
 	var k = kbLayout[elem];
-	document.getElementById(elem).title = desc + (elem ?  (" (" + 
+	document.getElementById(elem).title = desc + (kbLayout[elem] ?  (" (" + 
 		descKeyCode(k) + ")") : "");
 }
 
@@ -679,16 +688,24 @@ function updateSliders(initiator) {
 	drawCursor();
 }
 
-function swapTools(eraser) {
-	if(eraser) {
+function setTool(toolID) {
+	if(toolID >= 0) {
 		for (key in tool)
-			tool[key] = tools[2][key];
+			tool[key] = toolPresets[toolID][key];
 	}
-	else {
+	//MAGEECK NUMBAS
+	else if (toolID == -1) {
 		var back = tools[0];
 		tool = tools[0] = tools[1];
 		tools[1] = back;
 		updateColor(0,1);
+	}
+	else if (toolID == -2) {
+		for (key in tool)
+			tool[key] = toolPresets[0][key];
+		for (key in tool)
+			tools[1][key] = toolPresets[1][key];
+		updateColor(tools[1].color, 1);
 	}
 	updateColor(tool.color);
 	updateSliders();
