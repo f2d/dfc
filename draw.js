@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.10";
+var infoVersion = "v1.6.11";
 var infoDate = "May 12, 2013"
 
 var sketcher, canvas, context, sendForm,
@@ -13,6 +13,8 @@ var	globalOffset = 0.5, //pixel offset
 	globalOffs_1 = globalOffset - 0.01;
 
 var activeDrawing = false;
+
+var sendButton = true;
 
 var historyStorage = 32;
 var history = new Array(historyStorage);
@@ -168,27 +170,27 @@ for (i = 1; i <= 10; i ++) {
 }
 
 var actLayout = { 
-	  "history-undo" :				{"operation" :	"historyOperation(1)",	"title" : "&#x2190;",	"description" : "Назад"}
-	, "history-redo" :				{"operation" :	"historyOperation(2)",	"title" : "&#x2192;",	"description" : "Вперёд"}
-	, "history-store" :				{"operation" :	"savePic(-1)",			"title" : "&#x22C1;",	"description" : "Сделать back-up",	"once" : true}
-	, "history-extract" :			{"operation" :	"savePic(-2)",			"title" : "&#x22C0;",	"description" : "Извлечь back-up",	"once" : true}
+	  "history-undo" :				{"operation" :	"historyOperation('undo')",	"title" : "&#x2190;",	"description" : "Назад"}
+	, "history-redo" :				{"operation" :	"historyOperation('redo')",	"title" : "&#x2192;",	"description" : "Вперёд"}
+	, "history-store" :				{"operation" :	"picTransfer('toLS')",	"title" : "&#x22C1;",	"description" : "Сделать back-up",	"once" : true}
+	, "history-extract" :			{"operation" :	"picTransfer('fromLS')","title" : "&#x22C0;",	"description" : "Извлечь back-up",	"once" : true}
 
 	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "F",			"description" : "Закрасить полотно основным цветом",	"once" : true}
 	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "B",			"description" : "Закрасить полотно фоновым цветом",		"once" : true}
 	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"description" : "Инверсия полотна",		"once" : true}
-	, "canva-jpeg" :				{"operation" :	"savePic(1)",			"title" : "J",			"description" : "Сохранить в JPEG",		"once" : true}
-	, "canva-png" :					{"operation" :	"savePic(2)",			"title" : "P",			"description" : "Сохранить в PNG",		"once" : true}
-	, "canva-send" :				{"operation" :	"savePic(0)",			"title" : "Отправить &#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
+	, "canva-jpeg" :				{"operation" :	"picTransfer('toJPG')",	"title" : "J",			"description" : "Сохранить в JPEG",		"once" : true}
+	, "canva-png" :					{"operation" :	"picTransfer('toPNG')",	"title" : "P",			"description" : "Сохранить в PNG",		"once" : true}
+	, "canva-send" :				{"operation" :	"picTransfer('send')",	"title" : "Отправить &#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
 
 	, "tool-antialiasing" :			{"operation" :	"switchMode('tool-antialiasing')",		"title" : "AA",			"description" : "Anti-Aliasing",			"once" : true}
 	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"description" : "Предпросмотр кисти",		"once" : true}
 	, "tool-lowquality" :			{"operation" :	"switchMode('tool-lowquality')",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
 	, "tool-smooth" :				{"operation" :	"switchMode('tool-smooth')",			"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
 	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
-	, "tool-swap" :					{"operation" :	"setTool(-1)",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
+	, "tool-swap" :					{"operation" :	"setTool('swap')",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
 	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
 	, "tool-pencil" :				{"operation" :	"setTool(3)",			"title" : "i",			"description" : "Заменить инструмент на стандартный карандаш",	"once" : true}
-	, "tool-default" :				{"operation" :	"setTool(-2)",			"title" : "Ø",			"description" : "Восстановить значения по умолчанию",	"once" : true}
+	, "tool-default" :				{"operation" :	"setTool('reset')",			"title" : "Ø",			"description" : "Восстановить значения по умолчанию",	"once" : true}
 	, "tool-width-" :				{"operation" :	"toolModify(0, 'width', -1)",		"title" : "-",		"description" : "Уменьшить"}
 	, "tool-width+" :				{"operation" :	"toolModify(0, 'width', +1)",		"title" : "+",		"description" : "Увеличить"}
 	, "tool-opacity-" :				{"operation" :	"toolModify(0, 'opacity', -0.05)",	"title" : "-",		"description" : "Уменьшить"}
@@ -210,7 +212,7 @@ var actLayout = {
 //List of buttons to display
 var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-pencil", "tool-eraser", "tool-default", "|",
 					"tool-antialiasing", "tool-preview", "tool-smooth", "tool-lowquality", "|",
-					"history-store", "history-extract", "canva-jpeg", "canva-png", "canva-send", "|", "app-help"];
+					"history-store", "history-extract", "canva-jpeg", "canva-png", sendButton ? "canva-send" : "", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
 	actLayout["tool-opacity." + i] = {"operation" : "toolModify(0, 0, 0, " + (i / 10) + ")"}; 
@@ -352,18 +354,19 @@ function init()
 
 	for(i in guiButtons) {
 		var tElem = document.createElement("span");	
-		if(guiButtons[i] != "|") {
-			tElem.id = guiButtons[i];
-			tElem.className = (guiButtons[i] =="tool-antialiasing" && modes["tool-antialiasing"]) ? "button-active" : "button";
-			tElem.innerHTML = actLayout[guiButtons[i]].title;
-			tElem.setAttribute("onclick", actLayout[guiButtons[i]].operation);
-			bottomElem.appendChild(tElem);	
-			setElemDesc(guiButtons[i]);
-		} else {
-			tElem.className = "vertical";	
-			tElem.innerHTML = "&nbsp;";
-			bottomElem.appendChild(tElem);	
-		}
+		if(guiButtons[i] != "")
+			if(guiButtons[i] != "|") {
+				tElem.id = guiButtons[i];
+				tElem.className = (guiButtons[i] =="tool-antialiasing" && modes["tool-antialiasing"]) ? "button-active" : "button";
+				tElem.innerHTML = actLayout[guiButtons[i]].title;
+				tElem.setAttribute("onclick", actLayout[guiButtons[i]].operation);
+				bottomElem.appendChild(tElem);	
+				setElemDesc(guiButtons[i]);
+			} else {
+				tElem.className = "vertical";	
+				tElem.innerHTML = "&nbsp;";
+				bottomElem.appendChild(tElem);	
+			}
 	}
 
 	updateColor(tools[0].color, 0);
@@ -596,9 +599,9 @@ function cDrawEnd(event) {
 		context.putImageData(history[historyPosition], 0, 0);
 		context.stroke();
 		context.closePath();
-		historyOperation(0);
+		historyOperation('push');
 	}
-	activeDrawing=false;
+	activeDrawing = false;
 	updateDebugScreen();
 }
 
@@ -612,10 +615,10 @@ function cDrawRestore(event) {
 
 function cDrawCancel() {
 	if (activeDrawing) {
-		historyOperation(1);
-		historyOperation(2);
+		historyOperation('undo');
+		historyOperation('redo');
 	}
-	activeDrawing=false;
+	activeDrawing = false;
 	updateDebugScreen();
 }
 
@@ -663,7 +666,7 @@ function updateDebugScreen() {
 function clearScreen(toolIndex) {
 	context.fillStyle = "rgb(" + tools[toolIndex].color + ")";
 	context.fillRect(0, 0, cWidth, cHeight);
-	historyOperation(0);
+	historyOperation('push');
 }
 
 function invertColors() {
@@ -672,7 +675,7 @@ function invertColors() {
 		for (var j = 0; j < 3; j++)
 			buffer.data[i + j] = 255 - buffer.data[i + j];
 	context.putImageData(buffer, 0, 0);
-	historyOperation(0);
+	historyOperation('push');
 }
 
 function updateSliders(initiator) {
@@ -716,14 +719,13 @@ function setTool(toolID) {
 		for (key in tool)
 			tool[key] = toolPresets[toolID][key];
 	}
-	//MAGEECK NUMBAS
-	else if (toolID == -1) {
+	else if (toolID == 'swap') {
 		var back = tools[0];
 		tool = tools[0] = tools[1];
 		tools[1] = back;
 		updateColor(0,1);
 	}
-	else if (toolID == -2) {
+	else if (toolID == 'reset') {
 		for (key in tool)
 			tool[key] = toolPresets[0][key];
 		for (key in tool)
@@ -788,20 +790,16 @@ function updateColor(value, toolIndex) {
 }
 
 function historyOperation(opid) {
-	//0: Write: Refresh
-	//1: Read: Backward
-	//2: Read: Foreward
-	//3: Push Points //OUTDATED
-	if (opid == 1 && historyPosition > 0) {
+	if (opid == 'undo' && historyPosition > 0) {
 		historyPosition --;
 	}
-	if (opid == 2 && historyPosition < historyStorage - 1 && historyPosition < historyPositionMax) {
+	if (opid == 'redo' && historyPosition < historyStorage - 1 && historyPosition < historyPositionMax) {
 		historyPosition ++;
 	}
-	if (opid == 1 || opid == 2) {
+	if (opid == 'undo' || opid == 'redo') {
 		context.putImageData(history[historyPosition], 0, 0);
 	}
-	if (opid == 0) {
+	if (opid == 'push') {
 		if (historyPosition < historyStorage - 1) {
 			historyPosition ++;
 			historyPositionMax = historyPosition;
@@ -813,7 +811,7 @@ function historyOperation(opid) {
 		if (enableAutoSave) {
 			var dt = new Date().getTime();
 			if (dt - lastAutoSave > 60000) {
-				savePic(-1,true);
+				picTransfer('toLS',true);
 				lastAutoSave = dt;
 			}
 		}
@@ -888,24 +886,25 @@ function switchMode(mode) {
 		debugElem.innerHTML = "";
 }
 
-function savePic(value, auto) {
+function picTransfer(value, auto) {
 	var a = auto || false;
 	switch (value) {
-		case 0:
-			if (a || confirm("Вы уверены, что хотите загрузить изображение на сервер?")) {
-				var imageToSend = document.createElement("input");
-				var jpgData = canvas.toDataURL("image/jpeg");
-				var pngData = canvas.toDataURL();
-				imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
-				imageToSend.name = "content";
-				imageToSend.type = "hidden";
-				sendForm.appendChild(imageToSend);
-				sendForm.submit();
-			}
+		case "send":
+			if(sendButton)
+				if (a || confirm("Вы уверены, что хотите загрузить изображение на сервер?")) {
+					var imageToSend = document.createElement("input");
+					var jpgData = canvas.toDataURL("image/jpeg");
+					var pngData = canvas.toDataURL();
+					imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
+					imageToSend.name = "content";
+					imageToSend.type = "hidden";
+					sendForm.appendChild(imageToSend);
+					sendForm.submit();
+				}
 		break;
-		case 1: picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
-		case 2: picTab = window.open(canvas.toDataURL(), "_blank"); break;
-		case -1:
+		case "toJPG": picTab = window.open(canvas.toDataURL("image/jpeg"), "_blank"); break;
+		case "toPNG": picTab = window.open(canvas.toDataURL(), "_blank"); break;
+		case "toLS":
 			if (a || confirm("Вы уверены, что хотите загрузить данные в Local Storage?")) {
 				var jpgData = canvas.toDataURL("image/jpeg");
 				var pngData = canvas.toDataURL();
@@ -915,14 +914,16 @@ function savePic(value, auto) {
 					alert("Local Storage не поддерживается.");
 			}
 		break;
-		case -2:
-			var image = new Image();
-			if(!!window.localStorage)
-				image.src = window.localStorage.recovery;
-			else if (!a)
-				alert("Local Storage не поддерживается.");
-			context.drawImage(image, 0, 0);
-			historyOperation(0);
+		case "fromLS":
+			if (a || confirm("Вы уверены, что хотите загрузить данные из Local Storage?")) {
+				var image = new Image();
+				if(!!window.localStorage)
+					image.src = window.localStorage.recovery;
+				else if (!a)
+					alert("Local Storage не поддерживается.");
+				context.drawImage(image, 0, 0);
+				historyOperation('push');
+			}
 		break;
 		default: alert("Недопустимое значение (обновите кэш).");
 	}
