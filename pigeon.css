@@ -53,12 +53,15 @@
 	margin: 1px;
 }
 
+#sketcher input[type="range"] {
+	height: 20px;
+	padding: 0;
+	margin: 0;
+}
+
 #sketcher input[type="text"] {
 	width: 48px;
 	height: 20px;
-	position: relative;
-	top: 2px;
-	margin: 0;
 }
 
 #sketcher .button, #sketcher .button-active, #sketcher .button-disabled {

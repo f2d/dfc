@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.9";
+var infoVersion = "v1.6.10";
 var infoDate = "May 12, 2013"
 
 var sketcher, canvas, context, sendForm,
@@ -285,10 +285,10 @@ function init()
 			et = document.createElement("input");
 			et.id = "tool-" + a[i];
 			et.type = "range";
-			et.value = eval("tool." + a);
-			et.min = toolLimits[a][0];
-			et.max = toolLimits[a][1];
-			et.step = toolLimits[a][2];
+			et.value = tool[a[i]];
+			et.min = toolLimits[a[i]][0];
+			et.max = toolLimits[a[i]][1];
+			et.step = toolLimits[a[i]][2];
 			et.setAttribute("onchange", "updateSliders(1);");
 			sideElem.appendChild(et);
 			sliders[et.id] = et;
@@ -339,10 +339,10 @@ function init()
 	sideElem.appendChild(e);
 
 	colorCodeElem = document.createElement("input");
-	colorCodeElem.type = "color";
+	sideElem.appendChild(colorCodeElem);
+	colorCodeElem.type = "color"; //It's IE! I ain't gotta fix its shit. Blame MS right here.
 	colorCodeElem.id = "color";
 	colorCodeElem.setAttribute("onchange", "updateColor()");
-	sideElem.appendChild(colorCodeElem);
 
 	bottomElem = document.createElement("div");	
 	sketcher.appendChild(bottomElem);
@@ -875,7 +875,7 @@ function toolModify(id, param, inc, value) {
 		tools[id].opacity = (inc == 0 ? value : (parseFloat(tools[id].opacity) + inc)).toFixed(2);
 	else
 		tools[id][param] = (inc == 0 ? value : (tools[id][param] + inc));
-	
+
 	updateSliders();
 }
 
