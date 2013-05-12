@@ -49,12 +49,16 @@
 
 #sketcher input, #sketcher select {
 	font-family: "Trebuchet MS";
-	font-size: 14pt;	
+	font-size: 12pt;	
 	margin: 1px;
 }
 
 #sketcher input[type="text"] {
-	width: 64px;
+	width: 48px;
+	height: 20px;
+	position: relative;
+	top: 2px;
+	margin: 0;
 }
 
 #sketcher .button, #sketcher .button-active, #sketcher .button-disabled {
@@ -66,8 +70,8 @@
 	height: 24px;
 	text-align: center;
 	font-family: "Arial Unicode MS";
-	font-size: 11pt;
 	font-weight: bold;
+	font-size: 11pt;
 	margin-left: 2px;
 	margin-right: 2px;
 
@@ -76,6 +80,10 @@
 	-ms-user-select: none;
 	-o-user-select: none;
 	user-select: none;
+}
+
+#sketcher .button-mini {
+	min-width: 8px;
 }
 
 #sketcher .button {

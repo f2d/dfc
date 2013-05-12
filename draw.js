@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.8";
+var infoVersion = "v1.6.9";
 var infoDate = "May 12, 2013"
 
 var sketcher, canvas, context, sendForm,
@@ -154,8 +154,6 @@ var kbLayout = {
 	, "tool-opacity+" :				CTRL + "W".charCodeAt(0)
 	, "tool-shadow-" :				SHIFT + "Q".charCodeAt(0)
 	, "tool-shadow+" :				SHIFT + "W".charCodeAt(0)
-	, "tool-turn-" :				CTRL + SHIFT + "Q".charCodeAt(0)
-	, "tool-turn+" :				CTRL + SHIFT + "W".charCodeAt(0)
 
 	, "app-help" :					112
 
@@ -191,14 +189,12 @@ var actLayout = {
 	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
 	, "tool-pencil" :				{"operation" :	"setTool(3)",			"title" : "i",			"description" : "Заменить инструмент на стандартный карандаш",	"once" : true}
 	, "tool-default" :				{"operation" :	"setTool(-2)",			"title" : "Ø",			"description" : "Восстановить значения по умолчанию",	"once" : true}
-	, "tool-width-" :				{"operation" :	"toolModify(0, 1, -1)"}
-	, "tool-width+" :				{"operation" :	"toolModify(0, 1, +1)"}
-	, "tool-opacity-" :				{"operation" :	"toolModify(0, 0, -0.05)"}
-	, "tool-opacity+" :				{"operation" :	"toolModify(0, 0, +0.05)"}
-	, "tool-shadow-" :				{"operation" :	"toolModify(0, 2, -1)"}
-	, "tool-shadow+" :				{"operation" :	"toolModify(0, 2, +1)"}
-	, "tool-turn-" :				{"operation" :	"toolModify(0, 3, -1)"}
-	, "tool-turn+" :				{"operation" :	"toolModify(0, 3, +1)"}
+	, "tool-width-" :				{"operation" :	"toolModify(0, 'width', -1)",		"title" : "-",		"description" : "Уменьшить"}
+	, "tool-width+" :				{"operation" :	"toolModify(0, 'width', +1)",		"title" : "+",		"description" : "Увеличить"}
+	, "tool-opacity-" :				{"operation" :	"toolModify(0, 'opacity', -0.05)",	"title" : "-",		"description" : "Уменьшить"}
+	, "tool-opacity+" :				{"operation" :	"toolModify(0, 'opacity', +0.05)",	"title" : "+",		"description" : "Увеличить"}
+	, "tool-shadow-" :				{"operation" :	"toolModify(0, 'shadow', -1)",		"title" : "-",		"description" : "Уменьшить"}
+	, "tool-shadow+" :				{"operation" :	"toolModify(0, 'shadow', +1)",		"title" : "+",		"description" : "Увеличить"}
 
 	, "tool-width" : 				{"title" : "Толщина"}
 	, "tool-opacity" : 				{"title" : "Непрозрачность"}
@@ -284,7 +280,8 @@ function init()
 		i = a.length;
 	while (i--) { 
 		var et;
-		if ((e.type = "range") == e.type) {
+		var rangeElemSupport = (e.type = "range") == e.type;
+		if (rangeElemSupport) {
 			et = document.createElement("input");
 			et.id = "tool-" + a[i];
 			et.type = "range";
@@ -296,6 +293,10 @@ function init()
 			sideElem.appendChild(et);
 			sliders[et.id] = et;
 		}
+
+		if (!rangeElemSupport)
+			setToolButton(a[i], "-");
+
 		et = document.createElement("input");
 		et.id = "tool-" + a[i] + "-text";
 		et.value = eval("tool." + a[i]);
@@ -303,6 +304,9 @@ function init()
 		et.setAttribute("onchange", "updateSliders(2);");
 		sideElem.appendChild(et);
 		sliders[et.id] = et;
+
+		if (!rangeElemSupport)
+			setToolButton(a[i], "+");
 
 		et = document.createElement("span");
 		et.innerHTML = " " + actLayout["tool-" + a[i]].title;
@@ -369,6 +373,17 @@ function init()
 	updatePalette();
 	updateButtons();
 	updateSliders();
+}
+
+function setToolButton(property, sign) {
+	var button = "tool-" + property + sign;
+	var et = document.createElement("span");
+	et.id = button;
+	et.className = "button button-mini";
+	et.innerHTML = actLayout[button].title;
+	et.setAttribute("onclick", actLayout[button].operation);
+	sideElem.appendChild(et);	
+	setElemDesc(button);
 }
 
 function setElemDesc(elem, desc) {
@@ -810,7 +825,6 @@ function updateButtons() {
 
 	document.getElementById("history-redo").className = (historyPosition == historyPositionMax ? "button-disabled" : "button");
 	document.getElementById("history-undo").className = (historyPosition == 0 ? "button-disabled" : "button");
-
 }
 
 function cHotkeys(k) {
@@ -843,8 +857,7 @@ function cHotkeysStart(event) {
 				hki = setInterval('cHotkeys(' + k +')', 100);
 			}
 		}
-	}
-	else {
+	} else {
 		event.preventDefault();
 		event.returnValue = false;
 	}
@@ -858,11 +871,11 @@ function cHotkeysEnd(event) {
 }
 
 function toolModify(id, param, inc, value) {
-	switch (param) {
-		case 0: tools[id].opacity = (inc == 0 ? value : (tools[id].opacity + inc)).toFixed(2); break;
-		case 1: tools[id].width = (inc == 0 ? value : (tools[id].width + inc)); break;
-		case 2: tools[id].shadow = (inc == 0 ? value : (tools[id].shadow + inc)); break;
-	}
+	if (param == "opacity")
+		tools[id].opacity = (inc == 0 ? value : (parseFloat(tools[id].opacity) + inc)).toFixed(2);
+	else
+		tools[id][param] = (inc == 0 ? value : (tools[id][param] + inc));
+	
 	updateSliders();
 }
 
