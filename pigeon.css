@@ -59,10 +59,10 @@
 
 #sketcher .button, #sketcher .button-active, #sketcher .button-disabled {
 	cursor: pointer;
-	padding: 2px;
+	padding: 0 6px 0 6px;
 	display: inline-block;
 	border: 1px solid #acacac;
-	width: 32px;
+	min-width: 24px;
 	height: 24px;
 	text-align: center;
 	font-family: "Arial Unicode MS";

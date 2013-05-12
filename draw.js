@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.7";
-var infoDate = "May 10, 2013"
+var infoVersion = "v1.6.8";
+var infoDate = "May 12, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -39,16 +39,20 @@ var tools = [
 
 var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
 
-var debugMode = false,
-	fps = 0,
-	ticks = 0;
 
 var flushCursor = false,
 	neverFlushCursor = true;
-var lowQMode = false,
-	precisePreview = false,
-	antiAliasing = true;
-	smoothMode = false;
+
+var modes = {
+	"tool-lowquality": false
+,	"tool-preview": false
+,	"tool-antialiasing": true
+,	"tool-smooth": false
+,	"debug-mode": false
+	};
+
+var fps = 0,
+	ticks = 0;
 
 var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
@@ -108,7 +112,6 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 
 		, "@b", "@r", "Ику", "#000000", "#ffffff", "#5940c0", "#ee0501"
 		, "@b", "@r", "Тенши", "#ffffff", "#6dcef6", "#0073c1", "#f90b0b", "#405231", "#000000", "#f5d498", "#7cc074"
-
 		];
 
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
@@ -177,12 +180,12 @@ var actLayout = {
 	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"description" : "Инверсия полотна",		"once" : true}
 	, "canva-jpeg" :				{"operation" :	"savePic(1)",			"title" : "J",			"description" : "Сохранить в JPEG",		"once" : true}
 	, "canva-png" :					{"operation" :	"savePic(2)",			"title" : "P",			"description" : "Сохранить в PNG",		"once" : true}
-	, "canva-send" :				{"operation" :	"savePic(0)",			"title" : "&#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
+	, "canva-send" :				{"operation" :	"savePic(0)",			"title" : "Отправить &#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
 
-	, "tool-antialiasing" :			{"operation" :	"switchMode(2)",		"title" : "AA",			"description" : "Anti-Aliasing",			"once" : true}
-	, "tool-preview" :				{"operation" :	"switchMode(1)",		"title" : "&#x25CF;",	"description" : "Предпросмотр кисти",		"once" : true}
-	, "tool-lowquality" :			{"operation" :	"switchMode(0)",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
-	, "tool-smooth" :				{"operation" :	"switchMode(3)",		"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
+	, "tool-antialiasing" :			{"operation" :	"switchMode('tool-antialiasing')",		"title" : "AA",			"description" : "Anti-Aliasing",			"once" : true}
+	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"description" : "Предпросмотр кисти",		"once" : true}
+	, "tool-lowquality" :			{"operation" :	"switchMode('tool-lowquality')",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
+	, "tool-smooth" :				{"operation" :	"switchMode('tool-smooth')",			"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
 	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
 	, "tool-swap" :					{"operation" :	"setTool(-1)",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
 	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
@@ -205,7 +208,7 @@ var actLayout = {
 
 	, "app-help" :					{"operation" :	"showHelp()",			"title" : "?",			"description" : "Помощь",	"once" : true}
 
-	, "debug-mode" :				{"operation" :	"switchMode(-1)"}
+	, "debug-mode" :				{"operation" :	"switchMode('debug-mode')"}
 };
 
 //List of buttons to display
@@ -344,7 +347,7 @@ function init()
 		var tElem = document.createElement("span");	
 		if(guiButtons[i] != "|") {
 			tElem.id = guiButtons[i];
-			tElem.className = (guiButtons[i] =="tool-antialiasing" && antiAliasing) ? "button-active" : "button";
+			tElem.className = (guiButtons[i] =="tool-antialiasing" && modes["tool-antialiasing"]) ? "button-active" : "button";
 			tElem.innerHTML = actLayout[guiButtons[i]].title;
 			tElem.setAttribute("onclick", actLayout[guiButtons[i]].operation);
 			bottomElem.appendChild(tElem);	
@@ -477,7 +480,7 @@ function drawCursor () {
 		cursor.posY >= 0 && cursor.posY < cHeight) {
 		context.beginPath();
 		context.lineWidth = 1;
-		if (precisePreview) {
+		if (modes["tool-preview"]) {
 			context.fillStyle = "rgba(" + tool.color + ", " + tool.opacity + ")";
 			context.shadowBlur = tool.shadow;
 			context.shadowColor = "rgb(" + tool.color + ")";
@@ -488,7 +491,7 @@ function drawCursor () {
 		}
 		context.arc(cursor.posX, cursor.posY, tool.width / 2, 0, Math.PI*2, false);
 		context.closePath();
-		precisePreview ? context.fill() : context.stroke();
+		modes["tool-preview"] ? context.fill() : context.stroke();
 		if (!neverFlushCursor)
 			flushCursor = true;
 	}
@@ -500,32 +503,34 @@ function cDraw(event) {
 
 	updateDebugScreen();
 
-	if ((flushCursor || neverFlushCursor) && !(lowQMode && activeDrawing)) {
+	if ((flushCursor || neverFlushCursor) && !(modes["tool-lowquality"] && activeDrawing)) {
 		context.putImageData(history[historyPosition], 0, 0);
 	}
 
 	if (activeDrawing) {
 		var tX = cursor.prevX, tY = cursor.prevY;
-		cursor.prevX = smoothMode ? parseInt(x * 0.08 + cursor.prevX * 0.92) : cursor.posX;
-		cursor.prevY = smoothMode ? parseInt(y * 0.08 + cursor.prevY * 0.92) : cursor.posY;
-		if(!antiAliasing) { //This probably would require massive optimization. Blame W3C.
+		cursor.prevX = modes["tool-smooth"] ? parseInt(cursor.posX * 0.08 + cursor.prevX * 0.92) : cursor.posX;
+		cursor.prevY = modes["tool-smooth"] ? parseInt(cursor.posY * 0.08 + cursor.prevY * 0.92) : cursor.posY;
+		if(!modes["tool-antialiasing"]) { //This probably would require massive optimization. Blame W3C.
 			while(1) {
 				for (i = 0; i < tool.width; i++) {
 					var rC = Math.sqrt(1 - Math.pow(-1 + (i + 0.5) / tool.width * 2, 2));
-					context.moveTo(parseInt(tX - tool.width * rC / 2) + globalOffs_1, tY + globalOffset - parseInt(tool.width / 2) + i);
-					context.lineTo(parseInt(tX + tool.width * rC / 2) - globalOffset, tY + globalOffset - parseInt(tool.width / 2) + i);
+					context.moveTo(parseInt(tX - tool.width * rC / 2 - 0.5) + globalOffs_1, tY + globalOffset - parseInt(tool.width / 2) + i);
+					context.lineTo(parseInt(tX + tool.width * rC / 2 - 0.5) - globalOffset, tY + globalOffset - parseInt(tool.width / 2) + i);
+					context.stroke();
 				}
 				tX = parseInt((pX + tX) / 2);
 				tY = parseInt((pY + tY) / 2);
 				//if(tX == cursor.prevX && tY == cursor.prevY) //Uncomment this and your system will suddenly crash.
 					break;
-			}
+			}			
 		}
-		else
+		else {
 			context.lineTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
-		context.stroke();
+			context.stroke();
+		}
 	} else
-		if (neverFlushCursor && !lowQMode)
+		if (neverFlushCursor && !modes["tool-lowquality"])
 			drawCursor();
 }
 
@@ -547,14 +552,14 @@ function cDrawStart(event) {
 		var t = tools[(event.which == 1) ? 0 : 1];
 		context.putImageData(history[historyPosition], 0, 0);
 		activeDrawing = true;
-		context.lineWidth = antiAliasing ? t.width : 1;
+		context.lineWidth = modes["tool-antialiasing"] ? t.width : 1;
 		context.shadowBlur = t.shadow;
 		context.strokeStyle = "rgba(" + t.color + ", " + t.opacity + ")";
 		context.shadowColor = "rgb(" + t.color + ")";
 		context.lineJoin = "round";
 		context.lineCap = "round";
 		context.beginPath();
-		if(antiAliasing) {
+		if(modes["tool-antialiasing"]) {
 			context.moveTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
 			context.lineTo(cursor.posX + globalOffs_1, cursor.posY + globalOffs_1);
 			context.stroke();
@@ -631,7 +636,7 @@ function cLWChange(event) {
 }
 
 function updateDebugScreen() {
-	if (debugMode) {
+	if (modes["debug-mode"]) {
 		debugElem.innerHTML = "Cursor @" + cursor.posX + ":" + cursor.posY + "<br />Diff: " + (cursor.posX - cursor.prevX) + ":" + (cursor.posY - cursor.prevY) + "<br />FPS: " + fps;
 		ticks ++;
 	}
@@ -861,14 +866,10 @@ function toolModify(id, param, inc, value) {
 	updateSliders();
 }
 
-function switchMode(id) {
-	switch (id) {
-		case -1: debugMode =! debugMode; debugElem.innerHTML=""; break;
-		case 0: document.getElementById("tool-lowquality").className = (lowQMode = !lowQMode) ? "button-active" : "button"; break;
-		case 1: document.getElementById("tool-preview").className = (precisePreview = !precisePreview) ? "button-active" : "button"; break;
-		case 2: document.getElementById("tool-antialiasing").className = (antiAliasing = !antiAliasing) ? "button-active" : "button"; break;
-		case 3: document.getElementById("tool-smooth").className = (smoothMode = !smoothMode) ? "button-active" : "button"; break;
-	}
+function switchMode(mode) {
+	document.getElementById(mode).className = (modes[mode] = !modes[mode]) ? "button-active" : "button";
+	if(mode == "debug-mode")
+		debugElem.innerHTML = "";
 }
 
 function savePic(value, auto) {
