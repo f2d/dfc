@@ -262,6 +262,9 @@ function init()
 	canvas.setAttribute("onscroll", "return false;");
 
 	canvas.addEventListener("wheel", cLWChange, false);
+	canvas.addEventListener("mousewheel", cLWChange, false);
+	canvas.addEventListener("scroll", cLWChange, false);
+
 	canvas.width = cWidth;
 	canvas.height = cHeight;
 
