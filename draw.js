@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.13";
-var infoDate = "May 13, 2013"
+var infoVersion = "v1.6.14";
+var infoDate = "May 13-14, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -41,7 +41,6 @@ var tools = [
 
 var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
 
-
 var flushCursor = false,
 	neverFlushCursor = true;
 
@@ -55,7 +54,8 @@ var modes = {
 	};
 
 var fps = 0,
-	ticks = 0;
+	ticks = 0,
+	fpsi = 0;
 
 var paletteDesc = {"combo" : "Комбинированная", "safe" : "Web 216", "feijoa" : "Feijoa", "touhou" : "Тошки", "history" : "История"};
 var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
@@ -180,12 +180,12 @@ var actLayout = {
 	, "history-store" :				{"operation" :	"picTransfer('toLS')",	"title" : "&#x22C1;",	"small": "STORE",	"description" : "Сделать back-up",	"once" : true}
 	, "history-extract" :			{"operation" :	"picTransfer('fromLS')","title" : "&#x22C0;",	"small": "EXTRACT",	"description" : "Извлечь back-up",	"once" : true}
 
-	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "F",			"small": "FORE",	"description" : "Закрасить полотно основным цветом",	"once" : true}
-	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "B",			"small": "BACK",	"description" : "Закрасить полотно фоновым цветом",		"once" : true}
+	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "",			"small": "FORE",	"description" : "Закрасить полотно основным цветом",	"once" : true}
+	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "",			"small": "BACK",	"description" : "Закрасить полотно фоновым цветом",		"once" : true}
 	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"small": "INVERT",	"description" : "Инверсия полотна",		"once" : true}
-	, "canva-jpeg" :				{"operation" :	"picTransfer('toJPG')",	"title" : "J",			"small": "JPEG",	"description" : "Сохранить в JPEG",		"once" : true}
-	, "canva-png" :					{"operation" :	"picTransfer('toPNG')",	"title" : "P",			"small": "PNG",		"description" : "Сохранить в PNG",		"once" : true}
-	, "canva-send" :				{"operation" :	"picTransfer('send')",	"title" : "Отправить &#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
+	, "canva-jpeg" :				{"operation" :	"picTransfer('toJPG')",	"title" : "",			"small": "JPEG",	"description" : "Сохранить в JPEG",		"once" : true}
+	, "canva-png" :					{"operation" :	"picTransfer('toPNG')",	"title" : "",			"small": "PNG",		"description" : "Сохранить в PNG",		"once" : true}
+	, "canva-send" :				{"operation" :	"picTransfer('send')",	"title" : "&#x21B5;",	"small": "SEND",	"description" : "Отправить на сервер",	"once" : true}
 
 	, "tool-antialiasing" :			{"operation" :	"switchMode('tool-antialiasing')",		"title" : "&#x22A1;",	"small": "AA",		"description" : "Anti-Aliasing",			"once" : true}
 	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"small": "PREVIEW",	"description" : "Предпросмотр кисти",		"once" : true}
@@ -217,9 +217,9 @@ var actLayout = {
 };
 
 //List of buttons to display
-var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-default", "tool-pencil", "tool-eraser", "tool-line", "|", 
-					"tool-preview", "tool-antialiasing", "tool-smooth", "tool-lowquality", "|",
-					"history-store", "history-extract", "canva-jpeg", "canva-png", sendButton ? "canva-send" : "", "|", "app-help"];
+var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-default", "tool-pencil", "tool-eraser", "|", 
+					"tool-line", "tool-preview", "tool-antialiasing", "tool-smooth", "tool-lowquality", "|",
+					"history-store", "history-extract", "canva-jpeg", "canva-png", sendButton ? "|" : "", sendButton ? "canva-send" : "", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
 	actLayout["tool-opacity." + i] = {"operation" : "toolModify(0, 0, 0, " + (i / 10) + ")"}; 
@@ -408,8 +408,8 @@ function setElemDesc(elem, desc, info) {
 		descKeyCode(k) + ")") : "");
 	if (info)
 		tElem.innerHTML = "<div class='hotkey'>" + (kbLayout[elem] ? descKeyCode(k) : "&nbsp;") + "</div>"
-		 + actLayout[elem].title + "<br />" +
-		 "<span class='small'>" + actLayout[elem].small + "</span>";
+		 + (actLayout[elem].title || "&nbsp;") + "<br />" +
+		 "<span class='small'>" + (actLayout[elem].small || "&nbsp;") + "</span>";
 	else
 		tElem.innerHTML = actLayout[elem].title;
 }
@@ -561,18 +561,18 @@ function cDraw(event) {
 				//if(tX == cursor.prevX && tY == cursor.prevY) //Uncomment this and your system will suddenly crash.
 					break;
 			}			
-		}
-		else {
-			context.lineTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
-			context.stroke();
-		}
-		if(modes["tool-line"]) {
-			context.putImageData(history[historyPosition], 0, 0);
-			context.beginPath();	
-			context.moveTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
-			context.lineTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
-			context.stroke();
-			context.closePath();	
+		} else {
+			if(modes["tool-line"]) {
+				context.putImageData(history[historyPosition], 0, 0);
+				context.beginPath();
+				context.moveTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
+				context.lineTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
+				context.stroke();
+				context.closePath();
+			} else {
+				context.lineTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
+				context.stroke();
+			}
 		}
 	} else
 		if (neverFlushCursor && !modes["tool-lowquality"])
@@ -682,7 +682,7 @@ function cLWChange(event) {
 
 function updateDebugScreen() {
 	if (modes["debug-mode"]) {
-		debugElem.innerHTML = "Cursor @" + cursor.posX + ":" + cursor.posY + "<br />Diff: " + (cursor.posX - cursor.prevX) + ":" + (cursor.posY - cursor.prevY) + "<br />FPS: " + fps;
+		debugElem.innerHTML = "Cursor @" + cursor.posX + ":" + cursor.posY + "<br />Diff: " + (cursor.posX - cursor.prevX) + ":" + (cursor.posY - cursor.prevY) + "<br />FPS: " + fps + "<br />Ticks: " + ticks;
 		ticks ++;
 	}
 }
@@ -879,7 +879,7 @@ function cHotkeysStart(event) {
 			event.preventDefault();
 			event.returnValue = false;
 			if (cHotkeys(k)) {				
-				hki = setInterval('cHotkeys(' + k +')', 100);
+				hki = setInterval("cHotkeys(" + k + ")", 100);
 			}
 		}
 	} else {
@@ -906,8 +906,19 @@ function toolModify(id, param, inc, value) {
 
 function switchMode(mode) {
 	document.getElementById(mode).className = (modes[mode] = !modes[mode]) ? "button-active" : "button";
-	if(mode == "debug-mode")
+	if (mode == "debug-mode") {
 		debugElem.innerHTML = "";
+
+		if (modes["debug-mode"])
+			fpsi = setInterval("fpsCount()", 100);
+		else
+			clearInterval(fpsi);
+	}
+
+	if (mode == "tool-line") {		
+		historyOperation('push');
+		context.moveTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
+	}
 }
 
 function picTransfer(value, auto) {
