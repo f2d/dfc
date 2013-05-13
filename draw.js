@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.11";
-var infoDate = "May 12, 2013"
+var infoVersion = "v1.6.12";
+var infoDate = "May 13, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -14,7 +14,7 @@ var	globalOffset = 0.5, //pixel offset
 
 var activeDrawing = false;
 
-var sendButton = true;
+var sendButton = sendButton || false;
 
 var historyStorage = 32;
 var history = new Array(historyStorage);
@@ -35,9 +35,14 @@ var toolPresets = [
 ];
 
 var tools = [
-	{"opacity" : 1.00, "width" :  4, "shadow" : 0, "color" : "0, 0, 0"		} //Fore
-,	{"opacity" : 1.00, "width" : 20, "shadow" : 0, "color" : "255, 255, 255"} //Back
-], tool = tools[0];
+	{"opacity" : 0, "width" :  0, "shadow" : 0, "color" : "0, 0, 0"},
+	{"opacity" : 0, "width" :  0, "shadow" : 0, "color" : "0, 0, 0"}
+];
+
+for (i = 0; i < 2; i++)
+	for (key in toolPresets[i])
+		tools[i][key] = toolPresets[i][key];
+var tool = tools[0];
 
 var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
 
@@ -157,7 +162,8 @@ var kbLayout = {
 	, "tool-shadow-" :				SHIFT + "Q".charCodeAt(0)
 	, "tool-shadow+" :				SHIFT + "W".charCodeAt(0)
 
-	, "app-help" :					112
+	, "app-help" :					112 //F1
+	, "app-settings" :				115 //F4
 
 	, "debug-mode" :				12 //CLEAR
 };
@@ -170,27 +176,27 @@ for (i = 1; i <= 10; i ++) {
 }
 
 var actLayout = { 
-	  "history-undo" :				{"operation" :	"historyOperation('undo')",	"title" : "&#x2190;",	"description" : "Назад"}
-	, "history-redo" :				{"operation" :	"historyOperation('redo')",	"title" : "&#x2192;",	"description" : "Вперёд"}
-	, "history-store" :				{"operation" :	"picTransfer('toLS')",	"title" : "&#x22C1;",	"description" : "Сделать back-up",	"once" : true}
-	, "history-extract" :			{"operation" :	"picTransfer('fromLS')","title" : "&#x22C0;",	"description" : "Извлечь back-up",	"once" : true}
+	  "history-undo" :				{"operation" :	"historyOperation('undo')",	"title" : "&#x2190;",	"small": "UNDO",	"description" : "Назад"}
+	, "history-redo" :				{"operation" :	"historyOperation('redo')",	"title" : "&#x2192;",	"small": "REDO",	"description" : "Вперёд"}
+	, "history-store" :				{"operation" :	"picTransfer('toLS')",	"title" : "&#x22C1;",	"small": "STORE",	"description" : "Сделать back-up",	"once" : true}
+	, "history-extract" :			{"operation" :	"picTransfer('fromLS')","title" : "&#x22C0;",	"small": "EXTRACT",	"description" : "Извлечь back-up",	"once" : true}
 
-	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "F",			"description" : "Закрасить полотно основным цветом",	"once" : true}
-	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "B",			"description" : "Закрасить полотно фоновым цветом",		"once" : true}
-	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"description" : "Инверсия полотна",		"once" : true}
-	, "canva-jpeg" :				{"operation" :	"picTransfer('toJPG')",	"title" : "J",			"description" : "Сохранить в JPEG",		"once" : true}
-	, "canva-png" :					{"operation" :	"picTransfer('toPNG')",	"title" : "P",			"description" : "Сохранить в PNG",		"once" : true}
+	, "canva-fill" :				{"operation" :	"clearScreen(0)",		"title" : "F",			"small": "FORE",	"description" : "Закрасить полотно основным цветом",	"once" : true}
+	, "canva-delete" :				{"operation" :	"clearScreen(1)",		"title" : "B",			"small": "BACK",	"description" : "Закрасить полотно фоновым цветом",		"once" : true}
+	, "canva-invert" :				{"operation" :	"invertColors()",		"title" : "&#x25D0;",	"small": "INVERT",	"description" : "Инверсия полотна",		"once" : true}
+	, "canva-jpeg" :				{"operation" :	"picTransfer('toJPG')",	"title" : "J",			"small": "JPEG",	"description" : "Сохранить в JPEG",		"once" : true}
+	, "canva-png" :					{"operation" :	"picTransfer('toPNG')",	"title" : "P",			"small": "PNG",		"description" : "Сохранить в PNG",		"once" : true}
 	, "canva-send" :				{"operation" :	"picTransfer('send')",	"title" : "Отправить &#x21B5;",	"description" : "Отправить на сервер",	"once" : true}
 
-	, "tool-antialiasing" :			{"operation" :	"switchMode('tool-antialiasing')",		"title" : "AA",			"description" : "Anti-Aliasing",			"once" : true}
-	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"description" : "Предпросмотр кисти",		"once" : true}
-	, "tool-lowquality" :			{"operation" :	"switchMode('tool-lowquality')",		"title" : "&#x25A0;",	"description" : "Режим низкого качества",	"once" : true}
-	, "tool-smooth" :				{"operation" :	"switchMode('tool-smooth')",			"title" : "Ω",			"description" : "Режим сглаживания линии",	"once" : true}
+	, "tool-antialiasing" :			{"operation" :	"switchMode('tool-antialiasing')",		"title" : "&#x22A1;",	"small": "AA",		"description" : "Anti-Aliasing",			"once" : true}
+	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"small": "PREVIEW",	"description" : "Предпросмотр кисти",		"once" : true}
+	, "tool-lowquality" :			{"operation" :	"switchMode('tool-lowquality')",		"title" : "&#x25A0;",	"small": "LOW Q",	"description" : "Режим низкого качества",	"once" : true}
+	, "tool-smooth" :				{"operation" :	"switchMode('tool-smooth')",			"title" : "Ω",			"small": "SMOOTH",	"description" : "Режим сглаживания линии",	"once" : true}
 	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
-	, "tool-swap" :					{"operation" :	"setTool('swap')",			"title" : "&#x2194;",	"description" : "Поменять инструменты местами",					"once" : true}
-	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25A1;",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
-	, "tool-pencil" :				{"operation" :	"setTool(3)",			"title" : "i",			"description" : "Заменить инструмент на стандартный карандаш",	"once" : true}
-	, "tool-default" :				{"operation" :	"setTool('reset')",			"title" : "Ø",			"description" : "Восстановить значения по умолчанию",	"once" : true}
+	, "tool-swap" :					{"operation" :	"setTool('swap')",		"title" : "&#x2194;",	"small": "SWAP",	"description" : "Поменять инструменты местами",					"once" : true}
+	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25EF;",	"small": "ERASER",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
+	, "tool-pencil" :				{"operation" :	"setTool(3)",			"title" : "i",			"small": "PENCIL",	"description" : "Заменить инструмент на стандартный карандаш",	"once" : true}
+	, "tool-default" :				{"operation" :	"setTool('reset')",		"title" : "&#x2300;",	"small": "RESET",	"description" : "Восстановить значения по умолчанию",	"once" : true}
 	, "tool-width-" :				{"operation" :	"toolModify(0, 'width', -1)",		"title" : "-",		"description" : "Уменьшить"}
 	, "tool-width+" :				{"operation" :	"toolModify(0, 'width', +1)",		"title" : "+",		"description" : "Увеличить"}
 	, "tool-opacity-" :				{"operation" :	"toolModify(0, 'opacity', -0.05)",	"title" : "-",		"description" : "Уменьшить"}
@@ -204,7 +210,8 @@ var actLayout = {
 	, "tool-color" : 				{"title" : "Код цвета"}
 	, "tool-palette" : 				{"title" : "Палитра"}
 
-	, "app-help" :					{"operation" :	"showHelp()",			"title" : "?",			"description" : "Помощь",	"once" : true}
+	, "app-help" :					{"operation" :	"showHelp()",				"title" : "?",			"small": "HELP",	"description" : "Помощь",	"once" : true}
+	, "app-settings" :				{"operation" :	"alert('Not done yet.')",	"title" : "&#x263C;",	"small": "SETTINGS","description" : "Настройки","once" : true}
 
 	, "debug-mode" :				{"operation" :	"switchMode('debug-mode')"}
 };
@@ -358,10 +365,9 @@ function init()
 			if(guiButtons[i] != "|") {
 				tElem.id = guiButtons[i];
 				tElem.className = (guiButtons[i] =="tool-antialiasing" && modes["tool-antialiasing"]) ? "button-active" : "button";
-				tElem.innerHTML = actLayout[guiButtons[i]].title;
 				tElem.setAttribute("onclick", actLayout[guiButtons[i]].operation);
 				bottomElem.appendChild(tElem);	
-				setElemDesc(guiButtons[i]);
+				setElemDesc(guiButtons[i],null,true);
 			} else {
 				tElem.className = "vertical";	
 				tElem.innerHTML = "&nbsp;";
@@ -392,14 +398,22 @@ function setToolButton(property, sign) {
 	setElemDesc(button);
 }
 
-function setElemDesc(elem, desc) {
+function setElemDesc(elem, desc, info) {
+	info = info || false;
 	desc = desc || actLayout[elem].description;
 	var k = kbLayout[elem];
-	document.getElementById(elem).title = desc + (kbLayout[elem] ?  (" (" + 
+	var tElem = document.getElementById(elem);
+	tElem.title = desc + ((kbLayout[elem] && !info) ?  (" (" + 
 		descKeyCode(k) + ")") : "");
+	if (info)
+		tElem.innerHTML = "<div class='hotkey'>" + (kbLayout[elem] ? descKeyCode(k) : "&nbsp;") + "</div>"
+		 + actLayout[elem].title + "<br />" +
+		 "<span class='small'>" + actLayout[elem].small + "</span>";
+	else
+		tElem.innerHTML = actLayout[elem].title;
 }
 
-function generatePalette(name, step, slice) { //safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
+function generatePalette(name, step, slice) { //safe palette generator, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
 	var letters = [0, 0, 0];
 	while (letters[0]<=255 ) {
 		var l = palette[name].length;
@@ -519,7 +533,6 @@ function drawCursor () {
 }
 
 function cDraw(event) {
-
 	updatePosition(event);
 
 	updateDebugScreen();
