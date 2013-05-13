@@ -1,4 +1,4 @@
-var infoVersion = "v1.6.12";
+var infoVersion = "v1.6.13";
 var infoDate = "May 13, 2013"
 
 var sketcher, canvas, context, sendForm,
@@ -37,12 +37,7 @@ var toolPresets = [
 var tools = [
 	{"opacity" : 0, "width" :  0, "shadow" : 0, "color" : "0, 0, 0"},
 	{"opacity" : 0, "width" :  0, "shadow" : 0, "color" : "0, 0, 0"}
-];
-
-for (i = 0; i < 2; i++)
-	for (key in toolPresets[i])
-		tools[i][key] = toolPresets[i][key];
-var tool = tools[0];
+], tool = tools[0];
 
 var toolLimits = {"opacity": [0.05, 1, 0.05], "width": [1, 128, 1], "shadow": [0, 20, 1], "turnLimit": [0, 180, 1]};
 
@@ -55,6 +50,7 @@ var modes = {
 ,	"tool-preview": false
 ,	"tool-antialiasing": true
 ,	"tool-smooth": false
+,	"tool-line": false
 ,	"debug-mode": false
 	};
 
@@ -137,6 +133,7 @@ var CTRL = 0x0100,
 var kbLayout = { 
 	  "history-undo" :				"Z".charCodeAt(0)
 	, "history-redo" :				"X".charCodeAt(0)
+	, "history-redo" :				"X".charCodeAt(0)
 	, "history-store" :				119 //F8
 	, "history-extract" :			120 //F9
 
@@ -147,13 +144,15 @@ var kbLayout = {
 	, "canva-png" :					CTRL + "P".charCodeAt(0)
 	, "canva-send" :				CTRL + 13 //ENTER
 
-	, "tool-antialiasing" :			"O".charCodeAt(0)
-	, "tool-smooth" :				"K".charCodeAt(0)
-	, "tool-lowquality" :			"L".charCodeAt(0)
-	, "tool-preview" :				"P".charCodeAt(0)
+	, "tool-antialiasing" :			CTRL + "A".charCodeAt(0)
+	, "tool-smooth" :				CTRL + "K".charCodeAt(0)
+	, "tool-lowquality" :			CTRL + "L".charCodeAt(0)
+	, "tool-preview" :				"V".charCodeAt(0)
 	, "tool-colorpick" :			"C".charCodeAt(0)
 	, "tool-swap" :					"S".charCodeAt(0)
+	, "tool-pencil" :				"P".charCodeAt(0)
 	, "tool-eraser" :				"E".charCodeAt(0)
+	, "tool-line" :					"L".charCodeAt(0)
 	, "tool-default" :				"R".charCodeAt(0)
 	, "tool-width-" :				"Q".charCodeAt(0)
 	, "tool-width+" :				"W".charCodeAt(0)
@@ -192,6 +191,7 @@ var actLayout = {
 	, "tool-preview" :				{"operation" :	"switchMode('tool-preview')",			"title" : "&#x25CF;",	"small": "PREVIEW",	"description" : "Предпросмотр кисти",		"once" : true}
 	, "tool-lowquality" :			{"operation" :	"switchMode('tool-lowquality')",		"title" : "&#x25A0;",	"small": "LOW Q",	"description" : "Режим низкого качества",	"once" : true}
 	, "tool-smooth" :				{"operation" :	"switchMode('tool-smooth')",			"title" : "Ω",			"small": "SMOOTH",	"description" : "Режим сглаживания линии",	"once" : true}
+	, "tool-line" :					{"operation" :	"switchMode('tool-line')",				"title" : "&#x2014",	"small": "LINE",	"description" : "Режим прямых линий",		"once" : true}
 	, "tool-colorpick" :			{"operation" :	"cCopyColor()"}
 	, "tool-swap" :					{"operation" :	"setTool('swap')",		"title" : "&#x2194;",	"small": "SWAP",	"description" : "Поменять инструменты местами",					"once" : true}
 	, "tool-eraser" :				{"operation" :	"setTool(2)",			"title" : "&#x25EF;",	"small": "ERASER",	"description" : "Заменить инструмент на стандартный ластик",	"once" : true}
@@ -217,8 +217,8 @@ var actLayout = {
 };
 
 //List of buttons to display
-var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-pencil", "tool-eraser", "tool-default", "|",
-					"tool-antialiasing", "tool-preview", "tool-smooth", "tool-lowquality", "|",
+var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-default", "tool-pencil", "tool-eraser", "tool-line", "|", 
+					"tool-preview", "tool-antialiasing", "tool-smooth", "tool-lowquality", "|",
 					"history-store", "history-extract", "canva-jpeg", "canva-png", sendButton ? "canva-send" : "", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
@@ -381,6 +381,7 @@ function init()
 	debugElem = document.createElement("div");	
 	sketcher.appendChild(debugElem);
 
+	setTool('reset');
 	updateDebugScreen();
 	updatePalette();
 	updateButtons();
@@ -542,11 +543,13 @@ function cDraw(event) {
 	}
 
 	if (activeDrawing) {
-		var tX = cursor.prevX, tY = cursor.prevY;
-		cursor.prevX = modes["tool-smooth"] ? parseInt(cursor.posX * 0.08 + cursor.prevX * 0.92) : cursor.posX;
-		cursor.prevY = modes["tool-smooth"] ? parseInt(cursor.posY * 0.08 + cursor.prevY * 0.92) : cursor.posY;
-		if(!modes["tool-antialiasing"]) { //This probably would require massive optimization. Blame W3C.
-			while(1) {
+		if (!modes["tool-line"])  {
+			var tX = cursor.prevX, tY = cursor.prevY;
+			cursor.prevX = modes["tool-smooth"] ? parseInt(cursor.posX * 0.08 + cursor.prevX * 0.92) : cursor.posX;
+			cursor.prevY = modes["tool-smooth"] ? parseInt(cursor.posY * 0.08 + cursor.prevY * 0.92) : cursor.posY;
+		}
+		if (!modes["tool-antialiasing"]) { //This probably would require massive optimization. Blame W3C.
+			while (1) {
 				for (i = 0; i < tool.width; i++) {
 					var rC = Math.sqrt(1 - Math.pow(-1 + (i + 0.5) / tool.width * 2, 2));
 					context.moveTo(parseInt(tX - tool.width * rC / 2 - 0.5) + globalOffs_1, tY + globalOffset - parseInt(tool.width / 2) + i);
@@ -562,6 +565,14 @@ function cDraw(event) {
 		else {
 			context.lineTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
 			context.stroke();
+		}
+		if(modes["tool-line"]) {
+			context.putImageData(history[historyPosition], 0, 0);
+			context.beginPath();	
+			context.moveTo(cursor.prevX + globalOffset, cursor.prevY + globalOffset);
+			context.lineTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
+			context.stroke();
+			context.closePath();	
 		}
 	} else
 		if (neverFlushCursor && !modes["tool-lowquality"])
