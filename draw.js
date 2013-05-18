@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.14";
-var infoDate = "May 13-14, 2013"
+var infoVersion = "v1.6.15";
+var infoDate = "May 18, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -525,6 +525,7 @@ function drawCursor () {
 			context.strokeStyle = "rgb(" + tool.color + ")";
 			context.shadowBlur = 0;
 		}
+
 		context.arc(cursor.posX, cursor.posY, tool.width / 2, 0, Math.PI*2, false);
 		context.closePath();
 		modes["tool-preview"] ? context.fill() : context.stroke();
@@ -600,7 +601,11 @@ function cDrawStart(event) {
 		context.lineWidth = modes["tool-antialiasing"] ? t.width : 1;
 		context.shadowBlur = t.shadow;
 		context.strokeStyle = "rgba(" + t.color + ", " + t.opacity + ")";
-		context.shadowColor = "rgb(" + t.color + ")";
+		if (context.shadowBlur == 0)
+			context.shadowColor = 'transparent';
+		else
+			context.shadowColor = "rgb(" + t.color + ")";
+		
 		context.lineJoin = "round";
 		context.lineCap = "round";
 		context.beginPath();
@@ -952,12 +957,14 @@ function picTransfer(value, auto) {
 		case "fromLS":
 			if (a || confirm("Вы уверены, что хотите загрузить данные из Local Storage?")) {
 				var image = new Image();
-				if(!!window.localStorage)
+				if (!!window.localStorage) {
+					scetcher.appendChild(image);
 					image.src = window.localStorage.recovery;
-				else if (!a)
+					context.drawImage(image, 0, 0);
+					scetcher.removeChild(image);
+					historyOperation('push');
+				} else if (!a)
 					alert("Local Storage не поддерживается.");
-				context.drawImage(image, 0, 0);
-				historyOperation('push');
 			}
 		break;
 		default: alert("Недопустимое значение (обновите кэш).");
