@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.15";
-var infoDate = "May 18, 2013"
+var infoVersion = "v1.6.16";
+var infoDate = "May 18-19, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -50,6 +50,7 @@ var modes = {
 ,	"tool-antialiasing": true
 ,	"tool-smooth": false
 ,	"tool-line": false
+,	"app-help": false
 ,	"debug-mode": false
 	};
 
@@ -210,7 +211,7 @@ var actLayout = {
 	, "tool-color" : 				{"title" : "Код цвета"}
 	, "tool-palette" : 				{"title" : "Палитра"}
 
-	, "app-help" :					{"operation" :	"showHelp()",				"title" : "?",			"small": "HELP",	"description" : "Помощь",	"once" : true}
+	, "app-help" :					{"operation" :	"switchMode('app-help')",	"title" : "?",			"small": "HELP",	"description" : "Помощь",	"once" : true}
 	, "app-settings" :				{"operation" :	"alert('Not done yet.')",	"title" : "&#x263C;",	"small": "SETTINGS","description" : "Настройки","once" : true}
 
 	, "debug-mode" :				{"operation" :	"switchMode('debug-mode')"}
@@ -218,7 +219,7 @@ var actLayout = {
 
 //List of buttons to display
 var guiButtons = ["history-undo", "history-redo", "|", "canva-fill", "tool-swap", "canva-delete", "canva-invert", "|", "tool-default", "tool-pencil", "tool-eraser", "|", 
-					"tool-line", "tool-preview", "tool-antialiasing", "tool-smooth", "tool-lowquality", "|",
+					"tool-line", "tool-preview", "tool-smooth", "tool-lowquality", "|",
 					"history-store", "history-extract", "canva-jpeg", "canva-png", sendButton ? "|" : "", sendButton ? "canva-send" : "", "|", "app-help"];
 
 for (i = 1; i <= 10; i ++) {
@@ -286,6 +287,22 @@ function init()
 	sideElem = document.createElement("span");
 	sideElem.id = "tools";
 	sketcher.appendChild(sideElem);
+
+	helpElem = document.createElement("span");
+	helpElem.id = "help";
+	sketcher.appendChild(helpElem);
+	helpElem.style.display = "none";
+	helpElem.innerHTML = "Управление:<br />\
+Левая кнопка мыши — рисовать основным инструментом.<br />Правая кнопка мыши — рисовать вторичным инструментом.<br />\
+Средняя кнопка мыши (или клавиша " + descKeyCode(kbLayout["tool-colorpick"]) + ") — выбор цвета из холста<br />\
+Колёсико / " + descKeyCode(kbLayout["tool-width-"]) + " / " + 
+descKeyCode(kbLayout["tool-width+"]) + " / " + 
+descKeyCode(kbLayout["tool-width.10"]) + "—" + descKeyCode(kbLayout["tool-width.9"]) + " — изменение толщины.<br />\
+Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.<br />\
+Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.<br />\
+Курсор обязательно должен находиться над холстом!<br /><br />\
+В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.<br /><br />\
+Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate;
 
 	var e = document.createElement("input"),
 		a = ["shadow", "opacity", "width"], 
@@ -724,7 +741,7 @@ function updateSliders(initiator) {
 	if (tool.width >= toolLimits.width[1]) tool.width = toolLimits.width[1];
 
 	if (tool.shadow <= toolLimits.shadow[0]) tool.shadow = toolLimits.shadow[0]; else
-	if (tool.shadow >= toolLimits.shadow[1]) tool.shadow = to
+	if (tool.shadow >= toolLimits.shadow[1]) tool.shadow = toolLimits.shadow[1];
 
 	document.getElementById("tool-shadow-text").value = tool.shadow;
 	document.getElementById("tool-width-text").value = tool.width;
@@ -924,6 +941,11 @@ function switchMode(mode) {
 		historyOperation('push');
 		context.moveTo(cursor.posX + globalOffset, cursor.posY + globalOffset);
 	}
+
+	if (mode == "app-help") {		
+		sideElem.style.display = modes["app-help"] ? "none" : "";
+		helpElem.style.display = modes["app-help"] ? "" : "none";
+	}
 }
 
 function picTransfer(value, auto) {
@@ -938,7 +960,6 @@ function picTransfer(value, auto) {
 					imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
 					imageToSend.name = "content";
 					imageToSend.type = "hidden";
-					sendForm.appendChild(imageToSend);
 					sendForm.submit();
 				}
 		break;
@@ -982,18 +1003,4 @@ function descKeyCode(k) {
 		(k & META ? "Meta + ":"") + 
 		(k & SHIFT ? "Shift + ":"") + 
 		(kbDesc[k % 256] ? kbDesc[k % 256] : String.fromCharCode(k % 256));
-}
-
-function showHelp() {
-	alert("Управление:\n\
-Левая кнопка мыши — рисовать основным инструментом.\nПравая кнопка мыши — рисовать вторичным инструментом.\n\
-Средняя кнопка мыши (или клавиша " + descKeyCode(kbLayout["tool-colorpick"]) + ") — выбор цвета из холста\n\
-Колёсико / " + descKeyCode(kbLayout["tool-width-"]) + " / " + 
-descKeyCode(kbLayout["tool-width+"]) + " / " + 
-descKeyCode(kbLayout["tool-width.10"]) + "—" + descKeyCode(kbLayout["tool-width.9"]) + " — изменение толщины.\n\
-Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.\n\
-Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.\n\
-Курсор обязательно должен находиться над холстом!\n\n\
-В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.\n\n\
-Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate);
 }
