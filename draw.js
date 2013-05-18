@@ -960,6 +960,7 @@ function picTransfer(value, auto) {
 					imageToSend.value = (jpgData.length < pngData.length ? jpgData : pngData);
 					imageToSend.name = "content";
 					imageToSend.type = "hidden";
+					sendForm.appendChild(imageToSend);
 					sendForm.submit();
 				}
 		break;
@@ -979,10 +980,8 @@ function picTransfer(value, auto) {
 			if (a || confirm("Вы уверены, что хотите загрузить данные из Local Storage?")) {
 				var image = new Image();
 				if (!!window.localStorage) {
-					scetcher.appendChild(image);
 					image.src = window.localStorage.recovery;
 					context.drawImage(image, 0, 0);
-					scetcher.removeChild(image);
 					historyOperation('push');
 				} else if (!a)
 					alert("Local Storage не поддерживается.");
