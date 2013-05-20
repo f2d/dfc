@@ -1,5 +1,5 @@
-var infoVersion = "v1.6.16";
-var infoDate = "May 18-19, 2013"
+var infoVersion = "v1.6.17";
+var infoDate = "May 20, 2013"
 
 var sketcher, canvas, context, sendForm,
 	bottomElem, sideElem, debugElem,
@@ -120,7 +120,7 @@ var palette = new Array(); //"@b" breaks the line, "@r" gives name to a new row
 
 	palette["history"] = (!!window.localStorage && !!window.localStorage.historyPalette) ? JSON.parse(window.localStorage.historyPalette) : [];
 
-var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "classic";
+var currentPalette = (!!window.localStorage && !!window.localStorage.lastPalette) ? window.localStorage.lastPalette : "combo";
 
 var hki = 0; //Hotkey interval for Opera
 var hkPressed = false;
@@ -299,7 +299,7 @@ function init()
 descKeyCode(kbLayout["tool-width+"]) + " / " + 
 descKeyCode(kbLayout["tool-width.10"]) + "—" + descKeyCode(kbLayout["tool-width.9"]) + " — изменение толщины.<br />\
 Если зажать Ctrl или Shift, будет происхотить изменение прозрачности или тени соответственно.<br />\
-Остальные хоткеи можно подсмотреть, прочитав всплывающие подсказки к соответствующим кнопкам.<br />\
+Остальные хоткеи можно подсмотреть на соответствующих кнопках.<br />\
 Курсор обязательно должен находиться над холстом!<br /><br />\
 В поле код можно вводить цвета в трёх видах: «#xxxxxx», «#xxx», «d,d,d», где x  — любая шестнадцатиречная цифра (0—f), d — десятеричное число в диапазоне от 0 до 255. Всё это в формате RGB.<br /><br />\
 Feijoa Sketch " + infoVersion + " by Genius,  " + infoDate;
