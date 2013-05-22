@@ -1,0 +1,28 @@
+#dfc {padding: 8px; font-family: "Trebuchet MS"; font-size: 14pt; background-color: #f8f8f8; text-align: center;}
+#dfc canvas {margin: 0; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}
+#dfc input, select {font-family: "Trebuchet MS"; font-size: 14pt; margin: 1px;}
+#dfc input[type="text"] {width: 48px;}
+#dfc #dfc-color-text {width: 72px;}
+#dfc-buttons {height: 32px; padding: 8px;}
+#dfc-info p {padding-left: 32px; line-height: 24px; margin-bottom: 0;}
+#dfc-info, #dfc-colors {text-align: left; margin-top: 15px; margin-left: 5px;}
+#dfc-info, #dfc-palette {font-size: small; width: 320px;}
+#dfc-palette table tr td {height: 20px; width: 20px; padding: 0; margin: 0;}
+#dfc-palette table {border-collapse: collapse;}
+#dfc-palette {overflow-y: scroll; height: 180px;}
+#dfc-tools {margin: 0 auto; text-align: left; display: inline-block; vertical-align: top; width: 320px;}
+.dfc-L-close {padding-bottom: 24px; border-bottom: 1px solid #000; border-right: 1px solid #000;}
+.dfc-L-open {padding-top: 24px; border-top: 1px solid #000; border-left: 1px solid #000;}
+.dfc-button {background-color: #ddd;}
+.dfc-button, .dfc-button-active, .dfc-button-disabled {border: 1px solid #000; cursor: pointer; display: inline-block; width: 32px; height: 32px; padding: 2px; text-align: center; font-family: "Arial Unicode MS"; line-height: 7px;}
+.dfc-button-active {background-color: #ace;}
+.dfc-button-active:hover {background-color: #bef;}
+.dfc-button-disabled {color: gray; cursor: default;}
+.dfc-button-key, #dfc-debug {text-align: left;}
+.dfc-button-key, .dfc-button-subtitle {vertical-align: top; width: 32px; height: 10px; font-size: 9px; margin: 0; padding: 0;}
+.dfc-button-vertical {display: inline-block; vertical-align: top; width: 0; height: 32px; padding-bottom: 6px; margin-left: 4px; margin-right: 4px; border-left: 1px solid #000;}
+.dfc-button:hover {background-color: #eee;}
+.dfc-paletdark:hover {border-color: #fff;}
+.dfc-palettine:hover {border-color: #000;}
+.dfc-palettine, .dfc-paletdark {border: 2px solid transparent; cursor: pointer; height: 80%; width: 80%;}
+.dfc-palettine-tool {width: 32px; height: 32px; margin: 1px; border: 1px solid #000; display: inline-block; vertical-align: middle;}
