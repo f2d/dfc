@@ -1,28 +1,35 @@
-var dfc = new function() {
+﻿var dfc = new function() {
 
 var	NS = 'dfc' //* <- namespace prefix; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.6.2'
-,	INFO_DATE = '2013-04-01 .. 2013-05-22, forked from Feijoa v1.4.6'
+,	INFO_VERSION = 'v0.7.4'
+,	INFO_DATE = '2013-04-01 .. 2013-06-11'
+,	INFO_ABBR = 'Dumb Flat Canvas, github.com/f2d/dfc/'
 
 ,	self = this
-,	LS = window.localStorage
+,	LS = window.localStorage || localStorage
 ,	CANVAS_WIDTH = 640, CANVAS_HEIGHT = 360, DRAW_PIXEL_OFFSET = 0.5
-,	container, canvas, c2d, canvasLine, cLn, selectShape, selectPalette, sendForm, debugText, fpsInterval, fps = 0, ticks = 0
+,	container, canvas, c2d, canvasShape, cSh, selectShape, selectPalette, debugText, lang, outside = {}
+,	timerStart, fpsInterval, fps = 0, ticks = 0, timer = 0
 
 ,	xInside = -1, yInside = -1, xInDraw, yInDraw, xInPrev, yInPrev, drawLineStarted, drawLineBack, drawShapePreview
 ,	TOOLS_REF = [
-		{'blur' : 0, 'opacity' : 1.00, 'width' :  1, 'color' : '0, 0, 0'}	//* <- draw
-	,	{'blur' : 0, 'opacity' : 1.00, 'width' : 20, 'color' : '255, 255, 255'}	//* <- back
+		{blur: 0, opacity: 1.00, width:  1, color: '0, 0, 0'}	//* <- draw
+	,	{blur: 0, opacity: 1.00, width: 20, color: '255, 255, 255'}	//* <- back
 	], tools = [{}, {}], tool = tools[0], BOW = ['blur', 'opacity', 'width'], BOWL = 'BOW'
+,	RANGE = [
+		{min: 0   , max: 100, step: 1}
+	,	{min: 0.01, max: 1  , step: 0.01}
+	,	{min: 1   , max: 100, step: 1}
+	]
 
 ,	drawingActive = false, flushCursor = false, neverFlushCursor = true, cueAutoSave = false
-,	mode = {'debug' :	false
-	,	'shape' :	false
-	,	'curve' :	false
-	,	'lowQ' :	false
-	,	'brushView' :	false
-	,	'limitFPS' :	true
-	,	'autoSave' :	true
+,	mode = {debug:	false
+	,	shape:	false
+	,	curve:	false
+	,	lowQ:	false
+	,	brushView:	false
+	,	limitFPS:	false
+	,	autoSave:	true
 	}, modes = [], modeL = 'DLUQVFA', shapes = ['line', 'rectangle', 'circle']
 
 ,	history = new Array(32)
@@ -80,7 +87,7 @@ var	NS = 'dfc' //* <- namespace prefix; BTW, tabs align to 8 spaces
 	,	'Reisen', '#dcc3ff', '#2e228c', '#e94b6d'
 	, '\n', 'etc'
 	]
-, 'Web 216' : []
+//, 'Web 216' : []
 , 'history' : (!!LS && !!LS.historyPalette) ? JSON.parse(LS.historyPalette) : []
 },	currentPalette = (!!LS && !!LS.lastPalette) ? LS.lastPalette : 'auto';
 
@@ -92,10 +99,11 @@ function replaceAdd(t,s,a) {return replaceAll(t,s,s+a);}
 function setId(e,id) {return e.id = NS+'-'+id;}
 function setClass(e,c) {return e.className = NS+'-'+c;}
 function setEvent(e,onWhat,func) {return e.setAttribute(onWhat, NS+'.'+func);}
-function setContent(e,cont) {return e.innerHTML = replaceAdd(replaceAdd(replaceAdd(cont
-,' class="'	, NS+'-')
-,' id="'	, NS+'-')
-,' onChange="'	, NS+'.');}
+function setContent(e,cont) {
+var	a = [' class="',' id="',' onChange="',' onClick="'], aTo = '--..';
+	for (i in a) cont = replaceAdd(cont, a[i], NS+aTo[i]);
+	return e.innerHTML = cont;
+}
 function dge(id) {return document.getElementById(NS+(id?'-'+id:''));}
 function toggle_display(e) {e = dge(e); return e.style.display = (e.style.display?'':'none');}
 function showInfo() {toggle_display('colors'); setClass(dge('buttonH'), toggle_display('info') ? 'button' : 'button-active');}
@@ -154,12 +162,8 @@ var	colorDesc = '', colCount = 0, autoRows = true
 }
 
 function updatePosition(event, draw) {
-	xInside = event.pageX - canvas.offsetLeft;
-	yInside = event.pageY - canvas.offsetTop;
-	if (draw) {
-		xInDraw = DRAW_PIXEL_OFFSET + xInside;
-		yInDraw = DRAW_PIXEL_OFFSET + yInside;
-	}
+	xInDraw = DRAW_PIXEL_OFFSET + (xInside = event.pageX - canvas.offsetLeft);
+	yInDraw = DRAW_PIXEL_OFFSET + (yInside = event.pageY - canvas.offsetTop);
 }
 
 function drawCursor() {
@@ -173,7 +177,7 @@ function drawCursor() {
 		c2d.shadowColor = 'transparent';
 		c2d.shadowBlur = 0;
 	}
-	c2d.arc(xInside, yInside, tool.width/2, 0, 7/*Math.PI*2*/, false);
+	c2d.arc(xInDraw, yInDraw, tool.width/2, 0, 7/*Math.PI*2*/, false);
 	c2d.closePath();
 	mode.brushView ? c2d.fill() : c2d.stroke();
 	if (!neverFlushCursor) flushCursor = true;
@@ -194,16 +198,16 @@ function drawStart(event) {
 		drawLineStarted = drawLineBack = drawShapePreview = false;
 	var	t = tools[(event.which == 1) ? 0 : 1];
 	//	canvasRedraw();
-		cLn.lineWidth =
+		cSh.lineWidth =
 		c2d.lineWidth = t.width;
-		cLn.lineCap = cLn.lineJoin =
+		cSh.lineCap = cSh.lineJoin =
 		c2d.lineCap = c2d.lineJoin = 'round';
-		cLn.shadowColor =
+		cSh.shadowColor =
 		c2d.shadowColor = ((
-			cLn.shadowBlur =
+			cSh.shadowBlur =
 			c2d.shadowBlur = t.blur
 		) ? 'rgb('+t.color+')' : 'transparent');
-		cLn.strokeStyle =
+		cSh.strokeStyle =
 		c2d.strokeStyle = 'rgba('+t.color+', '+t.opacity+')';
 		c2d.beginPath();
 		c2d.moveTo(xInDraw, yInDraw);
@@ -236,12 +240,12 @@ var	redraw = true, newLine = (drawingActive && !mode.shape);
 		if (drawingActive) {
 			if (mode.shape) {
 				drawShapePreview = true;
-				cLn.clearRect(0, 0, canvas.width, canvas.height);
-				cLn.beginPath();
-				drawShape(cLn, selectShape.value);
-				cLn.stroke();
-		//		cLn.closePath();
-				c2d.drawImage(cLn.canvas, 0, 0);			//* <- draw 2nd canvas overlay with sole shape
+				cSh.clearRect(0, 0, canvas.width, canvas.height);
+				cSh.beginPath();
+				drawShape(cSh, selectShape.value);
+				cSh.stroke();
+		//		cSh.closePath();
+				c2d.drawImage(cSh.canvas, 0, 0);			//* <- draw 2nd canvas overlay with sole shape
 			}
 			if (drawLineStarted) c2d.stroke();
 		} else if (neverFlushCursor && !mode.lowQ && isMouseIn()) drawCursor();
@@ -325,25 +329,27 @@ function fillScreen(t) {
 	historyAct();
 }
 
+function updateSlider(i) {
+var	s = dge('range'+BOWL[i])
+,	t = dge('text'+BOWL[i]) || s
+,	r = RANGE[i], v = tool[i = BOW[i]];
+	if (v < r.min) tool[i] = v = r.min; else
+	if (v > r.max) tool[i] = v = r.max;
+	if (r.step < 1) v = parseFloat(v).toFixed(2);
+	s.value = t.value = v;
+}
+
 function updateSliders(s) {
-	if (s) {
-		s = (s === 2 ? 'text' : 'range');
-		for (i in BOW) tool[BOW[i]] = parseFloat(dge(s+BOWL[i]).value);
-	}
-	for (i in BOW) {
-	var	r = dge('range'+BOWL[i])
-	,	t = dge('text'+BOWL[i])
-	,	b = BOW[i], v = tool[b]
-	,	r_min = parseFloat(r.min)
-	,	r_max = parseFloat(r.max);
-		if (v < r_min) tool[b] = v = r_min; else
-		if (v > r_max) tool[b] = v = r_max;
-		if (parseFloat(r.step) < 1) v = parseFloat(v).toFixed(2);
-		       r.value = v;
-		if (t) t.value = v;
-	}
-	drawEnd();
-	if (isMouseIn()) {
+	if (s && s.id) {
+	var	prop = s.id[s.id.length-1];
+		for (i in BOW) if (prop == BOWL[i]) {
+			tool[BOW[i]] = parseFloat(s.value);
+			return updateSlider(i);
+		}
+	} else {
+		if (s) updateSlider(s); else
+		for (i in BOW) updateSlider(i);
+		drawEnd();
 		s = tool.width+4;
 		c2d.putImageData(history[historyPosition], 0, 0, xInside - s/2, yInside - s/2, s, s);
 		drawCursor();
@@ -351,14 +357,14 @@ function updateSliders(s) {
 }
 
 function toolTweak(prop, value) {
-	for (i in BOW) if (prop == BOWL[i]/* || prop == BOW[i]*/) {
+	for (i in BOW) if (prop == BOWL[i]) {
 	var	b = BOW[i];
 		if (value > 0) tool[b] = value;
 		else {
-		var	step = new Number(dge('range'+BOWL[i]).step), v = new Number(tool[b]);
-			tool[b] = (value ? (v - step) : (v + step));
+		var	v = new Number(tool[b]), s = RANGE[i].step;
+			tool[b] = (value ? v-s : v+s);
 		}
-		return updateSliders();
+		return updateSliders(i);
 	}
 }
 
@@ -402,17 +408,19 @@ var	t = tools[toolIndex || 0]
 //* put on top of history palette:
 var	p = palette['history'], found = p.length, i;
 	for (i = 0; i < found; i++) if (p[i] == v) found = i;
-	i = Math.min(found+1, PALETTE_COL_COUNT*9);	//* <- history length limit
-	while (i--) p[i] = p[i-1];
-	p[0] = v;
-	if (currentPalette == 'history') updatePalette();
-	if (!!LS) LS.historyPalette = JSON.stringify(p);
+	if (found) {
+		i = Math.min(found+1, PALETTE_COL_COUNT*9);		//* <- history length limit
+		while (i--) p[i] = p[i-1];
+		p[0] = v;
+		if (currentPalette == 'history') updatePalette();
+		if (!!LS) LS.historyPalette = JSON.stringify(p);
+	}
 
 //* update buttons:
 	c = 0;
 var	a = t.color.split(reg255split), e = dge((t == tool) ? 'colorF' : 'colorB');
 	for (i in a) c += parseInt(a[i]);
-	e.style.color = (c > 380 ? '#000' : '#fff');	//* <- inverted font color
+	e.style.color = (c > 380 ? '#000' : '#fff');			//* <- inverted font color
 	e.style.background = 'rgb(' + t.color + ')';
 	return v;
 }
@@ -458,60 +466,64 @@ function toggleMode(i, keep) {
 			debugText.textContent = '';
 			fpsInterval ? clearInterval(fpsInterval) : (fpsInterval = setInterval(fpsCount, 1000));
 		}
-	} else alert('Invalid case.');
+	} else alert(lang.bad_id);
 
 }
 
-function autoSave() {if (mode.autoSave && cueAutoSave) {sendPic(3,true); cueAutoSave = false;}}
-
-
-function unixDateToHMS(t) {
-	t = (t ? new Date(t) : new Date());
-	t = [t.getHours(), t.getMinutes(), t.getSeconds()];
+function unixDateToHMS(t,u) {
+	t = (t ? new Date(t+(t > 0 ? 0 : new Date())) : new Date());
+	t = (u	? [t.getUTCHours(), t.getUTCMinutes(), t.getUTCSeconds()]
+		: [t.getHours(), t.getMinutes(), t.getSeconds()]);
 	for (i in t) if (t[i] < 10) t[i] = '0'+t[i];
 	return t.join(':');
 }
 
+function timeElapsed() {timerText.textContent = unixDateToHMS(timer += 1000, 1);}
+function autoSave() {if (mode.autoSave && cueAutoSave) {sendPic(3,true); cueAutoSave = false;}}
+
 function sendPic(dest, auto) {
 var	a = auto || false;
 	if (dest > 2 && !LS) {
-		 if (!a) alert('Local Storage not supported.');
-	} else switch (dest) {
+		 if (!a) alert(lang.no_LS);
+	} else {
+		canvasRedraw();
+		switch (dest) {
 		case 0:
-			if (!sendForm) alert('Destination unavailable.'); else
-			if (confirm('Send image to server?')) {
+			if (!outside.form) alert(lang.no_form); else
+			if (confirm(lang.confirm_send)) {
 			var	pngData = canvas.toDataURL()
 			,	jpgData = canvas.toDataURL('image/jpeg')
-			,	times = dge('times')
-			,	image = dge('pic');
-				if (!image) {
-					times = document.createElement('input');
-					image = document.createElement('input');
-					image.type = times.type = 'hidden';
-					setId(times, times.name = 'times');
-					setId(image, image.name = 'pic');
-					sendForm.appendChild(image);
-					sendForm.appendChild(times);
+			,	txt = dge('txt')
+			,	pic = dge('pic');
+				if (!pic) {
+					setId(txt = document.createElement('input'), txt.name = 'txt');
+					setId(pic = document.createElement('input'), pic.name = 'pic');
+					pic.type = txt.type = 'hidden';
+					outside.form.appendChild(pic);
+					outside.form.appendChild(txt);
 				}
-				image.value = ((jpgData.length < pngData.length && pngData.length > 50000) ? jpgData : pngData);
-				times.value = drawTimeStart +'-'+ drawTimeLast;
-				sendForm.submit();
+				pic.value = ((outside.jpg_pref
+					&& pngData.length > outside.jpg_pref
+					&& pngData.length > jpgData.length
+				) ? jpgData : pngData);
+				txt.value = drawTimeStart +'-'+ drawTimeLast +','+ NS;
+				outside.form.submit();
 			}
 			break;
 		case 1: window.open(canvas.toDataURL(		 ), '_blank'); break;
 		case 2: window.open(canvas.toDataURL('image/jpeg'), '_blank'); break;
 		case 3:	
 		var	d = LS.canvasRecovery, cd = canvas.toDataURL();
-			if (d == cd) return alert('Nothing changed.');
+			if (d == cd) return a?0:alert(lang.no_change);
 		var	t = LS.canvasRecoveryTime, d2 = LS.canvasRecovery2 || 0;
 			if (d2 == cd) {
 				LS.canvasRecovery = d2;
-				LS.canvasRecoveryTime = LS.canvasRecovery2Time;	//* <- swap save slots
+				LS.canvasRecoveryTime = LS.canvasRecovery2Time;
 				LS.canvasRecovery2 = d;
 				LS.canvasRecovery2Time = t;
+				alert(lang.found_swap);
 			} else
-			if (a || confirm('Save image to your Local Storage?')) {
-				canvasRedraw();
+			if (a || confirm(lang.confirm_save)) {
 				if (LS.canvasRecoveryTime) {
 					LS.canvasRecovery2 = d;
 					LS.canvasRecovery2Time = t;
@@ -528,14 +540,19 @@ var	a = auto || false;
 			if (!t) return;
 		var	d = LS.canvasRecovery, cd = canvas.toDataURL();
 			if (d == cd) {
-				if ((!(t = LS.canvasRecovery2Time) || ((d = LS.canvasRecovery2) == cd))) return alert('Nothing changed.');
-				LS.canvasRecovery2 = LS.canvasRecovery;
+				if ((!(t = LS.canvasRecovery2Time) || ((d = LS.canvasRecovery2) == cd))) return alert(lang.no_change);
+		/*		LS.canvasRecovery2 = LS.canvasRecovery;
 				LS.canvasRecovery2Time = LS.canvasRecoveryTime;	//* <- swap save slots
 				LS.canvasRecovery = d;
 				LS.canvasRecoveryTime = t;
-			}
-			if (confirm('Restore image from your Local Storage?')) {
-				function canvasRecovery(i,t) {
+		*/	}
+			if (confirm(lang.confirm_load)) {
+			var	i = dge(t);
+				if (!i) {
+					setId(i = new Image(),t);
+					i.src = d;
+				}
+				i.onload = function (i,t) {
 					c2d.drawImage(i, 0, 0);
 					t = t.split('-');
 					drawTimeStart = t[0];
@@ -544,28 +561,16 @@ var	a = auto || false;
 					historyAct();
 					cueAutoSave = false;
 					if (i.alt) container.removeChild(i);
-				}
-			var	i = dge(t);
-				if (!i) {
-					i = new Image();
-					i.src = d;
-					i.onload = canvasRecovery(i,t);
-					setId(i,t);
-				}
-			/*	if (!i.complete) {
-					i.alt =
-'If you see this text, try to right-click this image and load manually. If you see the image, try to left-click on it.';
-					container.appendChild(i);
-					i.onclick = i.onload;
-				}*/
+				} (i,t);
 			}
 			break;
-		default: alert('Invalid case.');
+		default: alert(lang.bad_id);
+		}
 	}
 }
 
 function isMouseIn() {return (xInside >= 0 && yInside >= 0 && xInside < canvas.width && yInside < canvas.height);}
-function browserHotKeyPrevent(event) {return isMouseIn() ? event.preventDefault() || true : false;}
+function browserHotKeyPrevent(event) {return isMouseIn() ? (event.returnValue = false) || event.preventDefault() || true : false;}
 function hotKeys(event) {
 	if (browserHotKeyPrevent(event)) {
 		function c(s) {return s.charCodeAt(0);}
@@ -586,14 +591,14 @@ function hotKeys(event) {
 			case c('U'): toggleMode(2);	break;
 			case c('G'): toggleMode(3);	break;
 			case c('V'): toggleMode(4);	break;
-			case 119   : toggleMode(5);	break;
+			case 120   : toggleMode(5);	break;
 
 			case 112   : showInfo();	break;
 			case c('P'): sendPic(1);	break;
 			case c('J'): sendPic(2);	break;
 			case 113   : sendPic(3);	break;
 			case 115   : sendPic(4);	break;
-			case 117   : sendPic(0);	break;
+			case 119   : sendPic(0);	break;
 
 			case c('1'): toolTweak('W',  1);	break;
 			case c('2'): toolTweak('W',  2);	break;
@@ -624,98 +629,27 @@ function hotWheel(event) {
 	if (browserHotKeyPrevent(event)) {
 	var	d = event.deltaY || event.detail || event.wheelDelta
 	,	b = event.shiftKey?'B':(event.ctrlKey?'O':'W');
-		if (d > 0) toolTweak(b, -1); else
-		if (d < 0) toolTweak(b); else
+		toolTweak(b, d < 0?0:-1);
 		if (mode.debug) debugText.innerHTML += ' d='+d;
 	}
 	return false;
 }
 
+this.toggle_display = toggle_display;
 this.updateColor   = updateColor;
 this.updatePalette = updatePalette;
 this.updateSliders = updateSliders;
 
 this.init = function() {
-	if (!(sendForm = dge('send'))) document.title += ': '+NS+' '+INFO_VERSION;
+	if (!get_form()) document.title += ': '+NS+' '+INFO_VERSION;
 	setContent(container = dge(),
-'		<canvas id="canvas" tabindex="0">Your browser does not support HTML5 canvas.</canvas>\
-		<div id="tools">\
-			<span id="sliderW"><input type="range" id="rangeW" onChange="updateSliders(1);" min="1" max="123" step="1"></span>	Width<br>\
-			<span id="sliderO"><input type="range" id="rangeO" onChange="updateSliders(1);" min="0.01" max="1" step="0.01"></span>	Opacity<br>\
-			<span id="sliderB"><input type="range" id="rangeB" onChange="updateSliders(1);" min="0" max="123" step="1"></span>	Shadow<br>\
-			<div id="colors">\
-				Shape: <select id="shape-select"></select>\
-			<br>	Palette: <select id="palette-select" onChange="updatePalette();"></select>\
-				Hex: <input type="text" value="#000" id="color-text" onChange="updateColor();">\
-				<div id="palette"></div>\
-			</div>\
-			<div id="info">\
-					<p class="L-open">Hot keys (mouse over image only):</p>\
-				<p>	C, Mouse Mid = pick color from image.\
-				<br>	1-5, Q, W, Mouse Wheel = brush width.\
-				<br>	6-0, T, Y, Ctrl+Wheel = brush opacity.\
-				<br>	N, M, Shift+Wheel = brush shadow.\
-				<br>	Autosave every minute, last saved: <span id="saveTime">not yet</span>.\
-				</p>	<p class="L-close"><abbr title="Dumb Flat Canvas">DFC</abbr> sketch pad <abbr id="version"></abbr></p>\
-			</div>\
-		</div>\
+'		<canvas id="canvas" tabindex="0">'+lang.no_canvas+'</canvas>\
+		<div id="tools"></div>\
 		<div id="buttons"></div>\
 		<div id="debug"></div>'
 	);
-	toggle_display('info');
+	if (!(canvas = dge('canvas')).getContext) return;
 
-var	a = [//* subtitle, hotkey, pictogram, function, tooltip, id	//* used once within next 10 lines of code
-	['undo'	,'Z'	,'&#x2190;'	,'historyAct(1)'	,'Revert last change.'		,'buttonU'
-],	['redo'	,'X'	,'&#x2192;'	,'historyAct(2)'	,'Redo next reverted change.'	,'buttonR'
-],
-0,	['fill'	,'F'	,'&nbsp;'	,'fillScreen(0)'	,'Fill image with main color.'	,'colorF'
-],	['swap'	,'S'	,'&#x2194;'	,'toolSwap()'		,'Swap your tools.'
-],	['wipe'	,'D'	,'&nbsp;'	,'fillScreen(1)'	,'Fill image with back color.'	,'colorB'
-],	['invert','I'	,'&#x25D0;'	,'fillScreen(-1)'	,'Invert image colors.'
-],
-0,	['pencil','A'	,'i'		,'toolSwap(1)'		,'Set tool to sharp black.'
-],	['eraser','E'	,'&#x25CB;'	,'toolSwap(2)'		,'Set tool to large white.'
-],	['reset','R'	,'&#x25CE;'	,'toolSwap(3)'		,'Reset both tools.'
-],
-0,	['shape','L'	,'&#x25C7;'	,'toggleMode(1)'	,'Draw strict geometric shape.'	,'checkL'
-],	['curve','U'	,'&#x2307;'	,'toggleMode(2)'	,'Quadratic bezier curve for line corner smoothing.'	,'checkU'
-],	['rough','G'	,'&#x25A0;'	,'toggleMode(3)'	,'Skip draw cleanup while drawing to use less CPU.'	,'checkQ'
-],	['cursor','V'	,'&#x25CF;'	,'toggleMode(4)'	,'Brush preview on cursor.'	,'checkV'
-],	['fps','F8'	,'&#x231A;'	,'toggleMode(5)'	,'Limit FPS when drawing to use less CPU.'	,'checkF'
-],
-0,	['png'	,'P'	,'P'		,'sendPic(1)'		,'Save image as PNG file.'	,'buttonSP'
-],	['jpeg'	,'J'	,'J'		,'sendPic(2)'		,'Save image as JPEG file.'	,'buttonSJ'
-],	['save'	,'F2'	,'&#x22C1;'	,'sendPic(3)'		,'Save image copy to your Local Storage. Two slots available in a queue.'
-],	['load'	,'F4'	,'&#x22C0;'	,'sendPic(4)'		,'Load image copy from your Local Storage. Two slots available in a queue. \n\
-May not work in some browsers until set to load and show new images automatically.'		,'buttonL'
-],	['done'	,'F6'	,'&#x21B5;'	,'sendPic(0)'		,'Finish your work and send image to server.'
-],
-0,	['info'	,'F1'	,'?'		,'showInfo()'		,'Show/hide information.'	,'buttonH'
-]], d = dge('buttons'), b, e, i;
-	for (i in a) {
-		e = document.createElement('span');
-		if (b = a[i]) {
-			if (b.length > 5) setId(e, b[5]);
-			e.title = b[4]/*+(b[1]?' ('+b[1]+')':'')*/;
-			setContent(e,
-'<div class="button-key">'+b[1]+'</div>'+b[2]+
-'<div class="button-subtitle"><br>'+b[0]+'</div>');
-		var	func = b[3].replace(regFuncBrackets, '');
-			if (!self[func]) self[func] = eval(func);
-			setEvent(e, 'onclick', b[3]);
-			setClass(e, 'button');
-		} else	setClass(e, 'button-vertical');
-		d.appendChild(e);
-		d.innerHTML += '\n';					//* <- need any whitespace for correct visual result
-	}
-	for (name in mode) {
-	var	i = modes.length;
-		if (mode[modes[i] = name]) toggleMode(i,1);
-	}
-	setClass(dge('buttonL'), LS.canvasRecoveryTime ? 'button' : 'button-disabled');
-
-	debugText = dge('debug');
-	canvas = dge('canvas');
 	canvas.setAttribute('onscroll', 'return false;');
 	canvas.setAttribute('oncontextmenu', 'return false;');
 	canvas.addEventListener('mousedown'	, drawStart, false);
@@ -727,26 +661,91 @@ May not work in some browsers until set to load and show new images automaticall
 	container.addEventListener('wheel'	, hotWheel, false);
 	container.addEventListener('scroll'	, hotWheel, false);
 
-	canvasLine = document.createElement('canvas');
-	canvasLine.width  = canvas.width  = CANVAS_WIDTH;
-	canvasLine.height = canvas.height = CANVAS_HEIGHT;
+	canvasShape = document.createElement('canvas');
+	canvasShape.width  = canvas.width  = CANVAS_WIDTH;
+	canvasShape.height = canvas.height = CANVAS_HEIGHT;
 
-	cLn = canvasLine.getContext('2d');
+	cSh = canvasShape.getContext('2d');
 	c2d = canvas.getContext('2d');
 	c2d.fillStyle = 'white';
 	c2d.fillRect(0, 0, canvas.width, canvas.height);
 	history[0] = c2d.getImageData(0, 0, canvas.width, canvas.height);
 
-var	e = dge('rangeW'), i = BOWL.length;
-	if (e.type == 'range') while (i--) {
-		e = document.createElement('input');
-		e.type = 'text';
-		setId(e, 'text'+BOWL[i]);
-		setEvent(e, 'onchange', 'updateSliders(2);');
-		dge('slider'+BOWL[i]).appendChild(e);
-	} else while (i--) {
-		dge('range'+BOWL[i]).type = 'text';
+var	b = '', e = ': </td><td align="right"', i = BOW.length;
+	while (i--) b += '<span id="slider'+BOWL[i]+'"><input type="range" id="range'+BOWL[i]+'" onChange="updateSliders(this)" min="'
++RANGE[i].min+'" max="'
++RANGE[i].max+'" step="'
++RANGE[i].step+'"></span>	'+lang.tool[BOWL[i]]+'<br>\n';
+	setContent(dge('tools'),
+b+'			<div id="colors"><table width="100%"><tr><td>\
+				'+lang.shape	+e+'>	<select id="shape-select"></select>	</td><td>\
+				'+lang.time	+e+' onClick="toggle_display(\'timer\')" title="'+lang.show_hide+'">\
+								[<span id="timer">00:00:00</span>]</a>	</td></tr><tr><td>\
+				'+lang.palette	+e+'>	<select id="palette-select" onChange="updatePalette()"></select>	</td><td>\
+				'+lang.hex	+e+'>	<input type="text" value="#000" id="color-text" onChange="updateColor()" title="'+lang.hex_hint+'">	</td></tr></table>\
+				<div id="palette"></div>\
+			</div>\
+			<div id="info">'+lang.info+'</div>'
+	);
+	debugText = dge('debug');
+	timerText = dge('timer');
+	toggle_display(e = 'info');
+	e = dge(e).lastChild;
+	e.innerHTML = '<abbr title="'+INFO_ABBR+'">'+NS.toUpperCase()+'</abbr>'+e.innerHTML+'<abbr title="'+INFO_DATE+'">'+INFO_VERSION+'</abbr>';
+
+var	a = [//* subtitle, hotkey, pictogram, function, id; table used only within next 10 lines of code
+	['undo'	,'Z'	,'&#x2190;'	,'historyAct(1)'	,'buttonU'
+],	['redo'	,'X'	,'&#x2192;'	,'historyAct(2)'	,'buttonR'
+],
+0,	['fill'	,'F'	,'&nbsp;'	,'fillScreen(0)'	,'colorF'
+],	['swap'	,'S'	,'&#x2194;'	,'toolSwap()'
+],	['wipe'	,'D'	,'&nbsp;'	,'fillScreen(1)'	,'colorB'
+],	['invert','I'	,'&#x25D0;'	,'fillScreen(-1)'
+],
+0,	['pencil','A'	,'i'		,'toolSwap(1)'
+],	['eraser','E'	,'&#x25CB;'	,'toolSwap(2)'
+],	['reset','R'	,'&#x25CE;'	,'toolSwap(3)'
+],
+0,	['shape','L'	,'&#x25C7;'	,'toggleMode(1)'	,'checkL'
+],	['curve','U'	,'&#x2307;'	,'toggleMode(2)'	,'checkU'
+],	['cursor','V'	,'&#x25CF;'	,'toggleMode(4)'	,'checkV'
+],	['rough','G'	,'&#x25A0;'	,'toggleMode(3)'	,'checkQ'
+],	['fps'	,'F9'	,'&#x231A;'	,'toggleMode(5)'	,'checkF'
+],
+0,	['png'	,'P'	,'P'		,'sendPic(1)'		,'buttonSP'
+],	['jpeg'	,'J'	,'J'		,'sendPic(2)'		,'buttonSJ'
+],	['save'	,'F2'	,'&#x22C1;'	,'sendPic(3)'
+],	['load'	,'F4'	,'&#x22C0;'	,'sendPic(4)'		,'buttonL'
+],	['done'	,'F8'	,'&#x21B5;'	,'sendPic(0)'
+],
+0,	['info'	,'F1'	,'?'		,'showInfo()'		,'buttonH'
+]], d = dge('buttons');
+	for (i in a) {
+		e = document.createElement('span');
+		if (b = a[i]) {
+			if (b.length > 4) setId(e, b[4]);
+			e.title = lang.b[b[0]];
+			setContent(e,
+'<div class="button-key">'+b[1]+'</div>'+b[2]+
+'<div class="button-subtitle"><br>'+b[0]+'</div>');
+		var	func = b[3].replace(regFuncBrackets, '');
+			if (!self[func]) self[func] = eval(func);
+			setEvent(e, 'onclick', b[3]);
+			setClass(e, 'button');
+		} else	setClass(e, 'button-vertical');
+		d.appendChild(e);
+		d.innerHTML += '\n';					//* <- need any whitespace for correct visual result
 	}
+	for (name in mode) if (mode[modes[i = modes.length] = name]) toggleMode(i,1);
+	setClass(dge('buttonL'), LS && LS.canvasRecoveryTime ? 'button' : 'button-disabled');
+
+	d = (dge('rangeW').type == 'range');
+	for (i in BOW) if (d) {
+		e = document.createElement('input');
+		setId(e, (e.type = 'text')+BOWL[i]);
+		setEvent(e, 'onchange', 'updateSliders(this)');
+		dge('slider'+BOWL[i]).appendChild(e);
+	} else 	dge('range'+BOWL[i]).type = 'text';
 
 //* safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
 function generatePalette(name, step, slice) {
@@ -767,19 +766,16 @@ var	letters = [0, 0, 0], p = palette[name], l = p.length;
 	}
 }
 	generatePalette('auto', 85, 0);
-	generatePalette('Web 216', 51, 6);
+//	generatePalette('Web 216', 51, 6);
 
 	e = selectShape = dge('shape-select');
 	for (i in shapes) (
 		e.options[e.options.length] = new Option(shapes[i], i)
-	).selected = (i == 0);
+	).selected = !i;
 	e = selectPalette = dge('palette-select');
 	for (i in palette) (
 		e.options[e.options.length] = new Option(i, i)
 	).selected = (i == currentPalette);
-
-	(e = dge('version')).textContent = INFO_VERSION;
-	e.title = INFO_DATE;
 
 	toolSwap(3);
 	updateDebugScreen();
@@ -787,10 +783,148 @@ var	letters = [0, 0, 0], p = palette[name], l = p.length;
 	updateButtons();
 	updateSliders();
 
+	setInterval(timeElapsed, 1000);
 	setInterval(autoSave, 60000);
 }; //* END this.init()
 
+function get_form() {
+var	o = outside.form = dge('send'), e;
+	if (o && o.name) for (i in (o = o.name.split(';'))) if ((e = o[i].split('=', 2)).length > 1) outside[e[0]] = e[1];
+
+	if (!outside.lang) outside.lang = document.documentElement.lang || 'en';
+	if (outside.lang == 'ru') shapes = ['линия', 'прямоугольник', 'круг']
+, lang = {
+	bad_id:		'Ошибка выбора.'
+,	no_LS:		'Локальное Хранилище недоступно.'
+,	no_form:	'Назначение недоступно.'
+,	no_change:	'Нет изменений.'
+,	confirm_send:	'Отправить рисунок в сеть?'
+,	confirm_save:	'Сохранить рисунок в Локальное Хранилище?'
+,	confirm_load:	'Вернуть рисунок из Локального Хранилища?'
+,	found_swap:	'Рисунок был в запасе, поменялись местами.'
+,	no_canvas:	'Ваша программа не поддерживает HTML5-полотно.'
+, tool: {	B:	'Тень'
+	,	O:	'Непрозр.'
+	,	W:	'Толщина'
+},	shape:		'Форма'
+,	time:		'Время'
+,	palette:	'Палитра'
+,	hex:		'Цвет'
+,	hex_hint:	'Формат ввода - #f90, #ff9900, или 0,123,255.'
+,	show_hide:	'Кликните, чтобы спрятать или показать.'
+,	info:	'\
+					<p class="L-open">Управление (указатель над полотном):	</p>\
+				<p>	C, средний клик = подобрать цвет с рисунка.\
+				<br>	1-5, Q, W, колесо = толщина кисти.\
+				<br>	6-0, T, Y, Ctrl+колесо = непрозрачность.\
+				<br>	N, M, Shift+колесо = размытие тени.\
+				<br>	Автосохранение раз в минуту:	 <span id="saveTime">ещё не было</span>.\
+				</p>	<p class="L-close"> - доска для набросков, </p>'
+, b: {	undo:	'Отменить последнее действие.'
+,	redo:	'Отменить последнюю отмену.'
+,	fill:	'Залить полотно основным цветом.'
+,	swap:	'Поменять инструменты местами.'
+,	wipe:	'Залить полотно запасным цветом.'
+,	invert:	'Обратить цвета полотна.'
+,	pencil:	'Инструмент - карандаш.'
+,	eraser:	'Инструмент - ластик.'
+,	reset:	'Сбросить инструменты к начальным.'
+,	shape:	'Рисовать геометрические фигуры.'
+,	curve:	'Сглаживать углы.'
+,	cursor:	'Показывать кисть на указателе.'
+,	rough:	'Использовать меньше ЦП, пропуская перерисовку штриха.'
+,	fps:	'Использовать меньше ЦП, пропуская кадры.'
+,	png:	'Сохранить рисунок в PNG файл.'
+,	jpeg:	'Сохранить рисунок в JPEG файл.'
+,	save:	'Сохранить рисунок в Локальное Хранилище. Хранятся 2 последние позиции подряд.'
+,	load:	'Вернуть рисунок из Локального Хранилища. Хранятся 2 последние позиции подряд. \n\
+Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
+,	done:	'Завершить и отправить рисунок в сеть.'
+,	info:	'Показать или скрыть информацию.'
+}};
+else lang = {
+	bad_id:		'Invalid case.'
+,	no_LS:		'Local Storage not supported.'
+,	no_form:	'Destination unavailable.'
+,	no_change:	'Nothing changed.'
+,	confirm_send:	'Send image to server?'
+,	confirm_save:	'Save image to your Local Storage?'
+,	confirm_load:	'Restore image from your Local Storage?'
+,	found_swap:	'Found image at 2nd save slot, swapped the slots.'
+,	no_canvas:	'Your browser does not support HTML5 canvas.'
+, tool: {	B:	'Shadow'
+	,	O:	'Opacity'
+	,	W:	'Width'
+},	shape:		'Shape'
+,	time:		'Time'
+,	palette:	'Palette'
+,	hex:		'Hex'
+,	hex_hint:	'Valid formats - #f90, #ff9900, or 0,123,255.'
+,	show_hide:	'Click to show/hide.'
+,	info:	'\
+					<p class="L-open">Hot keys (mouse over image only):	</p>\
+				<p>	C, Mouse Mid = pick color from image.\
+				<br>	1-5, Q, W, Mouse Wheel = brush width.\
+				<br>	6-0, T, Y, Ctrl+Wheel = brush opacity.\
+				<br>	N, M, Shift+Wheel = brush shadow blur.\
+				<br>	Autosave every minute, last saved:	 <span id="saveTime">not yet</span>.\
+				</p>	<p class="L-close"> sketch pad </p>'
+, b: {	undo:	'Revert last change.'
+,	redo:	'Redo next reverted change.'
+,	fill:	'Fill image with main color.'
+,	swap:	'Swap your tools.'
+,	wipe:	'Fill image with back color.'
+,	invert:	'Invert image colors.'
+,	pencil:	'Set tool to sharp black.'
+,	eraser:	'Set tool to large white.'
+,	reset:	'Reset both tools.'
+,	shape:	'Draw strict geometric shape.'
+,	curve:	'Line corner smoothing.'
+,	cursor:	'Brush preview on cursor.'
+,	rough:	'Skip draw cleanup while drawing to use less CPU.'
+,	fps:	'Limit FPS when drawing to use less CPU.'
+,	png:	'Save image as PNG file.'
+,	jpeg:	'Save image as JPEG file.'
+,	save:	'Save image copy to your Local Storage. Two slots available in a queue.'
+,	load:	'Load image copy from your Local Storage. Two slots available in a queue. \n\
+May not work in some browsers until set to load and show new images automatically.'
+,	done:	'Finish and send image to server.'
+,	info:	'Show/hide information.'
+}};
+	return o;
+}
+
 document.addEventListener('DOMContentLoaded', this.init, false);
-document.write('<link rel="stylesheet" href="'+NS+'.css"><div id="'+NS+'">Loading...</div>');
+document.write(replaceAll('<style>\
+#| {padding: 8px; font-family: "Trebuchet MS"; font-size: 14pt; background-color: #f8f8f8; text-align: center;}\
+#| canvas {margin: 0; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}\
+#| input, #| select {font-family: "Trebuchet MS"; font-size: 14pt; margin: 1px;}\
+#| input[type="text"] {width: 48px;}\
+#| select, #| #|-color-text {width: 80px;}\
+#| select {margin-right: 4px;}\
+#|-buttons {height: 40px; padding: 8px;}\
+#|-info p {padding-left: 32px; line-height: 24px; margin-bottom: 0;}\
+#|-info, #|-colors {text-align: left; margin-top: 15px; margin-left: 5px;}\
+#|-info, #|-palette {font-size: small;}\
+#|-colors table tr td {padding: 0; margin: 0;}\
+#|-colors table {border-collapse: collapse;}\
+#|-palette {overflow-y: scroll; height: 171px; margin-top: 9px;}\
+#|-tools {width: 326px; margin: 0; text-align: left; display: inline-block; vertical-align: top; overflow-x: hidden;}\
+.|-L-close {padding-bottom: 24px; border-bottom: 1px solid #000; border-right: 1px solid #000;}\
+.|-L-open {padding-top: 24px; border-top: 1px solid #000; border-left: 1px solid #000;}\
+.|-button {background-color: #ddd;}\
+.|-button, .|-button-active, .|-button-disabled {border: 1px solid #000; cursor: pointer; display: inline-block; width: 32px; height: 32px; padding: 2px; text-align: center; font-family: "Arial Unicode MS"; line-height: 7px;}\
+.|-button-active {background-color: #ace;}\
+.|-button-active:hover {background-color: #bef;}\
+.|-button-disabled {color: gray; cursor: default;}\
+.|-button-key, #|-debug {text-align: left;}\
+.|-button-key, .|-button-subtitle {vertical-align: top; width: 32px; height: 10px; font-size: 9px; margin: 0; padding: 0;}\
+.|-button-vertical {display: inline-block; vertical-align: top; width: 0; height: 32px; padding-bottom: 6px; margin-left: 4px; margin-right: 4px; border-left: 1px solid #000;}\
+.|-button:hover {background-color: #eee;}\
+.|-paletdark, .|-palettine {border: 2px solid transparent; height: 15px; width: 15px; cursor: pointer;}\
+.|-paletdark:hover {border-color: #fff;}\
+.|-palettine:hover {border-color: #000;}\
+.|-palettine-tool {width: 32px; height: 32px; margin: 1px; border: 1px solid #000; display: inline-block; vertical-align: middle;}\
+</style>', '|', NS)+'<div id="'+NS+'">Loading '+NS+'...</div>');
 
 };
