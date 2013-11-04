@@ -1,13 +1,13 @@
 ﻿var dfc = new function () {
 
 var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.24'
-,	INFO_DATE = '2013-04-01 .. 2013-10-26'
+,	INFO_VERSION = 'v0.9.25'
+,	INFO_DATE = '2013-04-01 .. 2013-11-04'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg'
 ,	CR = NS+'CanvasRecover', CT = 'Time'
 ,	C1R = CR+'y', C1T = C1R+CT, BOTH_PANELS_HEIGHT = 640
-,	C2R = CR+'2', C2T = C2R+CT, DRAW_PIXEL_OFFSET = 0.5
+,	C2R = CR+'2', C2T = C2R+CT, DRAW_PIXEL_OFFSET = -0.5
 ,	LS = window.localStorage || localStorage
 
 ,	TOOLS_REF = [
@@ -38,7 +38,7 @@ var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align t
 			shape	: ['line', 'rectangle', 'circle', 'ellipse', 'pan']
 		,	lineCap	: ['round', 'butt', 'square']
 		,	lineJoin: ['round', 'bevel', 'miter']
-		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient', 'layers']
+		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient']//, 'layers']
 	}}
 ,	PALETTE_COL_COUNT = 16	//* <- used if no '\n' found
 ,	palette = [(LS && LS.historyPalette) ? JSON.parse(LS.historyPalette) : ['#f']
@@ -164,7 +164,7 @@ var	pt = dge('palette-table'), c = select.palette.value, p = palette[c];
 		],	bw = [	[  0,  0,  0]
 			,	[127,127,127]
 			,	[255,255,255]
-		],	l = hues.length, b = bw.length-1, f = 'return false;';
+		],	l = hues.length, f = 'return false;';
 
 			function linearBlend(from, to, frac, max) {
 				if (frac <= 0) return from;
@@ -463,7 +463,7 @@ function moveScreen(x, y) {
 var	d = draw.history.cur(), p = draw.step;
 	c2d.fillStyle = 'rgb(' + tools[1].color + ')';
 	if (p) {
-		for (i in {min:0,max:0}) d[i] = {
+		for (i in {min:0,max:0}) p[i] = {
 			x:Math[i](p.cur.x, p.prev.x)
 		,	y:Math[i](p.cur.y, p.prev.y)
 		};
