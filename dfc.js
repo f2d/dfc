@@ -1,13 +1,11 @@
 ﻿var dfc = new function () {
 
-var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.25'
-,	INFO_DATE = '2013-04-01 .. 2013-11-04'
+var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
+,	INFO_VERSION = 'v0.9.40'
+,	INFO_DATE = '2013-04-01 — 2014-02-21'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
-,	A0 = 'transparent', IJ = 'image/jpeg'
-,	CR = NS+'CanvasRecover', CT = 'Time'
-,	C1R = CR+'y', C1T = C1R+CT, BOTH_PANELS_HEIGHT = 640
-,	C2R = CR+'2', C2T = C2R+CT, DRAW_PIXEL_OFFSET = -0.5
+,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
+,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = 0.5
 ,	LS = window.localStorage || localStorage
 
 ,	TOOLS_REF = [
@@ -22,9 +20,9 @@ var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align t
 
 ,	flushCursor = false, neverFlushCursor = true
 ,	mode = {debug:	false
-	,	shape:	false	//* <- straight line	/ fill area	/ pie pan
+	,	shape:	false	//* <- straight line	/ fill area
 	,	step:	false	//* <- curve line	/ erase area	/ rect pan
-	,	lowQ:	false	//* TODO: binary pen?
+	,	lowQ:	false
 	,	brushView:	false
 	,	limitFPS:	false
 	,	autoSave:	true
@@ -32,18 +30,19 @@ var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align t
 ,	used = {}, cue = {upd:{}}
 ,	select = {
 		imgRes: {width:640, height:360}
-	,	imgLimits: {width:[64,640], height:[64,800]}
+	,	imgLimits: {width:[64,1920], height:[64,1080]}
 	,	lineCaps: {lineCap:0, lineJoin:0}
+	,	shapeFlags: [1,10, 2,2,2, 4]
 	,	options: {
-			shape	: ['line', 'rectangle', 'circle', 'ellipse', 'pan']
+			shape	: ['line', 'poly', 'rectangle', 'circle', 'ellipse', 'pan']
 		,	lineCap	: ['round', 'butt', 'square']
 		,	lineJoin: ['round', 'bevel', 'miter']
-		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient']//, 'layers']
+		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient']
 	}}
 ,	PALETTE_COL_COUNT = 16	//* <- used if no '\n' found
 ,	palette = [(LS && LS.historyPalette) ? JSON.parse(LS.historyPalette) : ['#f']
 //* '\t' = title, '\n' = line break + optional title, '\r' = special cases, '#f00' = hex color field, anything else = title + plaintext spacer
-	, [	'#f', '#d', '#a', '#8', '#5', '#2', '#0',		'#a00', '#740', '#470', '#0a0', '#074', '#047', '#00a', '#407', '#704'
+	, [	'#f', '#d', '#a', '#8', '#5', '#2', '#0',				'#a00', '#740', '#470', '#0a0', '#074', '#047', '#00a', '#407', '#704'
 	, '\n',	'#7f0000', '#007f00', '#00007f', '#ff007f', '#7fff00', '#007fff', '#3', '#e11', '#b81', '#8b1', '#1e1', '#1b8', '#18b', '#11e', '#81b', '#b18'
 	, '\n',	'#ff0000', '#00ff00', '#0000ff', '#ff7f00', '#00ff7f', '#7f00ff', '#6', '#f77', '#db7', '#bd7', '#7f7', '#7db', '#7bd', '#77f', '#b7d', '#d7b'
 	, '\n',	'#ff7f7f', '#7fff7f', '#7f7fff', '#ffff00', '#00ffff', '#ff00ff', '#9', '#faa', '#eca', '#cea', '#afa', '#aec', '#ace', '#aaf', '#cae', '#eac'
@@ -98,25 +97,32 @@ var	NS = 'dfc' //* <- namespace prefix, change here and above; BTW, tabs align t
 ,	draw = {o:{}, cur:{}, prev:{}
 	,	refresh:0, time: [0, 0]
 	,	line: {started:0, back:0, preview:0}
-	,	history: {pos:0, last:0, data:new Array(123)
-		,	cur:function() {return this.data[this.pos];}	//* TODO: sep.history per layer
-		,	act:function(i) {
+	,	history: {pos:0, last:0
+		,	cur: function() {return this.data[this.pos];}
+		,	act: function(i) {
 //* 0: Write: Refresh
 //* 1: Read: Back
 //* 2: Read: Forward
-	var	t = this, d = t.data.length - 1;
-		if (i) {
-			if (i == 1 && t.pos > 0) --t.pos; else
-			if (i == 2 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
-			canvasRedraw();
-			cue.autoSave = true;
-			used.history = 'Undo';
-		} else {
-			if (i !== 0) {if (t.pos < d) t.last = ++t.pos; else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];}
-			t.data[t.pos] = c2d.getImageData(0, 0, canvas.width, canvas.height);
+			var	t = this, d = t.data.length - 1;
+				if (i) {
+					if (i == 1 && t.pos > 0) --t.pos; else
+					if (i == 2 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
+					draw.screen();
+					cue.autoSave = true;
+					used.history = 'Undo';
+				} else {
+					if (i !== 0) {if (t.pos < d) t.last = ++t.pos; else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];}
+					t.data[t.pos] = c2d.getImageData(0, 0, canvas.width, canvas.height);
+				}
+				return 1;
+			}
 		}
-		return 1;
-	}}};
+	,	screen: function() {
+			c2d.fillStyle = 'white';
+			c2d.fillRect(0, 0, canvas.width, canvas.height);
+			c2d.putImageData(this.history.cur(), 0, 0);
+		}
+	};
 
 function historyAct(i) {if (draw.history.act(i)) updateDebugScreen(), updateHistoryButtons();}
 
@@ -140,20 +146,15 @@ function showInfo() {
 	setClass(dge('buttonH'), toggleView('info') ? 'button' : 'button-active');
 }
 function fpsCount() {fps = ticks; ticks = 0;}
-function canvasRedraw() {
-	c2d.fillStyle = 'white';
-	c2d.fillRect(0, 0, canvas.width, canvas.height);
-	c2d.putImageData(draw.history.cur(), 0, 0);
-}
 
 function updatePalette() {
 var	pt = dge('palette-table'), c = select.palette.value, p = palette[c];
-	if (LS) LS.lastPalette = c; //* ie-ie
+	if (LS) LS.lastPalette = c;
 	while (pt.childNodes.length) pt.removeChild(pt.lastChild);
 
 	if (p[0] == '\r') {
 		c = p[1];
-		if (c == 'g') {//		//* <- gradient
+		if (c == 'g') {
 		var	ctx = (c = document.createElement('canvas')).getContext('2d')
 		,	hues = [[255,  0,  0]
 			,	[255,255,  0]
@@ -201,10 +202,7 @@ var	pt = dge('palette-table'), c = select.palette.value, p = palette[c];
 			setContent(pt, '<span id="sliderS">'
 +'<input onChange="updateSliders(this)" type="range" id="rangeS" value="'+c.sat+'" min="0" max="'+c.sat+'" step="1">'
 +'<input onChange="updateSliders(this)" type="text" id="textS" value="'+c.sat+'"></span> '+lang.sat+'<br>');
-		} else
-		if (c == 'l') {//		//* <- layers
-			c = 'TODO: layers';
-		} else c = 'Unknown case.';
+		} else c = 'TODO';
 		pt.appendChild(c.tagName ? c : document.createTextNode(c));
 	} else {
 	var	tbl = document.createElement('table'), tr, td, fill, t = '', colCount = 0, autoRows = true;
@@ -252,20 +250,70 @@ var	pt = dge('palette-table'), c = select.palette.value, p = palette[c];
 function updateDebugScreen() {
 	if (!mode.debug) return;
 	ticks ++;
-var	t = '</td><td>', r = '</td></tr>	<tr><td>', c = draw.step;
+var	t = '</td><td>', r = '</td></tr>	<tr><td>', a, b = 'turn: ', c = draw.step, i;
+	if (a = draw.turn) for (i in a) b += i+'='+a[i]+'; ';
 	text.debug.innerHTML = '<table><tr><td>'
 +draw.refresh+t+'1st='+draw.time[0]+t+'last='+draw.time[1]+t+'fps='+fps
 +r+'Relative'+t+'x='+draw.o.x+t+'y='+draw.o.y+(isMouseIn()?t+'rgb='+pickColor(1):'')
-+r+'DrawOfst'+t+'x='+draw.cur.x+t+'y='+draw.cur.y
-+r+'Previous'+t+'x='+draw.prev.x+t+'y='+draw.prev.y+(c?''
-+r+'CurvStrt'+t+'x='+c.prev.x+t+'y='+c.prev.y
-+r+'CurveEnd'+t+'x='+c.cur.x+t+'y='+c.cur.y:'')+'</td></tr></table>';
++r+'DrawOfst'+t+'x='+draw.cur.x+t+'y='+draw.cur.y+t+'btn='+draw.btn
++r+'Previous'+t+'x='+draw.prev.x+t+'y='+draw.prev.y+t+'chain='+mode.click+(c?''
++r+'StpStart'+t+'x='+c.prev.x+t+'y='+c.prev.y
++r+'Step_End'+t+'x='+c.cur.x+t+'y='+c.cur.y:'')+'</td></tr></table>'+b;
+}
+
+function updateViewport(delta) {
+var	i, t = '', p = ['-moz-','-webkit-','-o-',''];
+	if (isNaN(delta)) draw.angle = 0, draw.pan = 0, draw.zoom = 1, t = 'none';
+	else
+	if (draw.turn.pan) {
+		draw.pan = {};
+		for (i in draw.o) draw.pan[i] = draw.o[i] - draw.turn.origin[i] + draw.turn.prev[i];
+	} else
+	if (draw.turn.zoom) {
+		i = draw.turn.prev * (draw.turn.origin + delta) / draw.turn.origin;
+		if (i > 4) i = 4; else
+		if (i < .25) i = .25;
+		draw.zoom = i;
+	} else {
+		draw.angle = draw.turn.prev + delta;
+		draw.a360 = Math.floor(draw.angle*180/Math.PI)%360;
+		draw.arad = draw.a360/180*Math.PI;
+	}
+	if (draw.pan) t += 'translate('+draw.pan.x+'px,'+draw.pan.y+'px)';
+	if (draw.angle) t += 'rotate('+draw.a360+'deg)';
+	if (draw.zoom != 1) t += 'scale('+(draw.zoom)+')';
+	for (i in p) canvas.style[p[i]+'transform'] = t;	//* <- not working in opera11.10, though should be possible
+	updateDebugScreen();
 }
 
 function updatePosition(event) {
-var	d = (select.shape.value == 4 || ((draw.active?c2d.lineWidth:tool.width) % 2) ? DRAW_PIXEL_OFFSET : 0);	//* <- not a 100% fix yet
-	draw.cur.x = d + (draw.o.x = event.pageX - draw.field.offsetLeft);
-	draw.cur.y = d + (draw.o.y = event.pageY - draw.field.offsetTop);
+var	i, o = ((select.shapeFlags[select.shape.value] & 4) || ((draw.active?c2d.lineWidth:tool.width) % 2) ? DRAW_PIXEL_OFFSET : 0);	//* <- not a 100% fix yet
+	draw.o.x = event.pageX - draw.field.offsetLeft;
+	draw.o.y = event.pageY - draw.field.offsetTop;
+	if (draw.pan && !(draw.turn && draw.turn.pan)) for (i in draw.o) draw.o[i] -= draw.pan[i];
+	if (!draw.turn && (draw.angle || draw.zoom != 1)) {
+	var	r = getCursorRad(2, draw.o.x, draw.o.y);
+		if (draw.angle) r.a -= draw.arad;
+		if (draw.zoom != 1) r.d /= draw.zoom;
+		draw.o.x = Math.cos(r.a)*r.d + canvas.width/2;
+		draw.o.y = Math.sin(r.a)*r.d + canvas.height/2;
+		o = 0;
+	}
+	for (i in draw.o) draw.cur[i] = o + draw.o[i];
+}
+
+function getCursorRad(r, x, y) {
+	if (draw.turn.pan) return {x: draw.o.x, y: draw.o.y};
+	x = (isNaN(x) ? draw.cur.x : x) - canvas.width/2;
+	y = (isNaN(y) ? draw.cur.y : y) - canvas.height/2;
+	return (r
+	? {	a:Math.atan2(y, x)
+	,	d:Math.sqrt(x*x+y*y)	//* <- looks stupid, will do for now
+	}
+	: (draw.turn.zoom
+		? Math.sqrt(x*x+y*y)
+		: Math.atan2(y, x)
+	));
 }
 
 function drawCursor() {
@@ -285,39 +333,48 @@ function drawCursor() {
 	if (!neverFlushCursor) flushCursor = true;
 }
 
-function drawShapeMode() {return (mode.shape || select.shape.value != 0);}
 function drawStart(event) {
-	updatePosition(event);
+	if (!isMouseIn()) return false;
 	canvas.focus();
 	event.preventDefault();
-var	s = select.shape.value;
+	event.stopPropagation();
+	event.cancelBubble = true;
+
+	if (draw.btn && (draw.btn != event.which)) return drawEnd();
+	if (mode.click) return ++mode.click, drawEnd(event);
+	if (event.altKey) draw.turn = {prev: draw.zoom, zoom: 1}; else
+	if (event.ctrlKey) draw.turn = {prev: draw.angle, angle: 1}; else
+	if (event.shiftKey) draw.turn = {prev: draw.pan ? {x: draw.pan.x, y: draw.pan.y} : {x:0,y:0}, pan: 1};
+
+	updatePosition(event);
+	if (draw.turn) return draw.turn.origin = getCursorRad();
+
+var	sf = select.shapeFlags[select.shape.value];
 	if (draw.step) {
-		if (mode.step && ((mode.shape && s == 0) || s == 4)) {
-			draw.step.done = 1;
+		if (mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
 			for (i in draw.o) draw.prev[i] = draw.cur[i];
-			return;
+			return draw.step.done = 1;
 		} else draw.step = 0;
 	}
-	switch (event.which) {
-		case 2: pickColor(); break;
-		case 1: case 3:
-		event.stopPropagation();
-		event.cancelBubble = true;
+//	if (event.shiftKey) mode.click = 1;
+	if ((draw.btn = event.which) != 1 && draw.btn != 3) pickColor();
+	else {
 		draw.active = 1;
 		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date();
 		if (!interval.timer) {
 			interval.timer = setInterval(timeElapsed, 1000);
 			interval.save = setInterval(autoSave, 60000);
 		}
-	//	canvasRedraw();
 		for (i in draw.o) draw.prev[i] = draw.cur[i];
 		for (i in draw.line) draw.line[i] = false;
 		for (i in select.lineCaps) c2s[i] = c2d[i] = select.options[i][select[i].value];
-	var	i = (event.which == 1 ? 1 : 0), t = tools[1-i];
+	var	i = (event.which == 1 ? 1 : 0), t = tools[1-i]
+	,	pf = ((sf & 8) && (mode.shape || !mode.step))
+	,	fig = ((sf & 2) && (mode.shape || pf));
 		for (i in (t = {
-			lineWidth: (s == 4?1:t.width)
-		,	fillStyle: (mode.shape && s != 0 && s != 4 ? 'rgba('+tools[i].color+', '+t.opacity+')' : A0)
-		,	strokeStyle: 'rgba('+t.color+', '+(s == 4?(draw.step?0.33:0.66):t.opacity)+')'
+			lineWidth: (((sf & 4) || (pf && !mode.step))?1:t.width)
+		,	fillStyle: (fig ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
+		,	strokeStyle: (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+((sf & 4)?(draw.step?0.33:0.66):t.opacity)+')')
 		,	shadowColor: (t.blur ? 'rgb('+t.color+')' : A0)
 		,	shadowBlur: t.blur
 		})) c2s[i] = c2d[i] = t[i];
@@ -327,8 +384,15 @@ var	s = select.shape.value;
 }
 
 function drawMove(event) {
-var	redraw = true, newLine = (draw.active && !drawShapeMode()), s = select.shape.value;
+	if (mode.click == 1 && !event.shiftKey) return mode.click = 0, drawEnd(event);
+
 	updatePosition(event);
+	if (draw.turn) return updateViewport(draw.turn.pan?1:draw.turn.delta = getCursorRad() - draw.turn.origin);
+
+var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
+,	newLine = (draw.active && !((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)));
+
+	if (mode.click) mode.click = 1;
 	if (newLine) {
 		if (draw.line.preview) {
 			drawShape(c2d, s);
@@ -346,20 +410,15 @@ var	redraw = true, newLine = (draw.active && !drawShapeMode()), s = select.shape
 		if (t-draw.refresh > 30) draw.refresh = t; else redraw = false;		//* <- put "> 1000/N" to redraw maximum N FPS
 	}
 	if (redraw) {
-		if ((flushCursor || neverFlushCursor) && !(mode.lowQ && draw.active)) canvasRedraw();
+		if ((flushCursor || neverFlushCursor) && !(mode.lowQ && draw.active)) draw.screen();
 		if (draw.active) {
-			if (drawShapeMode()) {
+			if ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)) {
 				draw.line.preview = true;
-				if (mode.step && s != 0 && s != 4) {
-					c2d.beginPath();
-					drawShape(c2d, s, 1);	//* <- erase shape area
-				} else {
-					c2s.clearRect(0, 0, canvas.width, canvas.height);
-					c2s.beginPath();
-					drawShape(c2s, (mode.step && s == 4 && (!draw.step || !draw.step.done))?1:s);
-					c2s.stroke();
-					c2d.drawImage(c2s.canvas, 0, 0);		//* <- draw 2nd canvas overlay with sole shape
-				}
+				c2s.clearRect(0, 0, canvas.width, canvas.height);
+				c2s.beginPath();
+				drawShape(c2s, (mode.step && (sf & 4) && (!draw.step || !draw.step.done))?2:s);
+				c2s.stroke();
+				c2d.drawImage(c2s.canvas, 0, 0);			//* <- draw 2nd canvas overlay with sole shape
 			}
 			if (draw.line.started) c2d.stroke();
 		} else if (neverFlushCursor && !mode.lowQ && isMouseIn()) drawCursor();
@@ -369,29 +428,33 @@ var	redraw = true, newLine = (draw.active && !drawShapeMode()), s = select.shape
 }
 
 function drawEnd(event) {
-var	s = select.shape.value;
+	if (!event || draw.turn) return draw.active = draw.step = draw.btn = draw.turn = 0;
+	if (mode.click == 1 && event.shiftKey) return drawMove(event);
 	if (draw.active) {
-		if (!draw.step && mode.step && ((mode.shape && s == 0) || s == 4)) {
+	var	s = select.shape.value, sf = select.shapeFlags[s], m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8));
+		if (!draw.step && mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
 			draw.step = {prev:{x:draw.prev.x, y:draw.prev.y}, cur:{x:draw.cur.x, y:draw.cur.y}};	//* <- normal straight line as base
 			return;
 		}
 		draw.time[1] = +new Date();
-		canvasRedraw();
-		if (mode.step && s != 0 && s != 4) {
-			drawShape(c2d, s, 1);
-		} else {
-		var	m = drawShapeMode();
-			if (m && draw.line.preview) {
-				c2d.fillStyle = c2s.fillStyle;
-				drawShape(c2d, s);
-			} else if (m || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
-				c2d.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
-			}
-			if (s != 4) c2d.stroke(); else used.move = 'Move';
+		draw.screen();
+		c2d.fillStyle = c2s.fillStyle;
+		if (sf & 8) {
+			c2d.closePath();
+			if (mode.shape || !mode.step) c2d.fill();
+			used.poly = 'Poly';
+		} else
+		if (m && draw.line.preview) {
+			drawShape(c2d, s);
+			if (!(sf & 4)) used.shape = 'Shape';
+		} else if (m || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
+			c2d.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
 		}
+		if (sf & 4) used.move = 'Move'; else if (!(sf & 8) || mode.step) c2d.stroke();
 		historyAct();
 		cue.autoSave = true;
-		draw.active = draw.step = 0;
+		draw.active = draw.step = draw.btn = 0;
+		if (mode.click && event.shiftKey) return mode.click = 0, drawStart(event);
 	}
 	updateDebugScreen();
 }
@@ -399,19 +462,20 @@ var	s = select.shape.value;
 function drawShape(ctx, i, clear) {
 var	s = draw.step;
 	switch (parseInt(i)) {
-		case 1:	if (s) {
-		//		if (i = ctx.setLineDash) i([3,3]);
-				ctx.strokeRect(s.prev.x, s.prev.y, s.cur.x-s.prev.x, s.cur.y-s.prev.y);	//* pan zone
-		//		if (i) i();
+	//* rect
+		case 2:	if (s) {
+			//* show pan source area
+				ctx.strokeRect(s.prev.x, s.prev.y, s.cur.x-s.prev.x, s.cur.y-s.prev.y);
 			} else if (clear) c2d.clearRect(draw.prev.x, draw.prev.y, draw.cur.x-draw.prev.x, draw.cur.y-draw.prev.y);
 			else {
-				if (ctx.fillStyle != A0)	//* rect
+				if (ctx.fillStyle != A0)
 				ctx.fillRect(draw.prev.x, draw.prev.y, draw.cur.x-draw.prev.x, draw.cur.y-draw.prev.y);
 				ctx.strokeRect(draw.prev.x, draw.prev.y, draw.cur.x-draw.prev.x, draw.cur.y-draw.prev.y);
 			}
 			break;
-		case 2:
-		var	xCenter = (draw.prev.x+draw.cur.x)/2	//* circle
+	//* circle
+		case 3:
+		var	xCenter = (draw.prev.x+draw.cur.x)/2
 		,	yCenter = (draw.prev.y+draw.cur.y)/2
 		,	radius = Math.sqrt(Math.pow(draw.cur.x-xCenter, 2) + Math.pow(draw.cur.y-yCenter, 2));
 			ctx.moveTo(xCenter+radius, yCenter);
@@ -424,8 +488,9 @@ var	s = draw.step;
 			} else if (ctx.fillStyle != A0) ctx.fill();
 			ctx.moveTo(draw.cur.x, draw.cur.y);
 			break;
-		case 3:
-		var	xCenter = (draw.prev.x+draw.cur.x)/2	//* ellipse
+	//* ellipse
+		case 4:
+		var	xCenter = (draw.prev.x+draw.cur.x)/2
 		,	yCenter = (draw.prev.y+draw.cur.y)/2
 		,	xRadius = Math.abs(draw.cur.x-xCenter)
 		,	yRadius = Math.abs(draw.cur.y-yCenter), qx = 1, qy = 1;
@@ -445,39 +510,57 @@ var	s = draw.step;
 			}
 			ctx.moveTo(draw.cur.x, draw.cur.y);
 			break;
-		case 4:	if (draw.prev.x != draw.cur.x		//* pan
+	//* pan
+		case 5:	if (draw.prev.x != draw.cur.x
 			|| (draw.prev.y != draw.cur.y)) moveScreen(draw.cur.x-draw.prev.x, draw.cur.y-draw.prev.y);
 			break;
+	//* line
 		default:if (s) {
-			var	p = (s.prev.x == draw.prev.x && s.prev.y == draw.prev.y ? draw.cur : draw.prev);
+			var	d = draw.cur, old = {}, t = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123,123,123,0.5)'};
+				for (i in t) old[i] = c2s[i], c2s[i] = t[i];
+				c2s.beginPath();
+				if (s.prev.x != draw.prev.x || s.prev.y != draw.prev.y) {
+					c2s.moveTo(d.x, d.y);
+					d = draw.prev;
+					c2s.lineTo(d.x, d.y);
+				}
+				c2s.moveTo(s.cur.x, s.cur.y);
+				c2s.lineTo(s.prev.x, s.prev.y);
+				c2s.stroke();
+				for (i in t) c2s[i] = old[i];
+				c2s.beginPath();
+		//* curve
 				ctx.moveTo(s.prev.x, s.prev.y);
-				ctx.bezierCurveTo(p.x, p.y, draw.cur.x, draw.cur.y, s.cur.x, s.cur.y);
-				return;
+				ctx.bezierCurveTo(s.cur.x, s.cur.y, d.x, d.y, draw.cur.x, draw.cur.y);
+			} else {
+		//* straigth
+				ctx.moveTo(draw.prev.x, draw.prev.y);
+				ctx.lineTo(draw.cur.x, draw.cur.y);
 			}
-			ctx.moveTo(draw.prev.x, draw.prev.y);	//* line
-			ctx.lineTo(draw.cur.x, draw.cur.y);
 	}
 }
 
 function moveScreen(x, y) {
-var	d = draw.history.cur(), p = draw.step;
+var	d = draw.history.cur(), p = draw.step, n = !mode.shape;
 	c2d.fillStyle = 'rgb(' + tools[1].color + ')';
 	if (p) {
 		for (i in {min:0,max:0}) p[i] = {
 			x:Math[i](p.cur.x, p.prev.x)
 		,	y:Math[i](p.cur.y, p.prev.y)
 		};
-		c2d.fillRect(p.min.x, p.min.y, p.max.x -= p.min.x, p.max.y -= p.min.y);
+		p.max.x -= p.min.x;
+		p.max.y -= p.min.y;
+		if (n) c2d.fillRect(p.min.x, p.min.y, p.max.x, p.max.y);
 		c2d.putImageData(d, x, y, p.min.x, p.min.y, p.max.x, p.max.y);
 	} else {
-		c2d.fillRect(0, 0, canvas.width, canvas.height);
+		if (n) c2d.fillRect(0, 0, canvas.width, canvas.height);
 		c2d.putImageData(d, x, y);
 	}
 }
 
 function fillCheck() {
 var	d = draw.history.cur(), i = d.data.length;
-	while (--i) if (d.data[i] != d.data[i%4]) return 0; return 1;	//* <- fill flood confirmed
+	while (--i) if (d.data[i] != d.data[i%4]) return 0; return 1;		//* <- fill flood confirmed
 }
 
 function fillScreen(i) {
@@ -522,14 +605,13 @@ function fillScreen(i) {
 }
 
 function pickColor(keep, c, event) {
-var	d;
 	if (c) {
-		d = c.ctx.getImageData(0, 0, c.width, c.height);
+	var	d = c.ctx.getImageData(0, 0, c.width, c.height);
 		c = (event.pageX - c.offsetLeft
 		+   (event.pageY - c.offsetTop)*c.width)*4;
 	} else {
 		d = draw.history.cur();
-		c = (draw.o.x + draw.o.y*canvas.width)*4;
+		c = (Math.floor(draw.o.x) + Math.floor(draw.o.y)*canvas.width)*4;
 	}
 	c = (d.data[c]*65536 + d.data[c+1]*256 + d.data[c+2]).toString(16);
 	while (c.length < 6) c = '0'+c; c = '#'+c;
@@ -612,7 +694,8 @@ function updateSliders(s) {
 
 function updateShape(s) {
 	if (!isNaN(s)) select.shape.value = s, s = 0;
-	setClass(dge('bottom'), ((s?s:s=select.shape).value == 0?'b c':(s.value == 4?'a b':'a c')));
+	s = select.shapeFlags[(s?s:s=select.shape).value];
+	setClass(dge('bottom'), (s & 1?'b c':(s & 4?'a b':'a c')));
 }
 
 function updateHistoryButtons() {
@@ -635,7 +718,7 @@ function updateDim(i) {
 			v > (b = select.imgLimits[i][1]) ? b : v)
 		);
 		if (v > c) {
-			canvasRedraw();
+			draw.screen();
 			historyAct(0);
 		}
 	}
@@ -651,6 +734,13 @@ function updateDim(i) {
 			c.display = i.display = '';
 			setClass(b, 'button-active');
 		}
+	}
+	container.style.minWidth = (v = canvas.width+dge('right').offsetWidth+14)+'px';
+	if (a = outside.restyle) {
+		v += 24;
+		if (!(c = dge(i = 'restyle'))) setId(container.parentNode.insertBefore(c = document.createElement('style'), container), i);
+		if ((b = outside.restmin) && ((b = eval(b).offsetWidth) > v)) v = b;
+		c.innerHTML = a+'{max-width:'+v+'px;}';
 	}
 }
 
@@ -698,7 +788,6 @@ function toggleMode(i, keep) {
 			interval.fps ? clearInterval(interval.fps) : (interval.fps = setInterval(fpsCount, 1000));
 		}
 	} else alert(lang.bad_id);
-
 }
 
 function unixDateToHMS(t,u) {
@@ -712,15 +801,22 @@ var	d = (t ? new Date(t+(t > 0 ? 0 : new Date())) : new Date());
 function timeElapsed() {text.timer.textContent = unixDateToHMS(timer += 1000, 1);}
 function autoSave() {if (mode.autoSave && cue.autoSave) {sendPic(2,true); cue.autoSave = false;}}
 
+function sendMeta() {
+var	i, j = [];
+	for (i in used) j.push(used[i]);
+	return outside.t0 +','+ draw.time.join('-') +','+ NS +' '+ INFO_VERSION + (j.length?' (used '+j.join(', ')+')':'');
+}
+
 function sendPic(dest, auto) {
-var	a = auto || false, c, d, e, t;
-	canvasRedraw();
+var	a = auto || false, c, d, e, i, t;
+	draw.screen();
 	switch (dest) {
 	case 0:
 	case 1: window.open(c = canvas.toDataURL(dest?IJ:''), '_blank');
 		break;
+//* save
 	case 2:
-		if (fillCheck()) return alert(lang.flood);
+		if (fillCheck()) return a?c:alert(lang.flood);
 		c = canvas.toDataURL();
 		if (!LS) return a?c:alert(lang.no_LS);
 		d = LS[C1R];
@@ -739,12 +835,13 @@ var	a = auto || false, c, d, e, t;
 				LS[C2T] = t;
 			}
 			LS[C1R] = c;
-			LS[C1T] = draw.time.join('-');
+			LS[C1T] = draw.time.join('-')+(used.read?'-'+used.read:'');
 			dge('saveTime').textContent = unixDateToHMS();
 			setClass(dge('buttonL'), 'button');
 			cue.autoSave = false;
 		}
 		break;
+//* load
 	case 3:
 		if (!LS) return alert(lang.no_LS);
 		t = LS[C1T];
@@ -752,13 +849,11 @@ var	a = auto || false, c, d, e, t;
 		d = LS[C1R];
 		if (d == (c = canvas.toDataURL())) {
 			if ((!(t = LS[C2T]) || ((d = LS[C2R]) == c))) return alert(lang.no_change);
-	/*		LS[C2R] = LS[C1R];
-			LS[C2T] = LS[C1T];	//* <- swap save slots
-			LS[C1R] = d;
-			LS[C1T] = t;
-	*/	}
+		}
 		if (confirm(lang.confirm_load)) {
-			draw.time = t = t.split('-'), dge('saveTime').textContent = unixDateToHMS(+t[1]);
+			t = t.split('-');
+			if (t.length > 2) used.read = t.slice(2).join('-');
+			draw.time = t.slice(0,2), a = dge('saveTime'), a.textContent = unixDateToHMS(+t[1]), a.title = new Date(+t[1]);
 			readPic(d);
 			used.LS = 'Local Storage';
 		}
@@ -766,10 +861,10 @@ var	a = auto || false, c, d, e, t;
 	case 4:	
 		if ((outside.read || (outside.read = dge('read'))) && (a = outside.read.value)) {
 			draw.time = [0, 0];
-			readPic(a);
-			used.read = 'File Read';
+			used.read = 'File Read: '+readPic(a);
 		}
 		break;
+//* send
 	default:
 		if (dest) alert(lang.bad_id); else
 		if (!outside.send) alert(lang.no_form); else
@@ -781,14 +876,17 @@ var	a = auto || false, c, d, e, t;
 				e.type = 'hidden';
 				outside.send.appendChild(e);
 			}
-			e = [];
-			for (i in used) e.push(used[i]);
-			a.txt.value = outside.t0 +','+ draw.time.join('-') +','+ NS +' '+ INFO_VERSION + (e.length?' (used '+e.join(', ')+')':'');
-			a.pic.value = ((((outside.jp
-				&& pngData.length > outside.jp) || (outside.jpg_pref
-				&& pngData.length > outside.jpg_pref))
-				&& pngData.length > (jpgData = canvas.toDataURL(IJ)).length
+			e = pngData.length;
+			a.txt.value = sendMeta();
+			a.pic.value = (((i = outside.jp || outside.jpg_pref)
+				&& (e > i)
+				&& (((c = canvas.width * canvas.height
+				) <= (d = select.imgRes.width * select.imgRes.height
+				))
+				|| (e > (i *= c/d)))
+				&& (e > (jpgData = canvas.toDataURL(IJ)).length)
 			) ? jpgData : pngData);
+			if (mode.debug) alert('jpg = '+(jpgData?jpgData.length:0)+'\npng = '+e+'\npng limit = '+i);
 			outside.send.submit();
 		}
 	}
@@ -798,78 +896,80 @@ var	a = auto || false, c, d, e, t;
 function readPic(s) {
 var	id = 'read-img', i = dge(id);
 	if (!i) setId(i = new Image(), id);
+	i.setAttribute('onclick', 'return this.parentNode.removeChild(this) && false;');
 	i.onload = function () {
 		for (d in select.imgRes) dge('img-'+d).value = canvasShape[d] = canvas[d] = i[d];
 		updateDim();
 		c2d.drawImage(i,0,0);
 		historyAct();
 		cue.autoSave = false;
-		draw.field.removeChild(i);
+		i.parentNode.removeChild(i);
 	}
 	draw.field.appendChild(i);
-	i.src = s;
+	return (0 === (i.src = s).indexOf('data:')) ? s.split(',', 1) : s;
 }
 
 function isMouseIn() {return (draw.o.x >= 0 && draw.o.y >= 0 && draw.o.x < canvas.width && draw.o.y < canvas.height);}
-function browserHotKeyPrevent(event) {return isMouseIn() ? (event.returnValue = false) || event.preventDefault() || true : false;}
+function browserHotKeyPrevent(event) {
+	return ((!draw.active && isMouseIn()) || (event.keyCode == 27))
+	? ((event.returnValue = false) || event.preventDefault() || true)
+	: false;
+}
 function hotKeys(event) {
 	if (browserHotKeyPrevent(event)) {
 		function c(s) {return s.charCodeAt(0);}
 	var	n = event.keyCode - c('0');
 		if ((n?n:n=10) > 0 && n < 11) {
-			(event.AltKey ? toolTweak('B', n/10) :
-			(event.CtrlKey? toolTweak('O', n/10) :
-					toolTweak('W', n>5 ? (n-5)*10 : n)));
+		var	k = [event.altKey, event.ctrlKey, 1];
+			for (i in k) if (k[i]) return toolTweak(BOWL[i], RANGE[i].step < 1 ? n/10 : (n>5 ? (n-5)*10 : n));
 		} else
 		switch (event.keyCode) {
+			case 27:	drawEnd();	break;	//* Esc
+			case 36:updateViewport();	break;	//* Home
+
 			case c('Z'):	historyAct(1);	break;
 			case c('X'):	historyAct(2);	break;
 			case c('C'):	pickColor();	break;
 			case c('F'):	fillScreen(0);	break;
 			case c('D'):	fillScreen(1);	break;
-//			case c('W'):	fillScreen();	break;
 			case c('I'):	fillScreen(-1);	break;
 			case c('H'):	fillScreen(-2);	break;
 			case c('V'):	fillScreen(-3);	break;
 			case c('S'):	toolSwap();	break;
 			case c('A'):	toolSwap(1);	break;
 			case c('E'):	toolSwap(2);	break;
-			case c('R'):	toolSwap(3);	break;
+			case c('G'):	toolSwap(3);	break;
 
 			case 8:
-if (text.debug.innerHTML.length)	toggleMode(0);	break; //* 45=Ins, 42=106=Num *, 8=bksp
+if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *, 8=bksp
 			case c('L'):	toggleMode(1);	break;
 			case c('U'):	toggleMode(2);	break;
-		//	case 118:	toggleMode(3);	break;
-			case 116:	toggleMode(4);	break;
-		//	case 120:	toggleMode(5);	break;
+			case 114:	toggleMode(4);	break;
 
 			case 112:	showInfo();	break;
-			case c('P'):	sendPic(0);	break;
-			case c('J'):	sendPic(1);	break;
+			case 116:	sendPic(0);	break;
+			case 118:	sendPic(1);	break;
 			case 113:	sendPic(2);	break;
 			case 115:	sendPic(3);	break;
 			case 117:	sendPic(4);	break;
 			case 119:	sendPic();	break;
 
 			case c('Q'):	updateShape(0);	break;
-			case c('W'):	updateShape(1);	break;
-			case c('B'):	updateShape(2);	break;
-			case c('N'):	updateShape(3);	break;
-			case c('M'):	updateShape(4);	break;
+			case c('P'):	updateShape(1);	break;
+			case c('R'):	updateShape(2);	break;
+			case c('T'):	updateShape(3);	break;
+			case c('Y'):	updateShape(4);	break;
+			case c('M'):	updateShape(5);	break;
 
-		/*	case c('Q'):	toolTweak('W', -1);	break;
-			case c('W'):	toolTweak('W');		break;
-			case c('T'):	toolTweak('O', -1);	break;
-			case c('Y'):	toolTweak('O');		break;
-			case c('N'):	toolTweak('B', -1);	break;
-			case c('M'):	toolTweak('B');		break;*/
+			case c('B'):
+			case c('O'):
+			case c('W'): toolTweak(String.fromCharCode(event.keyCode), event.altKey?-1:0); break;
 
 			case 106: case 42:
-text.debug.innerHTML = replaceAll(
-"<a href=\"javascript:var s=' ',t='';for(i in |)t+='\\n'+i+' = '+(|[i]+s).split(s,1);alert(t);\">|.props</a>\n"+
-"<a href=\"javascript:var t='',o=|.o;for(i in o)t+='\\n'+i+' = '+o[i];alert(t);\">|.outside</a>\n"+
-(outside.read?'':'F6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS); break;
+text.debug.innerHTML = sendMeta()+replaceAll(
+"\n<a href=\"javascript:var s=' ',t='';for(i in |)t+='\\n'+i+' = '+(|[i]+s).split(s,1);alert(t);\">|.props</a>"+
+"\n<a href=\"javascript:var t='',o=|.o;for(i in o)t+='\\n'+i+' = '+o[i];alert(t);\">|.outside</a>"+
+(outside.read?'':'\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS); break;
 
 			default: if (mode.debug) text.debug.innerHTML += '\n'+String.fromCharCode(event.keyCode)+'='+event.keyCode;
 		}
@@ -880,7 +980,7 @@ text.debug.innerHTML = replaceAll(
 function hotWheel(event) {
 	if (browserHotKeyPrevent(event)) {
 	var	d = event.deltaY || event.detail || event.wheelDelta
-	,	b = event.altKey?'B':(event.CtrlKey?'O':'W');
+	,	b = event.altKey?'B':(event.ctrlKey?'O':'W');
 		toolTweak(b, d < 0?0:-1);
 		if (mode.debug) text.debug.innerHTML += ' d='+d;
 	}
@@ -895,7 +995,8 @@ this.init = function() {
 var	a, b, c = 'canvas', d = '<div id="', e = '"></div>', f, i, j, n = '\n	', o = outside, p, s;
 	setContent(container = dge(),
 n+d+'load"><'+c+' id="'+c+'" tabindex="0">'+lang.no_canvas+'</'+c+'></div>'+
-n+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
+//n+
+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 
 	if (!(canvas = dge(c)).getContext) return;
 	canvasShape = document.createElement(c);
@@ -911,7 +1012,7 @@ n+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 
 	canvas.setAttribute('onscroll', f = 'return false;');
 	canvas.setAttribute('oncontextmenu', f);
-	canvas.addEventListener('mousedown'	, drawStart, f = false);
+	document.addEventListener('mousedown'	, drawStart, f = false);
 	document.addEventListener('mousemove'	, drawMove, f);	//* <- using 'document' to prevent negative clipping
 	document.addEventListener('mouseup'	, drawEnd, f);
 	container.addEventListener('keypress'	, browserHotKeyPrevent, f);
@@ -935,20 +1036,27 @@ n+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 +f+lang.palette	+a+'<select id="palette" onChange="updatePalette()"></select>	</td></tr></table>'
 +f+d+'palette-table"></div>'+e+'</div>'+e+d+'info">'+e+'</div>'+n);
 
-	a = '<abbr title="', b = '">', c = '</abbr>', d = '';
-	for (i in select.imgRes) d += (d?' x ':'')+'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')" title="'+lang.size_hint+select.imgLimits[i]+'">';
+	a = '<a href="javascript:void(0);" onClick="', b = '">', c = '</abbr>', d = '';
+	for (i in select.imgRes) d += (d?' x ':'')
++'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')" title="'+lang.size_hint+select.imgLimits[i]+'">';
+
+	i = '<abbr title="';
 	setContent(dge('info'), f+replaceAll(
-'<p class="L-open">'+lang.info[0]+'</p>\
-|<p>	'+lang.info[1].join('|<br>	')+' <span id="saveTime">'+lang.info[2]+'</span>.\
+'<p class="L-open">'+lang.info_top+'</p>\
+|<p>	'+lang.info.join('|<br>	').replace(/\{([^};]+);([^}]+)}/g, a+'$1()">$2</a>')
++':	'+i+(new Date())+'" id="saveTime">'+lang.info_no_save+'</abbr>.\
+|<br>	'+a+'toggleView(\'timer\')" title="'+lang.hide_hint+'">'+lang.info_time+'</a>'
++':	<span id="timer">'+lang.info_no_time+'</span>.\
 |</p>	<p class="L-close"> ', '|', f)
-+a+INFO_ABBR+b+NS.toUpperCase()+c+' '+lang.info[3]+' '
-+a+INFO_DATE+b+INFO_VERSION+c+'</p>'+f+'<table>'+f+'	<tr><td>'+lang.size+':	'+d+'</td></tr>'
-+f+'	<tr><td><span onClick="toggleView(\'timer\')" title="'+lang.hide_hint+'"> '+lang.info[4]
-+'	<abbr id="timer">00:00:00</abbr></span></td></tr>'+f+'</table>'+e);
++i+INFO_ABBR+b+NS.toUpperCase()+c+' '+lang.info_pad+' '
++i+INFO_DATE+b+INFO_VERSION+c+'</p>'
++f+'<div>'+lang.size+':	'+d
++f+'</div>'+e);
 
 	if (c = (canvas.height < BOTH_PANELS_HEIGHT)) toggleView('info');
 	for (i in text) text[i] = dge(i);
 	draw.field = dge('load');
+	draw.history.data = new Array(o.undo);
 
 	a = 'historyAct(', b = 'button', d = 'toggleMode(', e = 'sendPic(', f = 'fillScreen(', i = '&nbsp;';
 	a = [
@@ -966,16 +1074,14 @@ n+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 ],
 0,	['pencil','A'	,'i'		,(a='toolSwap(')+'1)'
 ],	['eraser','E'	,'&#x25CB;'	,a+'2)'
-],	['reset','R'	,'&#x25CE;'	,a+'3)'
+],	['reset' ,'G'	,'&#x25CE;'	,a+'3)'
 ],
-0,	['line|shape|global','L'	,'&#x25C7;|&#x25A0;|&#x25A4;'	,d+'1)'	,(a='check')+'L'
-],	['curve|shaper|rect','U'	,'&#x2307;|&#x25A1;|&#x25AD;'	,d+'2)'	,a+'U'
-],	['cursor','F5'	,'&#x25CF;'	,d+'4)'	,a+'V'
-/*],	['rough','F7'	,'&#x25A0;'	,d+'3)'	,a+'Q'
-],	['fps'	,'F9'	,'&#x231A;'	,d+'5)'	,a+'F'
-*/],
-0,	['png'	,'P'	,'P'		,e+'0)'	,b+'P'
-],	['jpeg'	,'J'	,'J'		,e+'1)'	,b+'J'
+0,	['line|area|copy','L'	,'&#x25C7;|&#x25A0;|&#x25A4;'	,d+'1)'	,(a='check')+'L'
+],	['curve|outline|rect','U'	,'&#x2307;|&#x25A1;|&#x25AD;'	,d+'2)'	,a+'U'
+],	['cursor','F3'	,'&#x25CF;'	,d+'4)'	,a+'V'
+],
+0,	['png'	,'F5'	,'P'		,e+'0)'	,b+'P'
+],	['jpeg'	,'F7'	,'J'		,e+'1)'	,b+'J'
 ],	['save'	,'F2'	,'&#x22C1;'	,e+'2)'
 ],	['load'	,'F4'	,'&#x22C0;'	,e+'3)'	,b+'L'
 ],!o.read || 0 == o.read?1:
@@ -1026,9 +1132,9 @@ n+d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 		dge('slider'+BOWL[i]).appendChild(e);
 	} else 	dge(a+BOWL[i]).type = b;
 
-	for (i in (a = ['input','select','span']))
+	for (i in (a = ['a', 'input', 'select', 'span']))
 	for (c in (b = container.getElementsByTagName(a[i])))
-	for (e in (d = ['onchange','onclick', 'onmouseover'])) if ((f = b[c][d[e]]) && !self[f = (''+f).match(regFunc)[1]]) self[f] = eval(f);
+	for (e in (d = ['onchange', 'onclick', 'onmouseover'])) if ((f = b[c][d[e]]) && !self[f = (''+f).match(regFunc)[1]]) self[f] = eval(f);
 
 	a = select.options, c = select.translated || a, f = (LS && LS.lastPalette && palette[LS.lastPalette]) ? LS.lastPalette : 1;
 	for (b in a) {
@@ -1062,6 +1168,7 @@ var	letters = [0, 0, 0], l = p.length;
 	toolSwap(3);
 	updatePalette();
 	updateSliders();
+	updateViewport();
 	historyAct(0);
 }; //* END this.init()
 
@@ -1069,19 +1176,23 @@ var	letters = [0, 0, 0], l = p.length;
 
 
 function get_form() {
-	outside.read = dge('read');
-var f = outside.send = dge('send'), o = f, e;
-	if (o && o.name) for (i in (o = o.name.split(';'))) if ((e = o[i].split('=', 2)).length > 1) outside[e[0]] = e[1];
-	if (!outside.t0) outside.t0 = Math.floor((+new Date())/1000);
-
-	if (!outside.lang) outside.lang = document.documentElement.lang || 'en';
-	if (outside.lang == 'ru')
+var	o = outside
+,	f = o.send = dge('send')
+,	e = o.read = dge('read'), p = (f || e), i;
+	if (p && p.name) for (i in (p = p.name.split(';'))) if ((e = p[i].split('=', 2)).length > 1) o[e[0]] = e[1];
+	CR = (o.saveprfx?o.saveprfx:NS)+CR;
+	C1T = (C1R = CR+'y')+CT;
+	C2T = (C2R = CR+'2')+CT;
+	if (!o.t0) o.t0 = Math.floor((+new Date())/1000);
+	if (!o.undo || isNaN(o.undo) || o.undo < 3) o.undo = 123; else o.undo = parseInt(o.undo);
+	if (!o.lang) o.lang = document.documentElement.lang || 'en';
+	if (o.lang == 'ru')
 select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 , select.translated = {
-	shape	: ['линия', 'прямоугольник', 'круг', 'овал', 'сдвиг']
+	shape	: ['линия', 'многоугольник', 'прямоугольник', 'круг', 'овал', 'сдвиг']
 ,	lineCap	: ['круг', 'бочка', 'квадрат']
 ,	lineJoin: ['круг', 'срез', 'угол']
-,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент', 'слои']
+,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент']
 }, lang = {
 	bad_id:		'Ошибка выбора.'
 ,	flood:		'Полотно пусто.'
@@ -1100,20 +1211,24 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 ,	palette:	'Палитра'
 ,	sat:		'Насыщ.'
 ,	hex:		'Цвет'
-,	hex_hint:	'Формат ввода - #a, #f90, #ff9900, или 0,123,255'
+,	hex_hint:	'Формат ввода — #a, #f90, #ff9900, или 0,123,255'
 ,	hide_hint:	'Кликните, чтобы спрятать или показать.'
-,	info: ['Управление (указатель над полотном):'
-	,	[	'C / средний клик = подобрать цвет с рисунка'
-		,	'Q / W / B / N / M = выбор формы'
-		,	'1-10 / колесо мыши = толщина кисти'
-		,	'Ctrl + 1-10 / колесо = прозрачность'
-		,	'Alt + 1-10 / колесо = размытие тени'
-		,	'Автосохранение раз в минуту:'
-	],	'ещё не было'
-	,	'- доска для набросков,'
-	,	'Времени прошло'
-],	size:	'Размер полотна'
-,	size_hint: 'Число между '
+,	info_top:	'Управление (указатель над полотном):'
+,	info: [	'C / средний клик = подобрать цвет с рисунка'
+	,	'Q / P / R / T / Y / M = выбор формы'
+//	,	'Shift + клик = цепочка форм, Esc = {drawEnd;отмена}'
+	,	'Ctrl + тяга = поворот полотна, Home = {updateViewport;сброс}'
+	,	'Alt + тяга = масштаб, Shift + т. = сдвиг рамки'
+	,	'1-10 / колесо мыши / (Alt +) W = толщина кисти'
+	,	'Ctrl + 1-10 / колесо / (Alt +) O = прозрачность'
+	,	'Alt + 1-10 / колесо / (Alt +) B = размытие тени'
+	,	'Автосохранение раз в минуту'
+],	info_no_save:	'ещё не было'
+,	info_no_time:	'ещё нет'
+,	info_time:	'Времени прошло'
+,	info_pad:	'— доска для набросков,'
+,	size:		'Размер полотна'
+,	size_hint:	'Число между '
 , b: {	undo:	{sub:'назад',	t:'Отменить последнее действие.'
 },	redo:	{sub:'вперёд',	t:'Отменить последнюю отмену.'
 },	fill:	{sub:'залить',	t:'Залить полотно основным цветом.'
@@ -1121,15 +1236,15 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 },	invert:	{sub:'инверт.',	t:'Обратить цвета полотна.'
 },	flip_h:	{sub:'отразить',t:'Отразить полотно слева направо.'
 },	flip_v:	{sub:'перевер.',t:'Перевернуть полотно вверх дном.'
-},	pencil:	{sub:'каранд.',	t:'Инструмент - тонкий простой карандаш.'
-},	eraser:	{sub:'стёрка',	t:'Инструмент - толстый белый карандаш.'
+},	pencil:	{sub:'каранд.',	t:'Инструмент — тонкий простой карандаш.'
+},	eraser:	{sub:'стёрка',	t:'Инструмент — толстый белый карандаш.'
 },	swap:	{sub:'смена',	t:'Поменять инструменты местами.'
 },	reset:	{sub:'сброс',	t:'Сбросить инструменты к начальным.'
 },	line:	{sub:'прямая',	t:'Прямая линия 1 зажатием.'
 },	curve:	{sub:'кривая',	t:'Сглаживать углы пути / кривая линия 2 зажатиями.'
-},	shape:	{sub:'закрас.',	t:'Закрашивать площадь геометрических фигур.'
-},	shaper:	{sub:'прозр.',	t:'Стирать площадь фигур до прозрачности.'
-},	global:	{sub:'глобал.',	t:'Сдвиг всех слоёв сразу.'
+},	area:	{sub:'закрас.',	t:'Закрашивать площадь геометрических фигур.'
+},	outline:{sub:'контур',	t:'Рисовать контур геометрических фигур.'
+},	copy:	{sub:'копия',	t:'Оставить старую копию.'
 },	rect:	{sub:'прямоуг.',t:'Сдвиг прямоугольником.'
 },	cursor:	{sub:'указат.',	t:'Показывать кисть на указателе.'
 },	rough:	{sub:'п.штрих',	t:'Уменьшить нагрузку, пропуская перерисовку штриха.'
@@ -1161,20 +1276,24 @@ else lang = {
 ,	palette:	'Palette'
 ,	sat:		'Saturat.'
 ,	hex:		'Color'
-,	hex_hint:	'Valid formats - #a, #f90, #ff9900, or 0,123,255'
+,	hex_hint:	'Valid formats — #a, #f90, #ff9900, or 0,123,255'
 ,	hide_hint:	'Click to show/hide.'
-,	info: ['Hot keys (mouse over image only):'
-	,	[	'C / Mouse Mid = pick color from image'
-		,	'Q / W / B / N / M = select shape'
-		,	'1-10 / Mouse Wheel = brush width'
-		,	'Ctrl + 1-10 / Wheel = brush opacity'
-		,	'Alt + 1-10 / Wheel = brush shadow blur'
-		,	'Autosave every minute, last saved:'
-	],	'not yet'
-	,	'sketch pad'
-	,	'Time elapsed'
-],	size:	'Image size'
-,	size_hint: 'Number between '
+,	info_top:	'Hot keys (mouse over image only):'
+,	info: [	'C / Mouse Mid = pick color from image'
+	,	'Q / P / R / T / Y / M = select shape'
+//	,	'Shift + click = chain shapes, Esc = {drawEnd;cancel}'
+	,	'Ctrl + drag = rotate canvas, Home = {updateViewport;reset}'
+	,	'Alt + d. = zoom, Shift + d. = move canvas frame'
+	,	'1-10 / Mouse Wheel / (Alt +) W = brush width'
+	,	'Ctrl + 1-10 / Wheel / (Alt +) O = brush opacity'
+	,	'Alt + 1-10 / Wheel / (Alt +) B = brush shadow blur'
+	,	'Autosave every minute, last saved'
+],	info_no_save:	'not yet'
+,	info_no_time:	'no yet'
+,	info_time:	'Time elapsed'
+,	info_pad:	'sketch pad'
+,	size:		'Image size'
+,	size_hint:	'Number between '
 , b: {	undo:	'Revert last change.'
 ,	redo:	'Redo next reverted change.'
 ,	fill:	'Fill image with main color.'
@@ -1188,9 +1307,9 @@ else lang = {
 ,	reset:	'Reset both tools.'
 ,	line:	'Draw straight line with 1 drag.'
 ,	curve:	'Smooth path corners / draw single curve with 2 drags.'
-,	shape:	'Fill geometric shapes.'
-,	shaper:	'Erase shape area to transparent.'
-,	global:	'Move all layers at once.'
+,	area:	'Fill geometric shapes.'
+,	outline:'Draw outline of geometric shapes.'
+,	copy:	'Keep old copy.'
 ,	rect:	'Move rectangle.'
 ,	cursor:	'Brush preview on cursor.'
 ,	rough:	'Skip draw cleanup while drawing to use less CPU.'
@@ -1212,27 +1331,30 @@ May not work in some browsers until set to load and show new images automaticall
 
 document.addEventListener('DOMContentLoaded', this.init, false);
 document.write(replaceAll(replaceAdd('\n<style>\
-#| canvas {margin: 0; border: 1px solid #aaa; cursor: \
-/* 3x3*/	url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAG0lEQVR42mNgYGD439DQ8B9EM4AYIAAVQMgAAFVYEfXw7aeiAAAAAElFTkSuQmCC\')\
+#| canvas {border: 1px solid #aaa; margin: 0; vertical-align: bottom; cursor: \
+/* 3x3 */ url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAG0lEQVR42mNgYGD439DQ8B9EM4AYIAAVQMgAAFVYEfXw7aeiAAAAAElFTkSuQmCC\')\
 , auto; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}\
+#| a {color: #888;}\
 #| input[type="text"] {width: 48px;}\
 #| input[type="range"] {width: 156px; height: 16px; margin: 0; padding: 0;}\
 #| select, #| #|-color-text {width: 78px;}\
+#|-debug td {width: 234px;}\
 #| {text-align: center; padding: 12px; background-color: #f8f8f8;}\
-#|, #| input, #| select {font-family: "Arial"; font-size: 14pt;}\
+#|, #| input, #| select {font-family: "Arial"; font-size: 14pt; line-height: normal;}\
 #|-bottom > span {font-family: "Arial Unicode MS"; line-height: 7px; border: 1px solid #000; width: 32px; height: 32px; padding: 2px; cursor: pointer; text-align: center; display: inline-block;}\
-#|-bottom {height: 30px; padding: 8px;}\
-#|-info p {padding-left: 32px; line-height: 24px; margin: 0;}\
+#|-bottom {margin-top: 12px;}\
+#|-info p {padding-left: 32px; line-height: 22px; margin: 0;}\
 #|-info p, #|-palette-table table {color: #000; font-size: small;}\
 #|-right span > input[type="text"] {margin: 2px;}\
-#|-right table {border-collapse: collapse; margin-top: 7px;}\
+#|-right table, #|-info > div {margin-top: 7px;}\
+#|-right table {border-collapse: collapse;}\
 #|-right td {padding: 0 2px; height: 32px;}\
-#|-right {color: gray; width: 321px; margin: 0; margin-left: 5px; text-align: left; display: inline-block; vertical-align: top; overflow-x: hidden;}\
+#|-right {color: gray; width: 321px; margin: 0; margin-left: 12px; text-align: left; display: inline-block; vertical-align: top; overflow-x: hidden;}\
 #|-palette-table .|-t {padding: 0 4px;}\
 #|-palette-table table {margin: 0;}\
 #|-palette-table td {margin: 0; padding: 0; height: 16px;}\
 #|-palette-table {overflow-y: scroll; height: 171px; margin: 7px 0 12px 0;}\
-#|-load {position: relative; display: inline-block;}\
+#|-load, #|-load canvas {position: relative; display: inline-block;}\
 #|-load img {position: absolute; top: 1px; left: 1px; margin: 0;}\
 .|-L-close {padding-bottom: 24px; border-bottom: 1px solid #000; border-right: 1px solid #000;}\
 .|-L-open {padding-top: 24px; border-top: 1px solid #000; border-left: 1px solid #000;}\
