@@ -1,11 +1,11 @@
 ﻿var dfc = new function () {
 
 var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.40'
-,	INFO_DATE = '2013-04-01 — 2014-02-21'
+,	INFO_VERSION = 'v0.9.41'
+,	INFO_DATE = '2013-04-01 — 2014-03-10'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
-,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = 0.5
+,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = -0.5
 ,	LS = window.localStorage || localStorage
 
 ,	TOOLS_REF = [
@@ -105,12 +105,15 @@ var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align t
 //* 2: Read: Forward
 			var	t = this, d = t.data.length - 1;
 				if (i) {
-					if (i == 1 && t.pos > 0) --t.pos; else
-					if (i == 2 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
+					if (i < 0 && t.pos > 0) --t.pos; else
+					if (i > 0 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
 					draw.screen();
 					cue.autoSave = true;
 					used.history = 'Undo';
 				} else {
+					if (i !== false) t.reversable = 0;
+					else if (t.reversable) return 0;
+					else t.reversable = 1;
 					if (i !== 0) {if (t.pos < d) t.last = ++t.pos; else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];}
 					t.data[t.pos] = c2d.getImageData(0, 0, canvas.width, canvas.height);
 				}
@@ -569,6 +572,8 @@ function fillScreen(i) {
 		c2d.clearRect(0, 0, canvas.width, canvas.height);
 	} else
 	if (i < 0) {
+		draw.screen();
+		historyAct(false);
 	var	d = draw.history.cur();
 		if (i == -1) {
 			used.inv = 'Invert';
@@ -927,8 +932,8 @@ function hotKeys(event) {
 			case 27:	drawEnd();	break;	//* Esc
 			case 36:updateViewport();	break;	//* Home
 
-			case c('Z'):	historyAct(1);	break;
-			case c('X'):	historyAct(2);	break;
+			case c('Z'):	historyAct(-1);	break;
+			case c('X'):	historyAct(1);	break;
 			case c('C'):	pickColor();	break;
 			case c('F'):	fillScreen(0);	break;
 			case c('D'):	fillScreen(1);	break;
@@ -1061,8 +1066,8 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	a = 'historyAct(', b = 'button', d = 'toggleMode(', e = 'sendPic(', f = 'fillScreen(', i = '&nbsp;';
 	a = [
 //* subtitle, hotkey, pictogram, function, id
-	['undo'	,'Z'	,'&#x2190;'	,a+'1)'	,b+'U'
-],	['redo'	,'X'	,'&#x2192;'	,a+'2)'	,b+'R'
+	['undo'	,'Z'	,'&#x2190;'	,a+'-1)'	,b+'U'
+],	['redo'	,'X'	,'&#x2192;'	,a+'1)'	,b+'R'
 ],
 0,	['fill'	,'F'	,i		,f+'0)'	,(a='color')+'F'
 ],	['swap'	,'S'	,'&#X21C4;'	,'toolSwap()'
@@ -1332,8 +1337,8 @@ May not work in some browsers until set to load and show new images automaticall
 document.addEventListener('DOMContentLoaded', this.init, false);
 document.write(replaceAll(replaceAdd('\n<style>\
 #| canvas {border: 1px solid #aaa; margin: 0; vertical-align: bottom; cursor: \
-/* 3x3 */ url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAG0lEQVR42mNgYGD439DQ8B9EM4AYIAAVQMgAAFVYEfXw7aeiAAAAAElFTkSuQmCC\')\
-, auto; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}\
+/*2x2*/	url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mNgYGCYUFdXN4EBRPz//38CADX3CDIkWWD7AAAAAElFTkSuQmCC\')\
+,	auto; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}\
 #| a {color: #888;}\
 #| input[type="text"] {width: 48px;}\
 #| input[type="range"] {width: 156px; height: 16px; margin: 0; padding: 0;}\
