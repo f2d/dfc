@@ -1,8 +1,8 @@
 ﻿var dfc = new function () {
 
 var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.41'
-,	INFO_DATE = '2013-04-01 — 2014-03-10'
+,	INFO_VERSION = 'v0.9.42'
+,	INFO_DATE = '2013-04-01 — 2014-04-03'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
 ,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = -0.5
@@ -113,7 +113,7 @@ var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align t
 				} else {
 					if (i !== false) t.reversable = 0;
 					else if (t.reversable) return 0;
-					else t.reversable = 1;
+					else t.reversable = 1, draw.screen();
 					if (i !== 0) {if (t.pos < d) t.last = ++t.pos; else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];}
 					t.data[t.pos] = c2d.getImageData(0, 0, canvas.width, canvas.height);
 				}
@@ -141,17 +141,17 @@ var	a = ['class','id','onChange','onClick'];
 	for (i in a) c = replaceAdd(c, ' '+a[i]+'="', NS+(a[i][0]=='o'?'.':'-'));
 	return e.innerHTML = c;
 }
-function dge(id) {return document.getElementById(NS+(id?'-'+id:''));}
-function toggleView(e) {e = dge(e); return e.style.display = (e.style.display?'':'none');}
+function id(id) {return document.getElementById(NS+(id?'-'+id:''));}
+function toggleView(e) {e = id(e); return e.style.display = (e.style.display?'':'none');}
 function showInfo() {
-	if (dge('colors').style.display == dge('info').style.display) return;
+	if (id('colors').style.display == id('info').style.display) return;
 	toggleView('colors');
-	setClass(dge('buttonH'), toggleView('info') ? 'button' : 'button-active');
+	setClass(id('buttonH'), toggleView('info') ? 'button' : 'button-active');
 }
 function fpsCount() {fps = ticks; ticks = 0;}
 
 function updatePalette() {
-var	pt = dge('palette-table'), c = select.palette.value, p = palette[c];
+var	pt = id('palette-table'), c = select.palette.value, p = palette[c];
 	if (LS) LS.lastPalette = c;
 	while (pt.childNodes.length) pt.removeChild(pt.lastChild);
 
@@ -572,7 +572,6 @@ function fillScreen(i) {
 		c2d.clearRect(0, 0, canvas.width, canvas.height);
 	} else
 	if (i < 0) {
-		draw.screen();
 		historyAct(false);
 	var	d = draw.history.cur();
 		if (i == -1) {
@@ -625,7 +624,7 @@ function pickColor(keep, c, event) {
 
 function updateColor(value, toolIndex) {
 var	t = tools[toolIndex || 0]
-,	c = dge('color-text')
+,	c = id('color-text')
 ,	v = value || c.value;
 	if (reg255.test(v)) {
 	var	a = (t.color = v).split(reg255split);
@@ -656,7 +655,7 @@ var	p = palette[0], found = p.length, i;
 
 //* update buttons:
 	c = 0;
-var	a = t.color.split(reg255split), e = dge((t == tool) ? 'colorF' : 'colorB');
+var	a = t.color.split(reg255split), e = id((t == tool) ? 'colorF' : 'colorB');
 	for (i in a) c += parseInt(a[i]);
 	e.style.color = (c > 380 ? '#000' : '#fff');			//* <- inverted font color
 	e.style.background = 'rgb(' + t.color + ')';
@@ -665,13 +664,13 @@ var	a = t.color.split(reg255split), e = dge((t == tool) ? 'colorF' : 'colorB');
 
 function updateSlider(i,e) {
 var	j = (e?i:BOWL[i])
-,	s = dge('range'+j)
-,	t = dge('text'+j) || s
+,	s = id('range'+j)
+,	t = id('text'+j) || s
 ,	r = (e?s:RANGE[i]), v = (e?parseFloat(e.value):tool[i = BOW[i]]);
 	if (v < r.min) v = r.min; else
 	if (v > r.max) v = r.max;
 	if (r.step < 1) v = parseFloat(v).toFixed(2);
-	if (e && (e = dge('gradient'))) {
+	if (e && (e = id('gradient'))) {
 		e.updateSat(v);
 	} else tool[i] = v;
 	s.value = t.value = v;
@@ -700,12 +699,12 @@ function updateSliders(s) {
 function updateShape(s) {
 	if (!isNaN(s)) select.shape.value = s, s = 0;
 	s = select.shapeFlags[(s?s:s=select.shape).value];
-	setClass(dge('bottom'), (s & 1?'b c':(s & 4?'a b':'a c')));
+	setClass(id('bottom'), (s & 1?'b c':(s & 4?'a b':'a c')));
 }
 
 function updateHistoryButtons() {
 var	a = {R:draw.history.last,U:0}, b = 'button', d = b+'-disabled', e;
-	for (i in a) setClass(dge(b+i), draw.history.pos == a[i] ?d:b);
+	for (i in a) setClass(id(b+i), draw.history.pos == a[i] ?d:b);
 	cue.upd = {J:1,P:1};
 }
 
@@ -717,7 +716,7 @@ var	i = e.id.slice(-1);
 
 function updateDim(i) {
 	if (i) {
-	var	a = dge('img-'+i), b, c = canvas[i], v = parseInt(a.value) || 0;
+	var	a = id('img-'+i), b, c = canvas[i], v = parseInt(a.value) || 0;
 		canvasShape[i] = canvas[i] = a.value = v = (
 			v < (b = select.imgLimits[i][0]) ? b : (
 			v > (b = select.imgLimits[i][1]) ? b : v)
@@ -728,9 +727,9 @@ function updateDim(i) {
 		}
 	}
 	if (!i || i[0] == 'h') {
-	var	b = dge('buttonH')
-	,	c = dge('colors').style
-	,	i = dge('info').style;
+	var	b = id('buttonH')
+	,	c = id('colors').style
+	,	i = id('info').style;
 		if (canvas.height < BOTH_PANELS_HEIGHT) {
 		var	a = (b.className.indexOf('active') >= 0), v = 'none';
 			c.display = (a?v:'');
@@ -740,10 +739,10 @@ function updateDim(i) {
 			setClass(b, 'button-active');
 		}
 	}
-	container.style.minWidth = (v = canvas.width+dge('right').offsetWidth+14)+'px';
+	container.style.minWidth = (v = canvas.width+id('right').offsetWidth+14)+'px';
 	if (a = outside.restyle) {
 		v += 24;
-		if (!(c = dge(i = 'restyle'))) setId(container.parentNode.insertBefore(c = document.createElement('style'), container), i);
+		if (!(c = id(i = 'restyle'))) setId(container.parentNode.insertBefore(c = document.createElement('style'), container), i);
 		if ((b = outside.restmin) && ((b = eval(b).offsetWidth) > v)) v = b;
 		c.innerHTML = a+'{max-width:'+v+'px;}';
 	}
@@ -787,7 +786,7 @@ function toggleMode(i, keep) {
 	if (i >= 0 && i < modes.length) {
 	var	n = modes[i], v = mode[n];
 		if (!keep) v = mode[n] = !v;
-		if (e = dge('check'+modeL[i])) setClass(e, v ? 'button-active' : 'button');
+		if (e = id('check'+modeL[i])) setClass(e, v ? 'button-active' : 'button');
 		if (n == 'debug') {
 			text.debug.textContent = '';
 			interval.fps ? clearInterval(interval.fps) : (interval.fps = setInterval(fpsCount, 1000));
@@ -841,8 +840,8 @@ var	a = auto || false, c, d, e, i, t;
 			}
 			LS[C1R] = c;
 			LS[C1T] = draw.time.join('-')+(used.read?'-'+used.read:'');
-			dge('saveTime').textContent = unixDateToHMS();
-			setClass(dge('buttonL'), 'button');
+			id('saveTime').textContent = unixDateToHMS();
+			setClass(id('buttonL'), 'button');
 			cue.autoSave = false;
 		}
 		break;
@@ -858,13 +857,13 @@ var	a = auto || false, c, d, e, i, t;
 		if (confirm(lang.confirm_load)) {
 			t = t.split('-');
 			if (t.length > 2) used.read = t.slice(2).join('-');
-			draw.time = t.slice(0,2), a = dge('saveTime'), a.textContent = unixDateToHMS(+t[1]), a.title = new Date(+t[1]);
+			draw.time = t.slice(0,2), a = id('saveTime'), a.textContent = unixDateToHMS(+t[1]), a.title = new Date(+t[1]);
 			readPic(d);
 			used.LS = 'Local Storage';
 		}
 		break;
 	case 4:	
-		if ((outside.read || (outside.read = dge('read'))) && (a = outside.read.value)) {
+		if ((outside.read || (outside.read = id('read'))) && (a = outside.read.value)) {
 			draw.time = [0, 0];
 			used.read = 'File Read: '+readPic(a);
 		}
@@ -875,8 +874,13 @@ var	a = auto || false, c, d, e, i, t;
 		if (!outside.send) alert(lang.no_form); else
 		if (fillCheck()) alert(lang.flood); else
 		if (confirm(lang.confirm_send)) {
+			if (!outside.send.tagName) {
+				setId(e = document.createElement('form'), 'send');
+				e.setAttribute('method', (outside.send.length && outside.send.toLowerCase() == 'get')?'get':'post');
+				container.appendChild(outside.send = e);
+			}
 		var	pngData = sendPic(2, 1), jpgData, a = {txt:0,pic:0};
-			for (i in a) if (!(a[i] = dge(i))) {
+			for (i in a) if (!(a[i] = id(i))) {
 				setId(e = a[i] = document.createElement('input'), e.name = i);
 				e.type = 'hidden';
 				outside.send.appendChild(e);
@@ -899,11 +903,11 @@ var	a = auto || false, c, d, e, i, t;
 }
 
 function readPic(s) {
-var	id = 'read-img', i = dge(id);
-	if (!i) setId(i = new Image(), id);
+var	d = 'read-img', i = id(d);
+	if (!i) setId(i = new Image(), d);
 	i.setAttribute('onclick', 'return this.parentNode.removeChild(this) && false;');
 	i.onload = function () {
-		for (d in select.imgRes) dge('img-'+d).value = canvasShape[d] = canvas[d] = i[d];
+		for (d in select.imgRes) id('img-'+d).value = canvasShape[d] = canvas[d] = i[d];
 		updateDim();
 		c2d.drawImage(i,0,0);
 		historyAct();
@@ -952,7 +956,7 @@ if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *,
 			case 114:	toggleMode(4);	break;
 
 			case 112:	showInfo();	break;
-			case 116:	sendPic(0);	break;
+			case 120:	sendPic(0);	break;
 			case 118:	sendPic(1);	break;
 			case 113:	sendPic(2);	break;
 			case 115:	sendPic(3);	break;
@@ -998,12 +1002,12 @@ function hotWheel(event) {
 this.init = function() {
 	if (!get_form()) document.title += ': '+NS+' '+INFO_VERSION;
 var	a, b, c = 'canvas', d = '<div id="', e = '"></div>', f, i, j, n = '\n	', o = outside, p, s;
-	setContent(container = dge(),
+	setContent(container = id(),
 n+d+'load"><'+c+' id="'+c+'" tabindex="0">'+lang.no_canvas+'</'+c+'></div>'+
 //n+
 d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 
-	if (!(canvas = dge(c)).getContext) return;
+	if (!(canvas = id(c)).getContext) return;
 	canvasShape = document.createElement(c);
 	for (i in select.imgRes) {
 		canvasShape[i] = canvas[i] = (o[a = i[0]]?o[a]:o[a] = (o[i]?o[i]:select.imgRes[i]));
@@ -1036,7 +1040,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	b += e+'</div>'+e+'<table width="100%"><tr><td>'
 +f+lang.shape	+a+'<select id="shape" onChange="updateShape(this)"></select>';
 	for (i in select.lineCaps) b += c+'<select id="'+i+'" title="'+(select.lineCaps[i] || i)+'"></select>';
-	setContent(dge('right'), b+'	</td></tr><tr><td>'
+	setContent(id('right'), b+'	</td></tr><tr><td>'
 +f+lang.hex	+a+'<input type="text" value="#000" id="color-text" onChange="updateColor()" title="'+lang.hex_hint+'">	'+c
 +f+lang.palette	+a+'<select id="palette" onChange="updatePalette()"></select>	</td></tr></table>'
 +f+d+'palette-table"></div>'+e+'</div>'+e+d+'info">'+e+'</div>'+n);
@@ -1046,7 +1050,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 +'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')" title="'+lang.size_hint+select.imgLimits[i]+'">';
 
 	i = '<abbr title="';
-	setContent(dge('info'), f+replaceAll(
+	setContent(id('info'), f+replaceAll(
 '<p class="L-open">'+lang.info_top+'</p>\
 |<p>	'+lang.info.join('|<br>	').replace(/\{([^};]+);([^}]+)}/g, a+'$1()">$2</a>')
 +':	'+i+(new Date())+'" id="saveTime">'+lang.info_no_save+'</abbr>.\
@@ -1059,8 +1063,8 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 +f+'</div>'+e);
 
 	if (c = (canvas.height < BOTH_PANELS_HEIGHT)) toggleView('info');
-	for (i in text) text[i] = dge(i);
-	draw.field = dge('load');
+	for (i in text) text[i] = id(i);
+	draw.field = id('load');
 	draw.history.data = new Array(o.undo);
 
 	a = 'historyAct(', b = 'button', d = 'toggleMode(', e = 'sendPic(', f = 'fillScreen(', i = '&nbsp;';
@@ -1085,7 +1089,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 ],	['curve|outline|rect','U'	,'&#x2307;|&#x25A1;|&#x25AD;'	,d+'2)'	,a+'U'
 ],	['cursor','F3'	,'&#x25CF;'	,d+'4)'	,a+'V'
 ],
-0,	['png'	,'F5'	,'P'		,e+'0)'	,b+'P'
+0,	['png'	,'F9'	,'P'		,e+'0)'	,b+'P'
 ],	['jpeg'	,'F7'	,'J'		,e+'1)'	,b+'J'
 ],	['save'	,'F2'	,'&#x22C1;'	,e+'2)'
 ],	['load'	,'F4'	,'&#x22C0;'	,e+'3)'	,b+'L'
@@ -1095,7 +1099,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	['done'	,'F8'	,'&#x21B5;'	,e+')'
 ],c?0:1
 ,!c?1:	['info'	,'F1'	,'?'	,'showInfo()'	,b+'H'
-]], f = dge('bottom'), d = '<div class="button-', c = '</div>';
+]], f = id('bottom'), d = '<div class="button-', c = '</div>';
 
 	function btnContent(e, subt, pict) {
 	var	t = lang.b[subt];
@@ -1124,18 +1128,18 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	f.innerHTML += '	';
 	for (name in mode) if (mode[modes[i = modes.length] = name]) toggleMode(i,1);
 
-	if (!LS || !LS[C1T]) setClass(dge('buttonL'), 'button-disabled');
+	if (!LS || !LS[C1T]) setClass(id('buttonL'), 'button-disabled');
 
 	i = (a = 'JP').length;
-	while (i--) if (b = dge('button'+a[i])) setEvent(b, 'onmouseover', 'updateSaveFileSize(this)');
+	while (i--) if (b = id('button'+a[i])) setEvent(b, 'onmouseover', 'updateSaveFileSize(this)');
 
-	a = 'range', b = 'text', d = (dge(a+'W').type == a);
+	a = 'range', b = 'text', d = (id(a+'W').type == a);
 	for (i in BOW) if (d) {
 		e = document.createElement('input');
 		setId(e, (e.type = b)+BOWL[i]);
 		setEvent(e, 'onchange', 'updateSliders(this)');
-		dge('slider'+BOWL[i]).appendChild(e);
-	} else 	dge(a+BOWL[i]).type = b;
+		id('slider'+BOWL[i]).appendChild(e);
+	} else 	id(a+BOWL[i]).type = b;
 
 	for (i in (a = ['a', 'input', 'select', 'span']))
 	for (c in (b = container.getElementsByTagName(a[i])))
@@ -1143,7 +1147,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 
 	a = select.options, c = select.translated || a, f = (LS && LS.lastPalette && palette[LS.lastPalette]) ? LS.lastPalette : 1;
 	for (b in a) {
-		e = select[b] = dge(b);
+		e = select[b] = id(b);
 		for (i in a[b]) (
 			e.options[e.options.length] = new Option(c[b][i], i)
 		).selected = (b == 'palette'?(i == f):!i);
@@ -1181,10 +1185,24 @@ var	letters = [0, 0, 0], l = p.length;
 
 
 function get_form() {
-var	o = outside
-,	f = o.send = dge('send')
-,	e = o.read = dge('read'), p = (f || e), i;
-	if (p && p.name) for (i in (p = p.name.split(';'))) if ((e = p[i].split('=', 2)).length > 1) o[e[0]] = e[1];
+var	o = outside, v = id('vars'), e, i, j, k
+,	f = o.send = id('send')
+,	r = o.read = id('read'), a = [v,f,r];
+	for (i in a) if ((e = a[i]) && (e = (e.getAttribute('data-vars') || e.name))) {
+		for (i in (a = e
+			.replace(/\s*=\s*/g, '=')
+			.replace(/[\s;]+=*/g, ';')
+			.split(';')
+		)) if ((e = a[i]).length) {
+			if ((e = e.split('=')).length > 1) {
+				k = e.pop();
+				for (j in e) o[e[j]] = k;
+			} else o[e[0]] = 1;
+/*	a) varname; var2=;		//noequal=1, empty=0
+	b) warname=two=3=last_val;	//samevalue, rightmost
+*/		}
+		break;	//* <- no care about the rest
+	}
 	CR = (o.saveprfx?o.saveprfx:NS)+CR;
 	C1T = (C1R = CR+'y')+CT;
 	C2T = (C2R = CR+'2')+CT;
