@@ -2,7 +2,7 @@
 
 var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
 ,	INFO_VERSION = 'v0.9.42'
-,	INFO_DATE = '2013-04-01 — 2014-04-03'
+,	INFO_DATE = '2013-04-01 — 2014-04-22'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
 ,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = -0.5
@@ -1000,7 +1000,7 @@ function hotWheel(event) {
 
 
 this.init = function() {
-	if (!get_form()) document.title += ': '+NS+' '+INFO_VERSION;
+	if (isTest()) document.title += ': '+NS+' '+INFO_VERSION;
 var	a, b, c = 'canvas', d = '<div id="', e = '"></div>', f, i, j, n = '\n	', o = outside, p, s;
 	setContent(container = id(),
 n+d+'load"><'+c+' id="'+c+'" tabindex="0">'+lang.no_canvas+'</'+c+'></div>'+
@@ -1184,7 +1184,8 @@ var	letters = [0, 0, 0], l = p.length;
 
 
 
-function get_form() {
+function isTest() {
+	if (C1T) return !o.send;
 var	o = outside, v = id('vars'), e, i, j, k
 ,	f = o.send = id('send')
 ,	r = o.read = id('read'), a = [v,f,r];
@@ -1346,7 +1347,7 @@ May not work in some browsers until set to load and show new images automaticall
 ,	done:	'Finish and send image to server.'
 ,	info:	'Show/hide information.'
 }};
-	return f;
+	return !o.send;
 }
 
 
