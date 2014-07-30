@@ -258,7 +258,7 @@ var	i = 0, j = (c > pos ? -1:1);
 //* delete:
 	if (u) y.layers.pop(), c = y.layer-1;
 
-	return selectLayer(c,1), i;
+	return selectLayer(c,1,1), i;
 }
 
 function selectLayer(i, ui_rewrite, scroll) {
@@ -337,7 +337,7 @@ var	a, b = 'button', j, k, l = 'layer', e = id('layers'), rId = /^.*\D(\d+)$/
 		}
 		setContent(e, j), i = id(l+c);
 	}
-	if (i && scroll) i.scrollIntoView();	//* <- param: true=alignWithTop (default), false=bottom
+	if (i && scroll) i.scrollIntoView();	//* <- param: none/true=alignWithTop, false=bottom
 	i = d.length-1, j = {U:i,T:i, D:1,B:1,M:1, C:0,E:0,H:0,V:0}, d = b+'-disabled';
 	for (i in j) setClass(id(l+i), (!c || c == j[i]) ?d:b);
 	updateHistoryButtons(), draw.view(2);
@@ -1431,7 +1431,7 @@ function hotKeys(event) {
 		switch (event.keyCode) {
 			case 38:	selectLayer(-2,0,1);break;
 			case 40:	selectLayer(-1,0,1);break;
-			case 37:	selectLayer('',0,1);break;
+			case 37:	selectLayer('top',0,1);break;
 			case 39:	selectLayer(1,0,1);
 		} else
 		switch (event.keyCode) {
