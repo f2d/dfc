@@ -5,8 +5,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 
 //* Configuration *------------------------------------------------------------
 
-,	INFO_VERSION = 'v1.2'
-,	INFO_DATE = '2014-07-16 — 2014-07-30'
+,	INFO_VERSION = 'v1.5'
+,	INFO_DATE = '2014-07-16 — 2014-08-01'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
 ,	A0 = 'transparent', IJ = 'image/jpeg'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers'
@@ -17,7 +17,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 
 ,	mode = {debug:	false
 	,	shape:	false	//* <- straight line	/ fill area	/ copy
-	,	step:	false	//* <- curve line	/ outline	/ move rect select
+	,	step:	false	//* <- curve		/ outline	/ part
 	,	lowQ:	false
 	,	erase:	false
 	,	brushView:	false
@@ -41,7 +41,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 		imgRes: {width:640, height:360}
 	,	imgLimits: {width:[64,640], height:[64,800]}
 	,	lineCaps: {lineCap:0, lineJoin:0}
-	,	shapeFlags: [1,10, 2,2,2, 4]
+	,	shapeFlags: [1,10,2,2,2,4]
 	,	options: {
 			shape	: ['line', 'poly', 'rectangle', 'circle', 'ellipse', 'pan']
 		,	lineCap	: ['round', 'butt', 'square']
@@ -82,7 +82,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 	, '\nZX Spectrum', '#0', '#0000ff', '#00ff00', '#00ffff', '#ff0000', '#ff00ff', '#ffff00', '#ffffff', '\tVIC-20', '#aa7449', '#eab489', '#b86962', '#c7ffff', '#ea9ff6', '#94e089', '#8071cc', '#ffffb2'
 
 	], [	'all'	, '#0', '#f', '#fcefe2'
-	, '\n', 'Reimu'	, '#fa5946', '#e5ff41', '', '', ''
+	, '\n', 'Reimu'	, '#fa5946', '#e5ff41', '', '', ''		//* <- mid-row spacers to align columns
 	,	'Marisa', '#fff87d', '#a864a8'
 	, '\n', 'Cirno'	, '#1760f3', '#97ddfd', '#fd3727', '#00d4ae', ''
 	,	'Alice'	, '#8787f7', '#fafab0', '#fabad2', '#f2dcc6', '#8'
@@ -98,8 +98,9 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 
 //* Set up (don't change) *----------------------------------------------------
 
-,	o12 = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)
+,	o12 = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)	//* <- broken forever, sadly
 ,	abc = 'abc'.split('')
+,	regLastNum = /^.*\D(\d+)$/
 ,	regHex = /^#*[0-9a-f]{6}$/i
 ,	regHex3 = /^#*([0-9a-f])([0-9a-f])([0-9a-f])$/i
 ,	reg255 = /^([0-9]{1,3}),\s*([0-9]{1,3}),\s*([0-9]{1,3})$/
@@ -118,9 +119,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 	,	refresh:0, time: [0, 0]
 	,	line: {started:0, back:0, preview:0}
 	,	history: {pos:0, last:0, layer:0, layers:[{show:1, color:'#f'}]
-		,	cur: function() {
-			var	t = this.layer;
-				return (t && (t = this.layers[t]) ? t.data[t.pos] : 0);
+		,	cur: function(t) {
+				return ((t || (t = this.layer)) && (t = this.layers[t]) ? t.data[t.pos] : 0);
 			}
 		,	act: function(i) {
 			var	t = this.layer;
@@ -129,7 +129,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 		//* 1: Read: Back
 		//* 2: Read: Forward
 			var	t = this.layers[t], d = t.data.length - 1;
-				if (i) {
+				if (i < -9) i = -i;
+				if (i && i < 9) {
 					if (i < 0 && t.pos > 0) --t.pos; else
 					if (i > 0 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
 					draw.view(1);
@@ -139,35 +140,31 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 					if (i !== false) t.reversable = 0;
 					else if (t.reversable) return 0;
 					else t.reversable = 1, draw.view();
-					if (i !== 0) {if (t.pos < d) t.last = ++t.pos; else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];}
-					t.data[t.pos] = ctx.draw.getImageData(0, 0, cv.view.width, cv.view.height);
+					if (i !== 0) {
+						if (t.pos < d) t.last = ++t.pos;
+						else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];
+					}
+					(t.data[t.pos] = ctx.draw.getImageData(0, 0, cv.view.width, cv.view.height)).date = i || (+new Date());
 				}
 				return 1;
 			}
 		}
 	,	preload: function(i) {
-		var	y = this.history, c = y.layer, d = y.layers, a = (i
-				? {	lower: [0,c-1]
+		var	y = this.history, c = y.layer, d = y.layers, a = (
+				i ? {	lower: [1,c-1]
 				,	draw: [c,c]
 				,	upper: [c+1,d.length-1]
-				}
-				: {	draw: [c,c]
+				} : {	draw: [c,c]
 				}
 			), j, k, l, t;
 			for (i in a) {
 				ctx[i].clearRect(0, 0, cv.view.width, cv.view.height);
-				for (j = a[i][0], l = a[i][1]; j <= l; j++) if ((t = d[j]).show) {
-					if (!j) {
-						ctx[i].fillStyle = t.color;
-						ctx[i].fillRect(0, 0, cv.view.width, cv.view.height);
-					} else
-					if (k = t.data[t.pos]) {
-						if (j == c) ctx[i].putImageData(k, 0, 0);
-						else {
-							ctx.temp.putImageData(k, 0, 0);
-							ctx[i].globalAlpha = t.alpha/RANGE.A.max;
-							ctx[i].drawImage(cv.temp, 0, 0);
-						}
+				for (j = a[i][0], l = a[i][1]; j <= l; j++) if (j && (t = d[j]).show && (k = y.cur(j))) {
+					if (j == c) ctx[i].putImageData(k, 0, 0);
+					else {
+						ctx.temp.putImageData(k, 0, 0);
+						ctx[i].globalAlpha = t.alpha/RANGE.A.max;
+						ctx[i].drawImage(cv.temp, 0, 0);
 					}
 				}
 				ctx[i].globalAlpha = 1;
@@ -175,32 +172,56 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 		}
 	,	view: function(i) {
 			if (i) draw.preload(i === 2);
-		var	y = this.history, c = y.layer, a = ['lower', 'draw', 'upper'];
-			ctx.view.clearRect(0, 0, cv.view.width, cv.view.height);
+		var	y = this.history, c = y.layer, d = y.layers, a = ['lower', 'draw', 'upper'];
+			if (d[0].show) {
+				ctx.view.fillStyle = d[0].color;
+				ctx.view.fillRect(0, 0, cv.view.width, cv.view.height);
+			} else ctx.view.clearRect(0, 0, cv.view.width, cv.view.height);
 			for (i in a) {
-				ctx.view.globalAlpha = ((c && i == 1) ? y.layers[c].alpha/RANGE.A.max : 1);
+				ctx.view.globalAlpha = (c && i == 1) ? d[c].alpha/RANGE.A.max : 1;
 				ctx.view.drawImage(cv[a[i]], 0, 0);
 			}
 		}
 	};
 
 function historyAct(i) {
-	y = draw.history;
+var	y = draw.history, c = y.layer, d = y.layers, z = d.length, x;
+//* global history timeline:
+	if (!c) {
+		if (i === 1) c = +new Date(); else
+		if (i === -1); else return;
+		function wiz(callback) {
+			z = d.length;
+			while (--z) {
+				x = d[z];
+				if (i < 0 && x.pos == 0) continue;
+				if (i > 0 && x.pos == x.last) continue;
+				x = x.data[x.pos+(i > 0?i:0)], callback(x?x.date:0);
+			}
+		}
+		wiz(function(x) {if ((i < 0)?(c < x):(c > x)) c = x;});
+		wiz(function(x) {if (c == x) y.layer = z, historyAct(i);});
+		y.layer = 0, updateLayers(1);
+	} else
+//* separate history per layer:
 	if (y.act(i)) {
-	var	d = y.layers, c = d.length, x = d[0].max, y, z;
-	//* after loading saved layers stack, put them in saved order:
-		if (x && (c == x)) {
-			y.layer = c-1, x = [d[0]], delete d[0].max;
-			while (--c) z = d[c], x[z.z] = z, delete z.z;
-			y.layers = x;
+		if ((x = d[0].max) && (z == x)) {
+		//* after loading saved layers stack, reorder as saved:
+			c = [d[0]], delete d[0].max;
+			while (--z) x = d[z], c[x.z] = x, delete x.z;
+			y.layers = c, selectLayer(0,1);
 		}
 		updateDebugScreen(), updateLayers(!x), updateHistoryButtons();
 	}
 }
 
 function updateHistoryButtons() {
-var	y = draw.history, c = y.layer, y = y.layers[c], a = c?{R:y.last,U:0}:0, b = 'button', d = b+'-disabled', i;
-	for (i in a) setClass(id(b+i), (!c || y.pos == a[i]) ?d:b);
+var	y = draw.history, c = y.layer, y = c?[0,y.layers[c]]:y.layers, a = 'UR', b = 'button', d = b+'-disabled', i, j, k;
+	for (i in a) {
+		k = d;
+		for (j in y) if (j > 0 && y[j].pos != (i > 0?y[j].last:0)) {k = b; break;}
+		setClass(id(b+a[i]), k);
+	}
 	cue.upd = {J:1,P:1};
 }
 
@@ -214,9 +235,9 @@ var	y = draw.history, c = y.layer, d = y.layers, z, u;
 //* merge down
 		if (c < 2) return;
 		if (z = y.cur()) {
-			d[c--].show = 0;
-			if (u = d[c].data[d[c].pos]) ctx.draw.putImageData(u, 0, 0);
-			else ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
+			d[c].show = 0, u = y.cur(--c);
+			u ?	ctx.draw.putImageData(u, 0, 0)
+			:	ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
 			ctx.temp.putImageData(z, 0, 0);
 			ctx.draw.globalAlpha = d[y.layer--].alpha/RANGE.A.max;
 			ctx.draw.drawImage(cv.temp, 0, 0);
@@ -242,19 +263,19 @@ var	x = {pos:0, last:0, show:1, alpha:100, name: lang.layer.prefix+'_'+(++count.
 	if (!x.z) moveLayer(++c), updateLayers(0,1);
 }
 
-function moveLayer(pos) {
+function moveLayer(to) {
 var	y = draw.history, c = y.layer, d = y.layers, u, x, z = d.length-1;
 	if (!c) return 0;
 //* input:
-	if (isNaN(pos)) u = pos, pos = z;
-	else if (pos < 0) pos = c-1;
-	else if (pos == 0) pos = c+1;
+	if (isNaN(to)) u = to, to = z;
+	else if (to < 0) to = c-1;
+	else if (to == 0) to = c+1;
 //* clip:
-	if (pos < 1) pos = 1; else
-	if (pos > z) pos = z;
+	if (to < 1) to = 1; else
+	if (to > z) to = z;
 //* go:
-var	i = 0, j = (c > pos ? -1:1);
-	while (c != pos) x = d[c], d[c] = d[c+j], d[c += j] = x, i += j;
+var	i = 0, j = (c > to?-1:1);
+	while (c != to) x = d[c], d[c] = d[c+j], d[c += j] = x, i += j;
 //* delete:
 	if (u) y.layers.pop(), c = y.layer-1;
 
@@ -272,8 +293,8 @@ var	y = draw.history, x = y.layer, z = y.layers.length-1;
 	if (x > z) x = z; else
 	if (x < 0) x = 0;
 //* show/hide:
-	(z = id('sliderA')).style.display = (x?'':'none');
-	(z = z.lastElementChild).value = (x?y.layers[x].alpha:RANGE.A.max);
+	(z = id('sliderA')).style.display = x?'':'none';
+	(z = z.lastElementChild).value = x ? y.layers[x].alpha : RANGE.A.max;
 //* go:
 	if (y.layer != x || ui_rewrite) y.layer = x, updateSliders(z), updateLayers(!ui_rewrite, scroll);
 }
@@ -281,7 +302,7 @@ var	y = draw.history, x = y.layer, z = y.layers.length-1;
 function changeLayer(e,i,t) {
 	if (draw.active) drawEnd();
 var	d = draw.history.layers;
-	if (t === 2) return d[i].show = (e.checked?1:0), draw.view(2);
+	if (t === 2) return d[i].show = e.checked?1:0, draw.view(2);
 
 var	v = d[i][t?'alpha':'name'] = e.value || e;
 	if (t && i && (e = id('layer'+i)) && (e = e.lastElementChild.lastElementChild.previousSibling) && (e.textContent != v)) {
@@ -290,14 +311,16 @@ var	v = d[i][t?'alpha':'name'] = e.value || e;
 }
 
 function updateLayers(ui_tweak, scroll) {
-var	a, b = 'button', j, k, l = 'layer', e = id('layers'), rId = /^.*\D(\d+)$/
-,	y = draw.history, c = y.layer, d = y.layers, i = d.length
-,	h = y.layers[0].color = hex2fix(y.layers[0].color), hi = isRgbDark(hex2rgb(h))?'#fff':'#000';
-	if (ui_tweak && id(l+0) && d[1]) {
+var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
+,	y = draw.history, c = y.layer, z = y.layers, i = z.length
+,	h = z[0].color = hex2fix(z[0].color), hi = isRgbDark(hex2rgb(h))?'#fff':'#000';
+
+	function getHistPos(a) {return /*((d = a.data[a.pos])?d.date:null)+'-'+*/a.pos+'/'+a.last;}
+
+	if (ui_tweak && id(l+0) && z[1]) {
 //* DOM fix:
 		j = e.getElementsByTagName('p'), k = j.length;
-		while (k--) {
-			a = d[parseInt(j[k].id.replace(rId, '$1'))];
+		while (k--) if (a = z[parseInt(j[k].id.match(regLastNum)[1])]) {
 			j[k].className = j[k].className.replace(b+'-active', b);
 			i = j[k].getElementsByTagName('input');
 			if (ui_tweak === 2 && !i[0].checked != !a.show) i[0].checked = !!a.show;
@@ -305,7 +328,7 @@ var	a, b = 'button', j, k, l = 'layer', e = id('layers'), rId = /^.*\D(\d+)$/
 				if (i[1].value != a.name) i[1].value = a.name;
 				i = j[k].firstElementChild.getElementsByTagName('i');
 				if (i[2].textContent != a.alpha) i[2].textContent = a.alpha;
-				if (i[3].textContent != (a = a.pos+'/'+a.last)) i[3].textContent = a;
+				if (i[3].textContent != (a = getHistPos(a))) i[3].textContent = a;
 			} else {
 				i = j[k].getElementsByTagName('button')[0].style;
 				i.backgroundColor = h;
@@ -318,27 +341,25 @@ var	a, b = 'button', j, k, l = 'layer', e = id('layers'), rId = /^.*\D(\d+)$/
 	} else {
 //* HTML reset, slower, resets scroll:
 		j = '<hr><div class="slide">', k = '<i title="';
-		clearContent(e);
 		while (i--) {
-			a = d[i];
+			a = z[i];
 			j += (i?'':'</div><hr>')
 			+'<p class="'+b+(i == c?'-active':'')
 			+'" onClick="selectLayer('+i+')" id="'+l+i+'"><i>'+k+lang.layer.hint.check
 			+'"><input type="checkbox" onChange="changeLayer(this,'+i+',2)"'+(a.show?' checked':'')+'></i><i>'
-			+(i
-			?	'<input type="text" onChange="changeLayer(this,'+i+')" value="'
+			+(i?	'<input type="text" onChange="changeLayer(this,'+i+')" value="'
 				+a.name+'" title="'+lang.layer.hint.name+'"></i>'
 				+k+lang.layer.hint.alpha+'">'+a.alpha+'</i>'
-				+k+lang.layer.hint.undo+'">'+a.pos+'/'+a.last
+				+k+lang.layer.hint.undo+'">'+getHistPos(a)
 			:	'<button class="rf" title="'+lang.layer.hint.bg+'" style="background-color:'
 				+h+'; color: '+hi+';" onClick="bgColor(0);return false" onContextMenu="bgColor(1);return false">'
 				+h+'</button>'+lang.layer.bg
 			)+'</i></i></p>';
 		}
-		setContent(e, j), i = id(l+c);
+		clearContent(e), setContent(e, j), i = id(l+c);
 	}
-	if (i && scroll) i.scrollIntoView();	//* <- param: none/true=alignWithTop, false=bottom
-	i = d.length-1, j = {U:i,T:i, D:1,B:1,M:1, C:0,E:0,H:0,V:0}, d = b+'-disabled';
+//	if (i && scroll) i.scrollIntoView();	//* <- param: none/true=alignWithTop, false=bottom
+	i = z.length-1, j = {U:i,T:i, D:1,B:1,M:1, C:0,E:0}, d = b+'-disabled';
 	for (i in j) setClass(id(l+i), (!c || c == j[i]) ?d:b);
 	updateHistoryButtons(), draw.view(2);
 }
@@ -369,7 +390,7 @@ var	a = ['class','id','onChange','onClick','onContextMenu'];
 	return e.innerHTML = c;
 }
 function clearContent(e) {while (e.childNodes.length) e.removeChild(e.lastChild);}	//* <- works without a blink, unlike e.innerHTML = '';
-function toggleView(e) {if (!e.tagName) e = id(e); return e.style.display = (e.style.display?'':'none');}
+function toggleView(e) {if (!e.tagName) e = id(e); return e.style.display = e.style.display?'':'none';}
 function propSwap(a, b) {
 var	r = {};
 	for (i in b) r[i] = a[i], a[i] = b[i];
@@ -380,11 +401,7 @@ var	r = {};
 
 function getOffsetXY(e) {
 var	x = 0, y = 0;
-	while (e) {
-		x += e.offsetLeft;
-		y += e.offsetTop;
-		e = e.offsetParent;
-	}
+	while (e) x += e.offsetLeft, y += e.offsetTop, e = e.offsetParent;
 	return {x:x, y:y};
 }
 
@@ -435,10 +452,9 @@ function dragOver(event) {
 	event.stopPropagation();
 	event.preventDefault();
 
-var	d = event.dataTransfer.files, e = (d && d.length);
-	event.dataTransfer.dropEffect = (e ? 'copy' : 'move');
+var	d = event.dataTransfer.files, e = d && d.length;
+	event.dataTransfer.dropEffect = e?'copy':'move';
 	if (!e) dragMove(event);
-	return false;
 }
 
 function drop(event) {
@@ -450,7 +466,7 @@ function drop(event) {
 
 //* Load images: from http://www.html5rocks.com/en/tutorials/file/dndfiles/
 	if (window.FileReader) {
-	var	d = event.dataTransfer.files, f, i = (d?d.length:0), j = i, k = 0, r;
+	var	d = event.dataTransfer.files, f, i = d?d.length:0, j = i, k = 0, r;
 		while (i--)
 		if ((f = d[i]).type.match('image.*')) {
 			++k;
@@ -466,7 +482,6 @@ function drop(event) {
 		}
 		if (j && !k) alert(lang.no_files);
 	}
-	return false;
 }
 
 //* Specific funcs *-----------------------------------------------------------
@@ -562,6 +577,27 @@ var	pt = id('colors'), c = select.palette.value, p = palette[c];
 	}
 }
 
+//* safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
+
+function generatePalette(p, step, slice) {
+	if (!(p = palette[p])) return;
+var	letters = [0, 0, 0], l = p.length;
+	if (l) p[l] = '\t', p[l+1] = '\n';
+	while (letters[0] <= 255) {
+		p[l = p.length] = '#';
+		for (var i = 0; i < 3; i++) {
+		var	s = letters[i].toString(16);
+			if (s.length == 1) s = '0'+s;
+			p[l] += s;
+		}
+		letters[2] += step;
+		if (letters[2] > 255) letters[2] = 0, letters[1] += step;
+		if (letters[1] > 255) letters[1] = 0, letters[0] += step;
+		if ((letters[1] == 0 || (letters[1] == step * slice)) && letters[2] == 0)
+			p[l+1] = '\n';
+	}
+}
+
 function fpsCount() {fps = ticks; ticks = 0;}
 function updateDebugScreen() {
 	if (!mode.debug) return;
@@ -635,7 +671,7 @@ function getCursorRad(r, x, y) {
 function drawCursor() {
 	if (mode.brushView) {
 		ctx.draw.fillStyle = 'rgba('+tool.color+', '+tool.opacity+')';
-		ctx.draw.shadowColor = ((ctx.draw.shadowBlur = tool.blur) ? 'rgb('+tool.color+')' : A0);
+		ctx.draw.shadowColor = (ctx.draw.shadowBlur = tool.blur) ? 'rgb('+tool.color+')' : A0;
 	} else {
 		ctx.draw.strokeStyle = 'rgb(123,123,123)';
 		ctx.draw.shadowColor = A0;
@@ -672,11 +708,10 @@ function drawStart(event) {
 	updatePosition(event);
 	if (draw.turn) return draw.turn.origin = getCursorRad();
 
-//* Drawing on cv.view:
-var	y = draw.history, i = y.layer;
-	if (!i || !y.layers[i].show) return false;
+//* Drawing on cv.draw:
+var	y = draw.history, i = y.layer, sf = select.shapeFlags[select.shape.value];
+	if (!(i || (sf & 4)) || !y.layers[i].show) return false;
 
-var	sf = select.shapeFlags[select.shape.value];
 	if (draw.step) {
 		if (mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
 			for (i in draw.o) draw.prev[i] = draw.cur[i];
@@ -699,10 +734,10 @@ var	sf = select.shapeFlags[select.shape.value];
 			t = select.options[i][select[i].value];
 			for (j in y) ctx[j][i] = t;
 		}
-	var	i = (event.which == 1 ? 1 : 0), j, t = tools[1-i]
+	var	i = (event.which == 1)?1:0, j, t = tools[1-i]
 	,	pf = ((sf & 8) && (mode.shape || !mode.step))
 	,	fig = ((sf & 2) && (mode.shape || pf));
-		for (i in (t = {
+		for (i in (t = mode.erase ? DRAW_HELPER : {
 			lineWidth: (((sf & 4) || (pf && !mode.step))?1:t.width)
 		,	fillStyle: (fig ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
 		,	strokeStyle: (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+((sf & 4)?(draw.step?0.33:0.66):t.opacity)+')')
@@ -749,7 +784,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
 				draw.line.preview = true;
 				if (mode.erase && (sf & 2)) {
 					ctx.draw.beginPath();
-					drawShape(ctx.draw, s, 1);				//* <- erase shape area
+					drawShape(ctx.draw, s, 1), ++redraw;		//* <- erase shape area
 				} else {
 					ctx.temp.clearRect(0, 0, cv.view.width, cv.view.height);
 					ctx.temp.beginPath();
@@ -771,11 +806,12 @@ function drawEnd(event) {
 	if (mode.click == 1 && event.shiftKey) return drawMove(event);
 	if (draw.active) {
 	var	s = select.shape.value, sf = select.shapeFlags[s], m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8));
+	//* 2pt line for 4pt curve:
 		if (!draw.step && mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
 			draw.step = {
 				prev:{x:draw.prev.x, y:draw.prev.y}
 			,	cur:{x:draw.cur.x, y:draw.cur.y}
-			};	//* <- normal straight line as base
+			};
 			return;
 		}
 		for (i in DRAW_HELPER) ctx.temp[i] = DRAW_HELPER[i];
@@ -788,8 +824,7 @@ function drawEnd(event) {
 				ctx.draw.clip();
 				ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
 				ctx.draw.restore();
-			} else
-			drawShape(ctx.draw, s, 1);
+			} else drawShape(ctx.draw, s, 1);
 		} else {
 			ctx.draw.fillStyle = ctx.temp.fillStyle;
 			if (sf & 8) {
@@ -871,15 +906,14 @@ var	s = draw.step, r = draw.cur, v = draw.prev;
 			break;
 	//* pan
 		case 5:	if (v.x != r.x
-			|| (v.y != r.y)) moveScreen(r.x-v.x, r.y-v.y);
+			|| (v.y != r.y)) moveScreen(r.x-v.x, r.y-v.y, c != ctx.temp);
 			break;
 	//* line
 		default:if (s) {
 			var	d = r, old = propSwap(ctx.temp, DRAW_HELPER);
 				ctx.temp.beginPath();
 				if (s.prev.x != v.x || s.prev.y != v.y) {
-					ctx.temp.moveTo(d.x, d.y);
-					d = v;
+					ctx.temp.moveTo(d.x, d.y), d = v;
 					ctx.temp.lineTo(d.x, d.y);
 				}
 				ctx.temp.moveTo(s.cur.x, s.cur.y);
@@ -898,8 +932,22 @@ var	s = draw.step, r = draw.cur, v = draw.prev;
 	}
 }
 
-function moveScreen(x, y) {
-var	d = draw.history.cur(), p = draw.step, n = !mode.shape;
+function moveScreen(dx, dy, fin) {
+var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape;
+	if (z) {
+		d = y.cur();
+		if (!d) return;
+		c = ctx.draw;
+	} else {
+		if (fin) {
+			y.layer = y.layers.length, t = +new Date();
+			while (--y.layer) moveScreen(dx, dy), historyAct(t);
+			return updateLayers();
+		} else {
+			draw.preload(1);
+		var	c = ctx.upper, d = c.getImageData(0, 0, cv.view.width, cv.view.height);
+		}
+	}
 	ctx.temp.clearRect(0, 0, cv.view.width, cv.view.height);
 	if (p) {
 		for (i in {min:0,max:0}) p[i] = {
@@ -908,13 +956,13 @@ var	d = draw.history.cur(), p = draw.step, n = !mode.shape;
 		};
 		p.max.x -= p.min.x;
 		p.max.y -= p.min.y;
-		if (n) ctx.draw.clearRect(p.min.x, p.min.y, p.max.x, p.max.y);
-		ctx.temp.putImageData(d, x, y, p.min.x, p.min.y, p.max.x, p.max.y);
+		if (n) c.clearRect(p.min.x, p.min.y, p.max.x, p.max.y);
+		ctx.temp.putImageData(d, dx, dy, p.min.x, p.min.y, p.max.x, p.max.y);
 	} else {
-		if (n) ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
-		ctx.temp.putImageData(d, x, y);
+		if (n) c.clearRect(0, 0, cv.view.width, cv.view.height);
+		ctx.temp.putImageData(d, dx, dy);
 	}
-	ctx.draw.drawImage(cv.temp, 0, 0);
+	c.drawImage(cv.temp, 0, 0);
 }
 
 function fillCheck() {
@@ -922,25 +970,35 @@ var	d = ctx.view.getImageData(0, 0, cv.view.width, cv.view.height), i = d.data.l
 	while (--i) if (d.data[i] != d.data[i%4]) return 0; return 1;		//* <- 1 for fill flood confirmed
 }
 
-function fillScreen(i) {
-	if (!draw.history.layer) {
-		if (!isNaN(i) && i >= -1) x = draw.history.layers[0], x.color = (i < 0 ? hex2inv(x.color) : rgb2hex(tools[i].color));
+function fillScreen(i,t) {
+	y = draw.history, l = y.layers, z = y.layer;
+	if (!z) {
+		if (isNaN(i)) return false;
+		if (i < 0) {
+			if (i == -1) l[0].color = hex2inv(l[0].color);
+			y.layer = l.length, t = +new Date();
+			while (--y.layer) fillScreen(i,t);
+		} else l[0].color = rgb2hex(tools[i].color);
 		return updateLayers();
 	}
 	if (isNaN(i) || i > 0) {
 		used.wipe = 'Wipe';
 		ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
 	} else
-	if (i < 0) {
-		historyAct(false);
-	var	d = draw.history.cur();
+	if (!i) {
+		used.fill = 'Fill';
+		ctx.draw.fillStyle = 'rgb(' + tools[i].color + ')';
+		ctx.draw.fillRect(0, 0, cv.view.width, cv.view.height);
+	} else {
+		draw.preload(), historyAct(-t || false), d = y.cur(), z = l[z];
+		if (!d) return;
 		if (i == -1) {
 			used.inv = 'Invert';
 			i = d.data.length;
 			while (i--) if (i%4 != 3) d.data[i] = 255 - d.data[i];	//* <- modify current history point, no push
 		} else {
 		var	hw = d.width, hh = d.height, w = cv.view.width, h = cv.view.height
-		,	hr = (i == -2), j, k, l = (hr?w:h)/2, m, n, x, y;
+		,	hr = (i == -2), j, k, l = (hr?w:h)/2, m, n, x, y, z, d;
 			if (hr) used.flip_h = 'Hor.Flip';
 			else	used.flip_v = 'Ver.Flip';
 			x = cv.view.width; while (x--) if ((!hr || x >= l) && x < hw) {
@@ -957,27 +1015,27 @@ function fillScreen(i) {
 				}
 			}}
 		}
-		ctx.draw.putImageData(d, 0, 0);
-		return;
-	} else {
-		used.fill = 'Fill';
-		ctx.draw.fillStyle = 'rgb(' + tools[i].color + ')';
-		ctx.draw.fillRect(0, 0, cv.view.width, cv.view.height);
+		ctx.draw.putImageData(z.data[z.pos] = d, 0, 0);
+		return draw.view(1);
 	}
 	cue.autoSave = false;
-	historyAct();
+	historyAct(t);
 }
 
 function pickColor(keep, c, event) {
 	if (c) {
+//* gradient palette:
 	var	d = c.ctx.getImageData(0, 0, c.width, c.height), o = getOffsetXY(c);
 		c = (event.pageX - o.x
 		+   (event.pageY - o.y)*c.width)*4;
 	} else {
-		d = draw.history.cur() || ctx.view.getImageData(0, 0, cv.view.width, cv.view.height);
 		c = (Math.floor(draw.o.x) + Math.floor(draw.o.y)*cv.view.width)*4;
+//* current layer:
+		d = draw.history.cur();
+//* whole image:
+		if (!d) draw.view(1), d = ctx.view.getImageData(0, 0, cv.view.width, cv.view.height);
 	}
-	c = (d.data[c]*65536 + d.data[c+1]*256 + d.data[c+2]).toString(16);
+	d = d.data, c = (d[c]*65536 + d[c+1]*256 + d[c+2]).toString(16);
 	while (c.length < 6) c = '0'+c; c = '#'+c;
 	return keep ? c : updateColor(c, event);
 }
@@ -1009,9 +1067,9 @@ function hex2rgb(v) {
 function rgb2hex(v) {
 	if (!reg255.test(v)) return false;
 	v = v.split(reg255split);
-var	x = '#', i;
-	for (i in v) x += ((v[i] = parseInt(v[i]).toString(16)).length == 1) ? '0'+v[i] : v[i];
-	return x;
+var	h = '#', i, j;
+	for (i in v) h += ((j = parseInt(v[i]).toString(16)).length == 1) ? '0'+j : j;
+	return h;
 }
 
 function isRgbDark(v) {
@@ -1047,8 +1105,8 @@ var	p = palette[0], found = p.length;
 	}
 
 //* update buttons:
-	i = id((t == tool) ? 'colorF' : 'colorB');
-	i.style.color = (isRgbDark(t.color) ? '#fff' : '#000');		//* <- inverted font color
+	i = id(t == tool?'colorF':'colorB');
+	i.style.color = isRgbDark(t.color)?'#fff':'#000';		//* <- inverted font color
 	i.style.background = 'rgb(' + t.color + ')';
 	return v;
 }
@@ -1077,10 +1135,11 @@ var	r = 'range', s = 'slider', t = 'text', c = id(r+b), d,e;
 }
 
 function updateSlider(i,e) {
-var	j = (e?i:BOWL[i])
+var	j = e?i:BOWL[i]
 ,	s = id('range'+j)
 ,	t = id('text'+j) || s
-,	r = (e?s:RANGE[j]), v = (e?parseFloat(e.value):tool[i = BOW[i]]);
+,	r = e?s:RANGE[j]
+,	v = e?parseFloat(e.value):tool[i = BOW[i]];
 	if (v < r.min) v = r.min; else
 	if (v > r.max) v = r.max;
 	if (r.step < 1) v = parseFloat(v).toFixed(2);
@@ -1160,7 +1219,7 @@ function toolTweak(prop, value) {
 		if (value > 0) tool[b] = value;
 		else {
 		var	v = new Number(tool[b]), s = RANGE[prop].step;
-			tool[b] = (value ? v-s : v+s);
+			tool[b] = value ? v-s : v+s;
 		}
 		return updateSliders(i);
 	}
@@ -1175,7 +1234,7 @@ function toolSwap(t) {
 	} else
 //* restore front set to one of defaults, line shape
 	if (t > 0) {
-		t = TOOLS_REF[t-1];
+	var	t = TOOLS_REF[t-1], i;
 		for (i in t) tool[i] = t[i];
 		updateShape(0);
 	} else
@@ -1183,7 +1242,6 @@ function toolSwap(t) {
 	if (t) {
 		if (mode.shape) toggleMode(1);
 		if (mode.step) toggleMode(2);
-		if (t == -2) tool.width = tool.opacity = 1, tool.blur = 0, updateColor(tool.color = '#888');
 		return updateShape(-t-1);
 //* restore all defaults
 	} else {
@@ -1203,7 +1261,7 @@ function toggleMode(i, keep) {
 	var	n = modes[i], v = mode[n];
 		if (!keep) v = mode[n] = !v;
 		if (e = id('check'+modeL[i])) {
-			setClass(e, v ? 'button-active' : 'button');
+			setClass(e, 'button'+(v?'-active':''));
 			if (e.parentNode.id == NS+'-warn') updateShape();
 		}
 		if (n == 'debug') {
@@ -1216,9 +1274,7 @@ function toggleMode(i, keep) {
 //* Save, load, send picture *-------------------------------------------------
 
 function unixDateToHMS(t,u,y) {
-var	d = (t ? new Date(t+(t > 0 ? 0 : new Date())) : new Date());
-	t = ['Hours','Minutes','Seconds'];
-	u = 'get'+(u?'UTC':'');
+var	d = t ? new Date(t+(t >0?0:new Date())) : new Date(), t = ['Hours','Minutes','Seconds'], u = 'get'+(u?'UTC':'');
 	if (y) t = ['FullYear','Month','Date'].concat(t);
 	for (i in t) if ((t[i] = d[u+t[i]]()+(y && i == 1?1:0)) < 10) t[i] = '0'+t[i];
 	return y ? t[0]+'-'+t[1]+'-'+t[2]+' '+t[3]+':'+t[4]+':'+t[5] : t.join(':');
@@ -1382,7 +1438,7 @@ var	d = 'read-img-'+(+new Date)+'-'+s.name, i = id(d), j, k;
 		newLayer(s);
 		ctx.draw.clearRect(0, 0, cv.view.width, cv.view.height);
 		ctx.draw.drawImage(i, 0, 0);
-		historyAct();
+		historyAct(s.z ? draw.time[1] : null);
 		cue.autoSave = false;
 		if (d = i.parentNode) d.removeChild(i);
 	}
@@ -1455,7 +1511,7 @@ function hotKeys(event) {
 if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *, 8=bksp
 			case c('L'):	toggleMode(1);	break;
 			case c('U'):	toggleMode(2);	break;
-			case 114:	toggleMode(4);	break;
+			case 121:	toggleMode(5);	break;
 
 			case 112:	resetAside();	break;	//* F1
 			case 120:	sendPic(0);	break;	//* F9
@@ -1504,11 +1560,11 @@ function hotWheel(event) {
 //* Autoplace windows around cv.view *------------------------------------------
 
 function resetAside() {
-var	margin = 2, off = getOffsetXY(draw.container), x = (off.x + cv.view.offsetWidth + margin), y = 0, z
+var	margin = 2, off = getOffsetXY(draw.container), x = off.x + cv.view.offsetWidth + margin, y = 0, z
 ,	a = container.getElementsByTagName('aside'), i = a.length, e;
 	while (i--) if ((e = a[i]).id) {
 		e.style.display = '';
-		if (z) x = (off.x - e.offsetWidth - margin);
+		if (z) x = off.x - e.offsetWidth - margin;
 		putInView(e, x, y+off.y);
 		y += e.offsetHeight + margin;
 		if (!z && y > select.imgRes.height) y = 0, z = 1;
@@ -1532,7 +1588,7 @@ var	b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style = '', s = '&nbsp;';
 
 	for (i in cv) ctx[i] = (cv[i] = (i == 'view'?e:document.createElement(c))).getContext('2d');
 	for (i in select.imgRes) {
-		b = (o[a = i[0]]?o[a]:o[a] = (o[i]?o[i]:select.imgRes[i]));
+		b = o[a = i[0]]?o[a]:(o[a] = o[i]?o[i]:select.imgRes[i]);
 		for (j in cv) cv[j][i] = b;
 		if ((o[b = c = a+'l']
 		|| (o[c] = o[b = i+'Limit']))
@@ -1592,7 +1648,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 
 			function btnContent(e, a) {
 			var	t = lang.b[a[0]], d = '<div class="'+b+'-', c = '</div>';
-				e.title = (t.t?t.t:t);
+				e.title = t.t?t.t:t;
 				setContent(e, d+'key">'+a[1]+c+a[2]+d+'subtitle"><br>'+(t.t?t.sub:a[0])+c);
 				return e;
 			}
@@ -1612,7 +1668,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 				setEvent(d, 'onclick', k[3]);
 				if (k.length > 4) setId(d, k[4]);
 				c.appendChild(d);
-			} else if (k != -1) c.innerHTML += (k < 0?'<hr>':(k?repeat(s,k):'<br>'));
+			} else if (k != -1) c.innerHTML += k < 0?'<hr>':(k?repeat(s,k):'<br>');
 			setClass(c, b+'s');
 			return bf ? e.insertBefore(c, bf) : e.appendChild(c);
 		}
@@ -1647,8 +1703,8 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],	['swap'	,'S'	,'&#X21C4;'	,j+')'
 ],	['erase','D'	,s		,f+'1)'	,c+'B'
 ],
-0,	['copy'	,a+'C'	,s		,n+'1)'	,l+'C'
-],	['merge',a+'M'	,s		,n+'-1)',l+'M'
+0,	['copy'	,a+'C'	,'&#x25EB;'	,n+'1)'	,l+'C'
+],	['merge',a+'M'	,'&#x25E7;'	,n+'-1)',l+'M'
 ],
 1,	['top'	,a+'T','&#x2191;'	,d+')'	,l+'T'
 ],	['bottom',a+'B','&#x2193;'	,d+'1)'	,l+'B'
@@ -1672,7 +1728,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],	['eraser','E'	,'&#x25CC;'	,j+'-2)'
 ],	['reset' ,'G'	,'&#x25CE;'	,j+'0)'
 ],
-1,	['cursor'		,'F3'	,'&#x25CF;'			,g+'4)'	,h+'V'
+1,	['cursor'		,'F10'	,'&#x25CF;'			,g+'5)'	,h+'V'
 ],
 1,	['line|area|copy'	,'L'	,'&ndash;|&#x25A0;|&#x25EB;'	,g+'1)'	,h+'L'
 ],	['curve|outline|rect'	,'U'	,'~|&#x25A1;|&#x25AF;'	,g+'2)'	,h+'U'
@@ -1720,25 +1776,6 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 		if (f == 'toggleView' && !(m = b[c]).title) m.title = lang[h.test(m.parentNode.tagName)?'hide_hint':'show_hint'];
 	}
 
-//* safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
-  function generatePalette(p, step, slice) {
-	if (!(p = palette[p])) return;
-var	letters = [0, 0, 0], l = p.length;
-	if (l) p[l] = '\t', p[l+1] = '\n';
-	while (letters[0] <= 255) {
-		p[l = p.length] = '#';
-		for (var i = 0; i < 3; i++) {
-		var	s = letters[i].toString(16);
-			if (s.length == 1) s = '0'+s;
-			p[l] += s;
-		}
-		letters[2] += step;
-		if (letters[2] > 255) letters[2] = 0, letters[1] += step;
-		if (letters[1] > 255) letters[1] = 0, letters[0] += step;
-		if ((letters[1] == 0 || (letters[1] == step * slice)) && letters[2] == 0)
-			p[l+1] = '\n';
-	}
-  }
 	generatePalette(1, 85, 0);
 	a = select.options, c = select.translated || a, f = (LS && LS.lastPalette && palette[LS.lastPalette]) ? LS.lastPalette : 1;
 	for (b in a) {
@@ -1784,7 +1821,7 @@ var	o = outside, v = id('vars'), e, i, j, k
 	CR = (o.saveprfx?o.saveprfx:NS)+CR;
 	C1T = (C1R = CR+'y')+CT, C1L = C1R+CL;
 	C2T = (C2R = CR+'2')+CT, C2L = C2R+CL;
-	o.t0 = (o.t0 ? o.t0+'000' : +new Date());
+	o.t0 = o.t0 ? o.t0+'000' : +new Date();
 	if (!o.undo || isNaN(o.undo) || o.undo < 3) o.undo = 123; else o.undo = parseInt(o.undo);
 	if (!o.lang) o.lang = document.documentElement.lang || 'en';
 
@@ -1817,7 +1854,7 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 	,	color:	'Цвет'
 	,	tool:	'Инструмент'
 },	layer: {prefix:	'Слой'
-	,	bg:	'Цвет фона'
+	,	bg:	'Цвет фона и общие операции'
 	,	hint: {
 			bg:	'Сменить цвет фона: левым кликом на цвет основного инструмента, правым — запасного.'
 		,	check:	'Видимость слоя.'
@@ -1920,7 +1957,7 @@ else o.lang = 'en', lang = {
 	,	color:	'Color'
 	,	tool:	'Tool'
 },	layer: {prefix:	'Layer'
-	,	bg:	'Background fill color'
+	,	bg:	'Background color, global actions'
 	,	hint: {
 			bg:	'Change bg color: left click to front tool color, right — to back.'
 		,	check:	'Layer visibility.'
@@ -2076,3 +2113,5 @@ document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 document.addEventListener('DOMContentLoaded', init, false);
 
 }; //* <- END global wrapper
+
+function showProps(o, z /*incl.zero*/) {var i,t='';for(i in o)if(z||o[i])t+='\n'+i+'='+o[i];alert(t);}
