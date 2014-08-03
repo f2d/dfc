@@ -5,8 +5,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 
 //* Configuration *------------------------------------------------------------
 
-,	INFO_VERSION = 'v1.5'
-,	INFO_DATE = '2014-07-16 — 2014-08-01'
+,	INFO_VERSION = 'v1.6'
+,	INFO_DATE = '2014-07-16 — 2014-08-03'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
 ,	A0 = 'transparent', IJ = 'image/jpeg'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers'
@@ -137,6 +137,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 					cue.autoSave = true;
 					used.history = 'Undo';
 				} else {
+				var	dt = i || (+new Date());
+				//	if (i) i = false;
 					if (i !== false) t.reversable = 0;
 					else if (t.reversable) return 0;
 					else t.reversable = 1, draw.view();
@@ -144,7 +146,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 						if (t.pos < d) t.last = ++t.pos;
 						else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];
 					}
-					(t.data[t.pos] = ctx.draw.getImageData(0, 0, cv.view.width, cv.view.height)).date = i || (+new Date());
+					(t.data[t.pos] = ctx.draw.getImageData(0, 0, cv.view.width, cv.view.height)).date = dt;
 				}
 				return 1;
 			}
@@ -162,6 +164,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 				for (j = a[i][0], l = a[i][1]; j <= l; j++) if (j && (t = d[j]).show && (k = y.cur(j))) {
 					if (j == c) ctx[i].putImageData(k, 0, 0);
 					else {
+						if (t.flag && !(k = getClippedImageData(k, j))) continue;
 						ctx.temp.putImageData(k, 0, 0);
 						ctx[i].globalAlpha = t.alpha/RANGE.A.max;
 						ctx[i].drawImage(cv.temp, 0, 0);
@@ -172,17 +175,35 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 		}
 	,	view: function(i) {
 			if (i) draw.preload(i === 2);
-		var	y = this.history, c = y.layer, d = y.layers, a = ['lower', 'draw', 'upper'];
+		var	y = this.history, c = y.layer, d = y.layers, a = ['lower', 'draw', 'upper'], j, k, l;
 			if (d[0].show) {
 				ctx.view.fillStyle = d[0].color;
 				ctx.view.fillRect(0, 0, cv.view.width, cv.view.height);
 			} else ctx.view.clearRect(0, 0, cv.view.width, cv.view.height);
 			for (i in a) {
-				ctx.view.globalAlpha = (c && i == 1) ? d[c].alpha/RANGE.A.max : 1;
-				ctx.view.drawImage(cv[a[i]], 0, 0);
+				j = a[i];
+				if (c && i == 1) {
+					if (d[c].flag) {
+						k = ctx[j].getImageData(0, 0, cv.view.width, cv.view.height), l = getClippedImageData(k);
+						if (!l) continue;
+						ctx[j].putImageData(l, 0, 0);
+					}
+					ctx.view.globalAlpha = d[c].alpha/RANGE.A.max;
+				} else ctx.view.globalAlpha = 1;
+				ctx.view.drawImage(cv[j], 0, 0);
+			//	if (i == 1 && d[c].flag) ctx[j].putImageData(k, 0, 0);
 			}
 		}
 	};
+
+function getClippedImageData(d, i) {
+var	y = draw.history, l = y.layers, c = i || y.layer, a;
+	while (l[--c].flag);
+	if (!c || !l[c].show || !(a = l[c].alpha) || !(c = y.cur(c))) return 0;
+	y = ctx.temp.createImageData(cv.view.width, cv.view.height), i = y.data.length, used.clip = 'Clip', a /= RANGE.A.max*255;
+	while (i--) y.data[i] = (i%4 == 3 ? Math.floor(c.data[i]*d.data[i]*a) : d.data[i]);
+	return y;
+}
 
 function historyAct(i) {
 var	y = draw.history, c = y.layer, d = y.layers, z = d.length, x;
@@ -248,7 +269,7 @@ var	y = draw.history, c = y.layer, d = y.layers, z, u;
 		return updateLayers(2);
 	}
 //* new
-var	x = {pos:0, last:0, show:1, alpha:100, name: lang.layer.prefix+'_'+(++count.layers)};
+var	x = {pos:0, last:0, show:1, flag:0, alpha:100, name: lang.layer.prefix+'_'+(++count.layers)};
 	x.data = new Array(outside.undo);
 	if (load === 1) {
 //* copy
@@ -257,7 +278,7 @@ var	x = {pos:0, last:0, show:1, alpha:100, name: lang.layer.prefix+'_'+(++count.
 		x.name = d[c].name+' (2)';
 	} else
 //* saved
-	if (load) for (z in {z:0, show:0, alpha:0, name:0}) if (z in load) x[z] = load[z];
+	if (load) for (z in {z:0, show:0, flag:0, alpha:0, name:0}) if (z in load) x[z] = load[z];
 //* clean otherwise
 	d[y.layer = d.length] = x;
 	if (!x.z) moveLayer(++c), updateLayers(0,1);
@@ -303,10 +324,11 @@ function changeLayer(e,i,t) {
 	if (draw.active) drawEnd();
 var	d = draw.history.layers;
 	if (t === 2) return d[i].show = e.checked?1:0, draw.view(2);
+	if (t === 3) return e.parentNode.style.backgroundColor = (d[i].flag ^= 1)?'#5ea':'', draw.view(2);
 
 var	v = d[i][t?'alpha':'name'] = e.value || e;
 	if (t && i && (e = id('layer'+i)) && (e = e.lastElementChild.lastElementChild.previousSibling) && (e.textContent != v)) {
-		e.textContent = v, draw.view();	//* <- additionally, redraws on slider mousemove, even without call here
+		e.textContent = v, draw.view(2);	//* <- additionally, redraws on slider mousemove, even without call here
 	}
 }
 
@@ -323,6 +345,7 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 		while (k--) if (a = z[parseInt(j[k].id.match(regLastNum)[1])]) {
 			j[k].className = j[k].className.replace(b+'-active', b);
 			i = j[k].getElementsByTagName('input');
+			i[0].parentNode.style.backgroundColor = a.flag?'#5ea':'';
 			if (ui_tweak === 2 && !i[0].checked != !a.show) i[0].checked = !!a.show;
 			if (i.length > 1) {
 				if (i[1].value != a.name) i[1].value = a.name;
@@ -330,9 +353,9 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 				if (i[2].textContent != a.alpha) i[2].textContent = a.alpha;
 				if (i[3].textContent != (a = getHistPos(a))) i[3].textContent = a;
 			} else {
-				i = j[k].getElementsByTagName('button')[0].style;
-				i.backgroundColor = h;
-				i.color = hi;
+				i = j[k].getElementsByTagName('button')[0], d = i.style;
+				d.backgroundColor = i.textContent = h;
+				d.color = hi;
 			}
 		}
 		if (i = id(l+c)) {
@@ -346,7 +369,9 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 			j += (i?'':'</div><hr>')
 			+'<p class="'+b+(i == c?'-active':'')
 			+'" onClick="selectLayer('+i+')" id="'+l+i+'"><i>'+k+lang.layer.hint.check
-			+'"><input type="checkbox" onChange="changeLayer(this,'+i+',2)"'+(a.show?' checked':'')+'></i><i>'
+			+(a.flag?'" style="background-color:#5ea':'')
+			+'"><input type="checkbox" onChange="changeLayer(this,'+i+',2)"'+(a.show?' checked':'')
+			+(i?' onContextMenu="changeLayer(this,'+i+',3);return false"':'')+'></i><i>'
 			+(i?	'<input type="text" onChange="changeLayer(this,'+i+')" value="'
 				+a.name+'" title="'+lang.layer.hint.name+'"></i>'
 				+k+lang.layer.hint.alpha+'">'+a.alpha+'</i>'
@@ -755,7 +780,7 @@ function drawMove(event) {
 	updatePosition(event);
 	if (draw.turn) return updateViewport(draw.turn.pan?1:draw.turn.delta = getCursorRad() - draw.turn.origin);
 
-var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
+var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 ,	newLine = (draw.active && !((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)));
 
 	if (mode.click) mode.click = 1;
@@ -776,7 +801,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
 	var	t = +new Date();
 		if (t-draw.refresh > 30) draw.refresh = t; else redraw = false;		//* <- put "> 1000/N" to redraw maximum N FPS
 	}
-	if (redraw) {
+	if (redraw && ((i = isMouseIn()) || draw.active)) {
 		redraw = 0;
 		if ((flushCursor || neverFlushCursor) && !(mode.lowQ && draw.active)) draw.preload(), ++redraw;
 		if (draw.active) {
@@ -794,7 +819,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
 				}
 			} else
 			if (draw.line.started) ctx.draw.stroke(), ++redraw;
-		} else if (neverFlushCursor && !mode.lowQ && isMouseIn()) drawCursor(), ++redraw;
+		} else if (i && neverFlushCursor && !mode.lowQ) drawCursor(), ++redraw;
 		updateDebugScreen();
 		if (redraw) draw.view();
 	}
@@ -1369,14 +1394,13 @@ var	a = auto || false, b, c, d, e, f, i, t;
 //* load project
 		if (!LS[i] || (b = JSON.parse(LS[i])).time != t) alert(lang.no_layers); else
 		if (confirm(lang.confirm_load)) {
-			t = t.split('-'), draw.time = t.slice(0,2);
+			t = t.split('-'), draw.time = t.slice(0,2), used = {LS:'Local Storage'};
 			if (t.length > 2) used.read = t.slice(2).join('-');
 			a = id('saveTime');
 			a.title = new Date(t = +t[1]);
 			a.textContent = (t = unixDateToHMS(t,0,1)).split(' ',2)[1];
 			a = b.layers, i = a[0].max = a.length, count = {layers:i-1, strokes:0}, d = draw.history, d.layers = [a[d.layer = 0]];
-			while (--i) readPic({z:i, show:a[i].show, alpha:a[i].alpha, name:a[i].name, data:a[i].data});
-			used.LS = 'Local Storage';
+			while (--i) readPic({z:i, show:a[i].show, flag:a[i].flag, alpha:a[i].alpha, name:a[i].name, data:a[i].data});
 		}
 		break;
 	case 5:
@@ -1474,10 +1498,10 @@ function hotKeys(event) {
 			case c('M'):	newLayer(-1);	break;
 			case c('E'):	moveLayer('del');break;
 		case 38:case c('U'):	moveLayer(0);	break;
-		case 40:case c('D'):	moveLayer(-1);	break;
+		case 40:case c('I'):	moveLayer(-1);	break;
 		case 37:case c('T'):	moveLayer();	break;
-		case 39:case c('B'):	moveLayer(1);	break;
-			case c('G'):	toggleMode(8);	break;
+		case 39:case c('Y'):	moveLayer(1);	break;
+		//	case c('G'):	toggleMode(8);	break;
 
 			case c('B'):
 			case c('O'):
@@ -1697,7 +1721,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],	['delete',a+'E','&times;'	,d+'"del")',l+'E'
 ],
 1,	['up'	,a+'U','&#x25B2;'	,d+'0)'	,l+'U'
-],	['down'	,a+'D','&#x25BC;'	,d+'-1)',l+'D'
+],	['down'	,a+'I','&#x25BC;'	,d+'-1)',l+'D'
 ],
 1,	['fill'	,'F'	,s		,f+'0)'	,c+'F'
 ],	['swap'	,'S'	,'&#X21C4;'	,j+')'
@@ -1707,7 +1731,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],	['merge',a+'M'	,'&#x25E7;'	,n+'-1)',l+'M'
 ],
 1,	['top'	,a+'T','&#x2191;'	,d+')'	,l+'T'
-],	['bottom',a+'B','&#x2193;'	,d+'1)'	,l+'B'
+],	['bottom',a+'Y','&#x2193;'	,d+'1)'	,l+'B'
 ],
 1,	['invert','I'	,'&#x25D0;'	,f+'-1)'
 ],	['flip_h','H'	,'&#x2194;'	,f+'-2)',l+'H'
@@ -1857,7 +1881,7 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 	,	bg:	'Цвет фона и общие операции'
 	,	hint: {
 			bg:	'Сменить цвет фона: левым кликом на цвет основного инструмента, правым — запасного.'
-		,	check:	'Видимость слоя.'
+		,	check:	'Видимость слоя. Правым кликом переключается режим группы ограниченного наложения.'
 		,	name:	'Название слоя, меняйте на что-то осмысленное, чтобы не перепутать.'
 		,	alpha:	'Непрозрачность слоя при наложении.'
 		,	undo:	'История отмен слоя.'
@@ -1960,7 +1984,7 @@ else o.lang = 'en', lang = {
 	,	bg:	'Background color, global actions'
 	,	hint: {
 			bg:	'Change bg color: left click to front tool color, right — to back.'
-		,	check:	'Layer visibility.'
+		,	check:	'Layer visibility. Right click to toggle clipping group mode.'
 		,	name:	'Layer entry name, change to something meaningful.'
 		,	alpha:	'Layer opacity ratio.'
 		,	undo:	'Layer undo history.'
