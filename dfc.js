@@ -1,8 +1,8 @@
 ﻿var dfc = new function () {
 
 var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.42'
-,	INFO_DATE = '2013-04-01 — 2014-04-22'
+,	INFO_VERSION = 'v0.9.43'
+,	INFO_DATE = '2013-04-01 — 2014-08-14'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
 ,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = -0.5
@@ -108,7 +108,7 @@ var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align t
 					if (i < 0 && t.pos > 0) --t.pos; else
 					if (i > 0 && t.pos < d && t.pos < t.last) ++t.pos; else return 0;
 					draw.screen();
-					cue.autoSave = true;
+					cue.autoSave = 1;
 					used.history = 'Undo';
 				} else {
 					if (i !== false) t.reversable = 0;
@@ -455,8 +455,8 @@ function drawEnd(event) {
 		}
 		if (sf & 4) used.move = 'Move'; else if (!(sf & 8) || mode.step) c2d.stroke();
 		historyAct();
-		cue.autoSave = true;
 		draw.active = draw.step = draw.btn = 0;
+		if (cue.autoSave < 0) autoSave(); else cue.autoSave = 1;
 		if (mode.click && event.shiftKey) return mode.click = 0, drawStart(event);
 	}
 	updateDebugScreen();
@@ -604,7 +604,7 @@ function fillScreen(i) {
 		c2d.fillStyle = 'rgb(' + tools[i].color + ')';
 		c2d.fillRect(0, 0, canvas.width, canvas.height);
 	}
-	cue.autoSave = false;
+	cue.autoSave = 0;
 	historyAct();
 }
 
@@ -803,7 +803,7 @@ var	d = (t ? new Date(t+(t > 0 ? 0 : new Date())) : new Date());
 }
 
 function timeElapsed() {text.timer.textContent = unixDateToHMS(timer += 1000, 1);}
-function autoSave() {if (mode.autoSave && cue.autoSave) {sendPic(2,true); cue.autoSave = false;}}
+function autoSave() {if (mode.autoSave && cue.autoSave && !(cue.autoSave = (draw.active?-1:0))) sendPic(2,true);}
 
 function sendMeta() {
 var	i, j = [];
@@ -842,7 +842,7 @@ var	a = auto || false, c, d, e, i, t;
 			LS[C1T] = draw.time.join('-')+(used.read?'-'+used.read:'');
 			id('saveTime').textContent = unixDateToHMS();
 			setClass(id('buttonL'), 'button');
-			cue.autoSave = false;
+			cue.autoSave = 0;
 		}
 		break;
 //* load
@@ -863,7 +863,7 @@ var	a = auto || false, c, d, e, i, t;
 		}
 		break;
 	case 4:	
-		if ((outside.read || (outside.read = id('read'))) && (a = outside.read.value)) {
+		if (a || ((outside.read || (outside.read = id('read'))) && (a = outside.read.value))) {
 			draw.time = [0, 0];
 			used.read = 'File Read: '+readPic(a);
 		}
@@ -903,7 +903,11 @@ var	a = auto || false, c, d, e, i, t;
 }
 
 function readPic(s) {
-var	d = 'read-img', i = id(d);
+	if (!s.data) s = {
+		name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)
+	,	data: s
+	};
+var	d = 'read-img'+(+new Date)+'-'+s.name, i = id(d);
 	if (!i) setId(i = new Image(), d);
 	i.setAttribute('onclick', 'return this.parentNode.removeChild(this) && false;');
 	i.onload = function () {
@@ -911,11 +915,41 @@ var	d = 'read-img', i = id(d);
 		updateDim();
 		c2d.drawImage(i,0,0);
 		historyAct();
-		cue.autoSave = false;
+		cue.autoSave = 0;
 		i.parentNode.removeChild(i);
 	}
 	draw.field.appendChild(i);
-	return (0 === (i.src = s).indexOf('data:')) ? s.split(',', 1) : s;
+	return i.src = s.data, s.name;
+}
+
+function dragOver(event) {
+	event.stopPropagation();
+	event.preventDefault();
+
+var	d = event.dataTransfer.files, e = d && d.length;
+	event.dataTransfer.dropEffect = e?'copy':'move';
+}
+
+function drop(event) {
+	event.stopPropagation();
+	event.preventDefault();
+
+var	d = event.dataTransfer.files, i = (d?d.length:0), f, r;
+	if (!window.FileReader || !i) return;
+	while (i--)
+	if ((f = d[i]).type.match('image.*')) {
+		(r = new FileReader()).onload = (function(f) {
+			return function(e) {
+				sendPic(4, {
+					name: f.name
+				,	data: e.target.result
+				});
+			};
+		})(f);
+		r.readAsDataURL(f);
+		return;
+	}
+	alert(lang.no_files);
 }
 
 function isMouseIn() {return (draw.o.x >= 0 && draw.o.y >= 0 && draw.o.x < canvas.width && draw.o.y < canvas.height);}
@@ -1001,7 +1035,7 @@ function hotWheel(event) {
 
 this.init = function() {
 	if (isTest()) document.title += ': '+NS+' '+INFO_VERSION;
-var	a, b, c = 'canvas', d = '<div id="', e = '"></div>', f, i, j, n = '\n	', o = outside, p, s;
+var	a, b, c = 'canvas', d = '<div id="', e = '"></div>', f, g, h, i, j, k, n = '\n	', o = outside, p, s = '&nbsp;';
 	setContent(container = id(),
 n+d+'load"><'+c+' id="'+c+'" tabindex="0">'+lang.no_canvas+'</'+c+'></div>'+
 //n+
@@ -1019,16 +1053,18 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	c2d.fillStyle = 'white';
 	c2d.fillRect(0, 0, o.w, o.h);
 
-	canvas.setAttribute('onscroll', f = 'return false;');
-	canvas.setAttribute('oncontextmenu', f);
-	document.addEventListener('mousedown'	, drawStart, f = false);
-	document.addEventListener('mousemove'	, drawMove, f);	//* <- using 'document' to prevent negative clipping
-	document.addEventListener('mouseup'	, drawEnd, f);
-	container.addEventListener('keypress'	, browserHotKeyPrevent, f);
-	container.addEventListener('keydown'	, hotKeys, f);
-	container.addEventListener('mousewheel'	, e = hotWheel, f);
-	container.addEventListener('wheel'	, e, f);
-	container.addEventListener('scroll'	, e, f);
+	document.addEventListener('dragover'	, dragOver	, f = false);
+	document.addEventListener('drop'	, drop		, f);
+	document.addEventListener('mousedown'	, drawStart	, f);
+	document.addEventListener('mousemove'	, drawMove	, f);	//* <- using 'document' to prevent negative clipping
+	document.addEventListener('mouseup'	, drawEnd	, f);
+	document.addEventListener('keypress'	, browserHotKeyPrevent, f);
+	document.addEventListener('keydown'	, hotKeys	, f);
+	document.addEventListener('mousewheel'	, e = hotWheel	, f);
+	document.addEventListener('wheel'	, e, f);
+	document.addEventListener('scroll'	, e, f);
+	canvas.setAttribute('onscroll'		, f = 'return false;');
+	canvas.setAttribute('oncontextmenu'	, f);
 
 	c = '</td><td class="r">', a = ': '+c+'	', e = n+'	', f = e+'	', b = e+d+'colors">'+d+'sliders">', i = BOW.length;
 	while (i--) {
@@ -1049,16 +1085,17 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	for (i in select.imgRes) d += (d?' x ':'')
 +'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')" title="'+lang.size_hint+select.imgLimits[i]+'">';
 
-	i = '<abbr title="';
+	b = '<abbr title="', h = '<span class="rf">', g = h+s+b
++NS.toUpperCase()+', '+INFO_ABBR+', '+lang.info_pad+', '+INFO_DATE+'">'+INFO_VERSION+'</abbr>.</span>';
+
 	setContent(id('info'), f+replaceAll(
 '<p class="L-open">'+lang.info_top+'</p>\
 |<p>	'+lang.info.join('|<br>	').replace(/\{([^};]+);([^}]+)}/g, a+'$1()">$2</a>')
-+':	'+i+(new Date())+'" id="saveTime">'+lang.info_no_save+'</abbr>.\
++':	'+h+b+(new Date())+'" id="saveTime">'+lang.info_no_save+'</abbr>.</span>\
 |<br>	'+a+'toggleView(\'timer\')" title="'+lang.hide_hint+'">'+lang.info_time+'</a>'
-+':	<span id="timer">'+lang.info_no_time+'</span>.\
++':	'+h+'<span id="timer">'+lang.info_no_time+'</span>.</span>\
 |</p>	<p class="L-close"> ', '|', f)
-+i+INFO_ABBR+b+NS.toUpperCase()+c+' '+lang.info_pad+' '
-+i+INFO_DATE+b+INFO_VERSION+c+'</p>'
++lang.info_drop+g+'</p>'
 +f+'<div>'+lang.size+':	'+d
 +f+'</div>'+e);
 
@@ -1067,15 +1104,15 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	draw.field = id('load');
 	draw.history.data = new Array(o.undo);
 
-	a = 'historyAct(', b = 'button', d = 'toggleMode(', e = 'sendPic(', f = 'fillScreen(', i = '&nbsp;';
+	a = 'historyAct(', b = 'button', d = 'toggleMode(', e = 'sendPic(', f = 'fillScreen(';
 	a = [
 //* subtitle, hotkey, pictogram, function, id
 	['undo'	,'Z'	,'&#x2190;'	,a+'-1)'	,b+'U'
 ],	['redo'	,'X'	,'&#x2192;'	,a+'1)'	,b+'R'
 ],
-0,	['fill'	,'F'	,i		,f+'0)'	,(a='color')+'F'
+0,	['fill'	,'F'	,s		,f+'0)'	,(a='color')+'F'
 ],	['swap'	,'S'	,'&#X21C4;'	,'toolSwap()'
-],	['erase','D'	,i		,f+'1)'	,a+'B'
+],	['erase','D'	,s		,f+'1)'	,a+'B'
 ],
 0,	['invert','I'	,'&#x25D0;'	,f+'-1)'
 ],	['flip_h','H'	,'&#x2194;'	,f+'-2)'
@@ -1085,14 +1122,14 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 ],	['eraser','E'	,'&#x25CB;'	,a+'2)'
 ],	['reset' ,'G'	,'&#x25CE;'	,a+'3)'
 ],
-0,	['line|area|copy','L'	,'&#x25C7;|&#x25A0;|&#x25A4;'	,d+'1)'	,(a='check')+'L'
-],	['curve|outline|rect','U'	,'&#x2307;|&#x25A1;|&#x25AD;'	,d+'2)'	,a+'U'
+0,	['line|area|copy','L'	,'&ndash;|&#x25A0;|&#x25A4;'	,d+'1)'	,(a='check')+'L'
+],	['curve|outline|rect','U'	,'~|&#x25A1;|&#x25AD;'	,d+'2)'	,a+'U'
 ],	['cursor','F3'	,'&#x25CF;'	,d+'4)'	,a+'V'
 ],
 0,	['png'	,'F9'	,'P'		,e+'0)'	,b+'P'
 ],	['jpeg'	,'F7'	,'J'		,e+'1)'	,b+'J'
-],	['save'	,'F2'	,'&#x22C1;'	,e+'2)'
-],	['load'	,'F4'	,'&#x22C0;'	,e+'3)'	,b+'L'
+],	['save'	,'F2'	,'!'	,e+'2)'
+],	['load'	,'F4'	,'?'	,e+'3)'	,b+'L'
 ],!o.read || 0 == o.read?1:
 	['read'	,'F6'	,'&#x21E7;'	,e+'4)'
 ],!o.send || 0 == o.send?1:
@@ -1104,28 +1141,26 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	function btnContent(e, subt, pict) {
 	var	t = lang.b[subt];
 		e.title = (t.t?t.t:t);
-		setContent(e, d+'key">'+b[1]+c+pict+d+'subtitle"><br>'+(t.t?t.sub:subt)+c);
+		setContent(e, d+'key">'+k[1]+c+pict+d+'subtitle"><br>'+(t.t?t.sub:subt)+c);
 		return e;
 	}
 
-	for (i in a) if (1 !== (b = a[i])) {
-		f.innerHTML += n+(b?'':'&nbsp;')+'	';	//* <- need any whitespace for correct visual result
-		if (b) {
-			e = document.createElement('span');
+	for (i in a) if (1 !== (k = a[i])) {
+		if (k) {
+			e = document.createElement(b);
 
-			if (b[0].indexOf('|') > 0) {
-				s = b[0].split('|');
-				p = b[2].split('|');
-				for (j in s) setClass(e.appendChild(btnContent(document.createElement('span'), s[j], p[j])), 'abc'[j]);
-			} else btnContent(e, b[0], b[2]);
+			if (k[0].indexOf('|') > 0) {
+				s = k[0].split('|');
+				p = k[2].split('|');
+				for (j in s) setClass(e.appendChild(btnContent(document.createElement('div'), s[j], p[j])), 'abc'[j]);
+			} else btnContent(e, k[0], k[2]);
 
-			setClass(e, 'button');
-			setEvent(e, 'onclick', b[3]);
-			if (b.length > 4) setId(e, b[4]);
+			setClass(e, b);
+			setEvent(e, 'onclick', k[3]);
+			if (k.length > 4) setId(e, k[4]);
 			f.appendChild(e);
-		}
+		} else f.innerHTML += '&nbsp;';
 	}
-	f.innerHTML += '	';
 	for (name in mode) if (mode[modes[i = modes.length] = name]) toggleMode(i,1);
 
 	if (!LS || !LS[C1T]) setClass(id('buttonL'), 'button-disabled');
@@ -1141,7 +1176,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 		id('slider'+BOWL[i]).appendChild(e);
 	} else 	id(a+BOWL[i]).type = b;
 
-	for (i in (a = ['a', 'input', 'select', 'span']))
+	for (i in (a = ['a', 'input', 'select', 'span', 'button']))
 	for (c in (b = container.getElementsByTagName(a[i])))
 	for (e in (d = ['onchange', 'onclick', 'onmouseover'])) if ((f = b[c][d[e]]) && !self[f = (''+f).match(regFunc)[1]]) self[f] = eval(f);
 
@@ -1225,6 +1260,7 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 ,	confirm_load:	'Вернуть рисунок из Локального Хранилища?'
 ,	found_swap:	'Рисунок был в запасе, поменялись местами.'
 ,	no_LS:		'Локальное Хранилище недоступно.'
+,	no_files:	'Среди файлов не найдено изображений.'
 ,	no_form:	'Назначение недоступно.'
 ,	no_change:	'Нет изменений.'
 ,	no_canvas:	'Ваша программа не поддерживает HTML5-полотно.'
@@ -1250,7 +1286,8 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 ],	info_no_save:	'ещё не было'
 ,	info_no_time:	'ещё нет'
 ,	info_time:	'Времени прошло'
-,	info_pad:	'— доска для набросков,'
+,	info_pad:	'доска для набросков'
+,	info_drop:	'Можно перетащить сюда файлы с диска.'
 ,	size:		'Размер полотна'
 ,	size_hint:	'Число между '
 , b: {	undo:	{sub:'назад',	t:'Отменить последнее действие.'
@@ -1290,6 +1327,7 @@ else lang = {
 ,	confirm_load:	'Restore image from your Local Storage?'
 ,	found_swap:	'Found image at slot 2, swapped slots.'
 ,	no_LS:		'Local Storage not supported.'
+,	no_files:	'No image files found.'
 ,	no_form:	'Destination unavailable.'
 ,	no_change:	'Nothing changed.'
 ,	no_canvas:	'Your browser does not support HTML5 canvas.'
@@ -1316,6 +1354,7 @@ else lang = {
 ,	info_no_time:	'no yet'
 ,	info_time:	'Time elapsed'
 ,	info_pad:	'sketch pad'
+,	info_drop:	'You can drag files from disk and drop here.'
 ,	size:		'Image size'
 ,	size_hint:	'Number between '
 , b: {	undo:	'Revert last change.'
@@ -1355,45 +1394,50 @@ May not work in some browsers until set to load and show new images automaticall
 
 document.addEventListener('DOMContentLoaded', this.init, false);
 document.write(replaceAll(replaceAdd('\n<style>\
-#| canvas {border: 1px solid #aaa; margin: 0; vertical-align: bottom; cursor: \
-/*2x2*/	url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mNgYGCYUFdXN4EBRPz//38CADX3CDIkWWD7AAAAAElFTkSuQmCC\')\
-,	auto; /*-webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; -o-user-select: none; user-select: none;*/}\
-#| a {color: #888;}\
-#| input[type="text"] {width: 48px;}\
+#| .|-L-close {padding-bottom: 24px; border-bottom: 1px solid #000; border-right: 1px solid #000;}\
+#| .|-L-open {padding-top: 24px; border-top: 1px solid #000; border-left: 1px solid #000;}\
+#| .|-button {background-color: #ddd;}\
+#| .|-button-active {background-color: #ace;}\
+#| .|-button-active:hover {background-color: #bef;}\
+#| .|-button-disabled {color: gray; cursor: default;}\
+#| .|-button-key, #| .|-button-subtitle {vertical-align: top; height: 10px; font-size: 9px; margin: 0; padding: 0;}\
+#| .|-button-key, #|-debug {text-align: left;}\
+#| .|-button-subtitle {line-height: 6px; margin: 0 -3px;}\
+#| .|-button:hover {background-color: #eee;}\
+#| .|-paletdark, #| .|-palettine {border: 2px solid transparent; height: 15px; width: 15px; cursor: pointer;}\
+#| .|-paletdark:hover {border-color: #fff;}\
+#| .|-palettine:hover {border-color: #000;}\
+#| .|-r {text-align: right;}\
+/*#| .|-rf {display: block; float: right;}\
+*/#| a {color: #888;}\
+#| a:hover {color: #000;}\
+#| abbr {border-bottom: 1px dotted #111;}\
+#| canvas {border: 1px solid #aaa; margin: 0; vertical-align: bottom; cursor:\
+	url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mNgYGCYUFdXN4EBRPz//38CADX3CDIkWWD7AAAAAElFTkSuQmCC\'),\
+	auto;}\
 #| input[type="range"] {width: 156px; height: 16px; margin: 0; padding: 0;}\
+#| input[type="text"] {width: 48px;}\
 #| select, #| #|-color-text {width: 78px;}\
-#|-debug td {width: 234px;}\
 #| {text-align: center; padding: 12px; background-color: #f8f8f8;}\
 #|, #| input, #| select {font-family: "Arial"; font-size: 14pt; line-height: normal;}\
-#|-bottom > span {font-family: "Arial Unicode MS"; line-height: 7px; border: 1px solid #000; width: 32px; height: 32px; padding: 2px; cursor: pointer; text-align: center; display: inline-block;}\
-#|-bottom {margin-top: 12px;}\
-#|-info p {padding-left: 32px; line-height: 22px; margin: 0;}\
+#|-bottom > button {border: 1px solid #000; width: 38px; height: 38px; margin: 2px; padding: 2px; font-size: 15px; line-height: 7px; text-align: center; cursor: pointer;}\
+#|-bottom {margin: 10px 0 -2px;}\
+#|-debug td {width: 234px;}\
+#|-info p {padding-left: 22px; line-height: 22px; margin: 0;}\
 #|-info p, #|-palette-table table {color: #000; font-size: small;}\
-#|-right span > input[type="text"] {margin: 2px;}\
-#|-right table, #|-info > div {margin-top: 7px;}\
-#|-right table {border-collapse: collapse;}\
-#|-right td {padding: 0 2px; height: 32px;}\
-#|-right {color: gray; width: 321px; margin: 0; margin-left: 12px; text-align: left; display: inline-block; vertical-align: top; overflow-x: hidden;}\
+#|-load img {position: absolute; top: 1px; left: 1px; margin: 0;}\
+#|-load, #|-load canvas {position: relative; display: inline-block;}\
 #|-palette-table .|-t {padding: 0 4px;}\
 #|-palette-table table {margin: 0;}\
-#|-palette-table td {margin: 0; padding: 0; height: 16px;}\
-#|-palette-table {overflow-y: scroll; height: 171px; margin: 7px 0 12px 0;}\
-#|-load, #|-load canvas {position: relative; display: inline-block;}\
-#|-load img {position: absolute; top: 1px; left: 1px; margin: 0;}\
-.|-L-close {padding-bottom: 24px; border-bottom: 1px solid #000; border-right: 1px solid #000;}\
-.|-L-open {padding-top: 24px; border-top: 1px solid #000; border-left: 1px solid #000;}\
-.|-button {background-color: #ddd;}\
-.|-button-active {background-color: #ace;}\
-.|-button-active:hover {background-color: #bef;}\
-.|-button-disabled {color: gray; cursor: default;}\
-.|-button-key, #|-debug {text-align: left;}\
-.|-button-key, .|-button-subtitle {vertical-align: top; height: 10px; font-size: 9px; margin: 0; padding: 0;}\
-.|-button-subtitle {margin: 0 -3px;}\
-.|-button:hover {background-color: #eee;}\
-.|-paletdark, .|-palettine {border: 2px solid transparent; height: 15px; width: 15px; cursor: pointer;}\
-.|-paletdark:hover {border-color: #fff;}\
-.|-palettine:hover {border-color: #000;}\
-.|-r {text-align: right;}\
-.|-a .|-a, .|-b .|-b, .|-c .|-c {display: none;}\
+#|-palette-table tr td {margin: 0; padding: 0; height: 16px;}\
+#|-palette-table {overflow-y: auto; max-height: 178px; margin: 0 0 12px 0;}\
+#|-right span > input[type="text"] {margin: 2px;}\
+#|-right table {border-collapse: collapse;}\
+#|-right table, #|-info > div {margin-top: 7px;}\
+#|-right td {padding: 0 2px; height: 32px;}\
+#|-right {color: gray; width: 321px; margin: 0; margin-left: 12px; text-align: left; display: inline-block; vertical-align: top; overflow-x: hidden;}\
+#| .|-a .|-a,\
+#| .|-b .|-b,\
+#| .|-c .|-c {display: none;}\
 </style>', '}', '\n'), '|', NS)+'\n<div id="'+NS+'">Loading '+NS+'...</div>\n');
 };
