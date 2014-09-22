@@ -5,15 +5,14 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 
 //* Configuration *------------------------------------------------------------
 
-,	INFO_VERSION = 'v1.7c'
-,	INFO_DATE = '2014-07-16 — 2014-08-19'
+,	INFO_VERSION = 'v1.11'
+,	INFO_DATE = '2014-07-16 — 2014-09-22'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
-,	A0 = 'transparent', IJ = 'image/jpeg'
+,	A0 = 'transparent', IJ = 'image/jpeg', SO = 'source-over', DO = 'destination-out'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers'
-,	C1R, C1T, C1L, C2R, C2T, C2L
 ,	LS = window.localStorage || localStorage
 ,	DRAW_PIXEL_OFFSET = -0.5
-,	DRAW_HELPER = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123,123,123,0.5)'}
+,	DRAW_HELPER = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123,123,123,0.5)', globalCompositeOperation: SO}
 
 ,	mode = {debug:	false
 	,	shape:	false	//* <- straight line	/ fill area	/ copy
@@ -24,17 +23,17 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 	,	limitFPS:	false
 	,	autoSave:	true
 	,	globalHistory:	false
-	}, modes = [], modeL = 'DLUQEVFAG', flushCursor = false, neverFlushCursor = true
+	}, modes = [], modeL = 'DLUQEVFAG'
 
 ,	RANGE = {
 		B: {min: 0   , max: 100, step: 1}
 	,	O: {min: 0.01, max: 1  , step: 0.01}
 	,	W: {min: 1   , max: 100, step: 1}
-	}, BOW = ['blur', 'opacity', 'width'], BOWL = 'BOW'
+	}, BOW = ['grid', 'blur', 'opacity', 'width'], BOWL = 'GBOW'
 
 ,	TOOLS_REF = [
-		{blur: 0, opacity: 1.00, width:  1, color: '0, 0, 0'}		//* <- draw
-	,	{blur: 0, opacity: 1.00, width: 10, color: '255, 255, 255'}	//* <- back
+		{grid: 1, blur: 0, opacity: 1.00, width:  1, clip: SO, color: '0,0,0'}		//* <- draw
+	,	{grid: 0, blur: 0, opacity: 1.00, width: 20, clip: DO, color: '255,255,255'}	//* <- back
 	], tools = [{}, {}], tool = tools[0]
 
 ,	select = {
@@ -42,11 +41,13 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 	,	imgLimits: {width:[64,640], height:[64,800]}
 	,	lineCaps: {lineCap:0, lineJoin:0}
 	,	shapeFlags: [1,10,2,2,2,4]
+	,	clipBorder: ['', '#123', '#5ea']//, '#5ae', '#ff0', '#f40']
 	,	options: {
 			shape	: ['line', 'poly', 'rectangle', 'circle', 'ellipse', 'pan']
 		,	lineCap	: ['round', 'butt', 'square']
 		,	lineJoin: ['round', 'bevel', 'miter']
-		,	blurType: ['scale', 'integral']
+		,	filter	: ['scale', 'integral']
+		,	compose	: [SO, 'destination-over', 'source-atop', 'destination-atop', 'lighter', 'xor', DO]
 		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient']
 	}}
 
@@ -114,7 +115,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 ,	fps = 0, ticks = 0, timer = 0
 ,	interval = {fps:0, timer:0, save:0}, text = {debug:0, timer:0}
 ,	ctx = {}, cnv = {view:0, draw:0, lower:0, current:0, upper:0, filter:0, temp:0}
-,	used = {}, cue = {upd:{}}, count = {layers:0, strokes:0, undo:0}
+,	used = {}, cue = {upd:{}}, count = {layers:0, strokes:0, erases:0, undo:0}
 
 ,	draw = {m:{}, o:{}, cur:{}, prev:{}
 	,	refresh:0, time: [0, 0]
@@ -136,7 +137,7 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 					cue.autoSave = 1;
 				} else {
 			//* 0 or timestamp: Write
-				var	dt = i || (+new Date());
+				var	dt = i || (+new Date);
 					if (i !== false) t.reversable = 0;
 					else if (t.reversable) return 0;
 					else t.reversable = 1, draw.view();
@@ -159,12 +160,14 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 				} : {	draw: [c,c]
 				}
 			), j, k, l, t, s = this.shift || 0, z;
+			for (i in ctx) ctx[i].globalCompositeOperation = SO;
 			for (i in a) {
 				ctx[i].clearRect(0, 0, cnv.view.width, cnv.view.height);
 				for (j = a[i][0], l = a[i][1]; j <= l; j++) if (j && (t = d[j]).show && (k = y.cur(j))) {
 					if (j == c) ctx[i].putImageData(k, 0, 0);
 					else {
-						if (t.flag && !(k = getClippedImageData(k, j))) continue;
+						if (t.clip && !(k = getClippedImageData(k, j))) continue;
+						ctx.temp.clearRect(0, 0, cnv.view.width, cnv.view.height);
 						ctx.temp.putImageData(k, 0, 0);
 						if (t.blur) filterCanvas(t.blur, t.filter);
 						ctx[i].globalAlpha = t.alpha/RANGE.A.max;
@@ -182,10 +185,10 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 				ctx.view.fillRect(0, 0, cnv.view.width, cnv.view.height);
 			} else ctx.view.clearRect(0, 0, cnv.view.width, cnv.view.height);
 			for (i in a) {
-				j = a[i];
+				ctx[j = a[i]].globalCompositeOperation = SO;
 				if (c && i == 1) {
 					l = d[c];
-					if (l.flag) {
+					if (l.clip) {
 						k = ctx[j].getImageData(0, 0, cnv.view.width, cnv.view.height), l = getClippedImageData(k);
 						if (!l) continue;
 						ctx[j].putImageData(l, 0, 0);
@@ -202,7 +205,7 @@ function historyAct(i) {
 var	y = draw.history, c = y.layer, d = y.layers, z = d.length, x;
 //* global history timeline:
 	if (!c) {
-		if (i === 1) c = +new Date(); else
+		if (i === 1) c = +new Date; else
 		if (i === -1); else return;
 		function wiz(callback) {
 			z = d.length;
@@ -219,8 +222,8 @@ var	y = draw.history, c = y.layer, d = y.layers, z = d.length, x;
 	} else
 //* separate history per layer:
 	if (y.act(i)) {
-		if ((x = d[0].max) && (z == x)) {
-		//* after loading saved layers stack, reorder as saved:
+		if ((x = d[0].max) && (x == z)) {
+//* after loading saved layers stack, reorder as saved:
 			c = [d[0]], delete d[0].max;
 			while (--z) x = d[z], c[x.z] = x, delete x.z;
 			y.layers = c, selectLayer(0,1);
@@ -314,7 +317,8 @@ var	u = (y.layer != x || ui_rewrite);
 			z = id('slider'+i).lastElementChild, z.value = x[a[i]] || 0;
 			if (u) updateSliders(z);
 		}
-		id('blurType').value = x.filter || 0;
+		a = ['compose','filter'];
+		for (i in a) if (z = id(a[i])) z.value = x[i] || 0;
 	}
 //* show/hide:
 	z = id('layers');
@@ -324,14 +328,15 @@ var	u = (y.layer != x || ui_rewrite);
 function tweakLayer(e,i,t) {
 	if (draw.active) drawEnd();
 var	y = draw.history, d = y.layers;
+	if (isNaN(i) || i < 0) i = y.layer;
 	if (!t) return (isNaN(t)
 		? (e.id
-			? (d[isNaN(i) ? (i = y.layer) : i].filter = e.value)
+			? (d[i][t?'compose':'filter'] = e.value)
 			: (d[i].show = e.checked?1:0))
-		: (e.parentNode.style.backgroundColor = (d[i].flag = (d[i].flag?0:1))?'#5ea':'')
+		: (e.parentNode.style.backgroundColor = select.clipBorder[d[i].clip = (d[i].clip?d[i].clip+1:2) % select.clipBorder.length])
 	), draw.view(2);
 
-var	v = d[i][['name','blur','alpha'][--t]] = (isNaN(e) ? e.value : e);
+var	v = d[i][['name','blur','alpha'][--t]] = (typeof e === 'object' ? e.value : e);
 	if (t && i
 	&& (e = id('layer'+i))
 	&& (e = e.lastElementChild.lastElementChild.previousSibling)
@@ -354,7 +359,7 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 		while (k--) if (a = z[parseInt(j[k].id.match(regLastNum)[1])]) {
 			j[k].className = j[k].className.replace(b+'-active', b);
 			i = j[k].getElementsByTagName('input');
-			i[0].parentNode.style.backgroundColor = a.flag?'#5ea':'';
+			i[0].parentNode.style.backgroundColor = select.clipBorder[a.clip] || '';
 			if (ui_tweak === 2 && !i[0].checked != !a.show) i[0].checked = !!a.show;
 			if (i.length > 1) {
 				if (i[1].value != a.name) i[1].value = a.name;
@@ -373,6 +378,7 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 		}
 		if (i = id(l+c)) {
 			i.className = i.className.replace(b, b+'-active');
+			if (scroll && c > 0) i.scrollIntoView();
 		}
 	} else {
 //* HTML reset, slower, resets scroll:
@@ -382,7 +388,7 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 			j += (j?(i?'':'</div><hr>'):'<hr>')
 			+'<p class="'+b+(i == c?'-active':'')
 			+'" onClick="selectLayer('+i+')" id="'+l+i+'"><i>'+k+lang.layer.hint.check
-			+(a.flag?'" style="background-color:#5ea':'')
+			+(a.clip?'" style="background-color:#5ea':'')
 			+'"><input type="checkbox" onChange="'	+'tweakLayer(this,'+i+')"'+(a.show?' checked':'')
 			+(i?' onContextMenu="'			+'tweakLayer(this,'+i+',0);return false"':'')+'></i><i>'
 			+(i?	'<input type="text" onChange="'	+'tweakLayer(this,'+i+',1)" value="'
@@ -395,8 +401,8 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 				+h+'</button>'+lang.layer.bg
 			)+'</i></i></p>';
 		}
-		clearContent(e), setContent(e, j), i = id(l+c);
-		if (i && c < z.length-10) i.scrollIntoView();	//* <- param: none/true=alignWithTop, false=bottom
+		clearContent(e), setContent(e, j);
+		if (c > 0 && c < z.length-10 && (i = id(l+c))) i.scrollIntoView();	//* <- param: none/true=alignWithTop, false=bottom
 	}
 	i = z.length-1, j = {U:i,T:i, D:1,B:1,M:1, C:0,E:0}, d = b+'-disabled';
 	for (i in j) setClass(id(l+i), (!c || c == j[i]) ?d:b);
@@ -411,9 +417,9 @@ function setBG(i) {
 
 function getClippedImageData(d, i) {
 var	y = draw.history, l = y.layers, c = i || y.layer, a;
-	while (l[--c].flag);
+	while (l[--c].clip);
 	if (!c || !l[c].show || !(a = l[c].alpha) || !(c = y.cur(c))) return 0;
-	y = ctx.temp.createImageData(cnv.view.width, cnv.view.height), i = y.data.length, used.clip = 'Clip', a /= RANGE.A.max*255;
+	y = ctx.temp.createImageData(cnv.view.width, cnv.view.height), i = y.data.length, a /= RANGE.A.max*255;
 	while (i--) y.data[i] = (i%4 == 3 ? Math.floor(c.data[i]*d.data[i]*a) : d.data[i]);
 	return y;
 }
@@ -548,11 +554,24 @@ var	c = ii.context, d = ii.imageData, p = ii.pixels;
 //* Strokes and shapes *-------------------------------------------------------
 
 function drawCursor() {
-var	c = ctx.view;
+var	c = ctx[mode.brushView?'draw':'view'], d = tool.grid;
+	if (d > 1) {
+	var	m, n = Math.floor(tool.width / d), o = draw.o, v = (n < 1 ? (n = 1) : n)*d, w = v+DRAW_PIXEL_OFFSET, v = v-DRAW_PIXEL_OFFSET;
+		for (i in DRAW_HELPER) c[i] = DRAW_HELPER[i];
+		c.beginPath();
+		for (i = -n; i <= n; i++) {
+			m = i*d+DRAW_PIXEL_OFFSET;
+			c.moveTo(o.x+m, o.y-v);
+			c.lineTo(o.x+m, o.y+w);
+			c.moveTo(o.x-v, o.y+m);
+			c.lineTo(o.x+w, o.y+m);
+		}
+		c.stroke();
+	}
 	if (mode.brushView) {
-		c = ctx.draw;
 		c.fillStyle = 'rgba('+tool.color+', '+tool.opacity+')';
 		c.shadowColor = (c.shadowBlur = tool.blur) ? 'rgb('+tool.color+')' : A0;
+		c.globalCompositeOperation = tool.clip;
 	} else {
 		c.strokeStyle = 'rgb(123,123,123)';
 		c.shadowColor = A0;
@@ -562,10 +581,13 @@ var	c = ctx.view;
 	c.beginPath();
 	c.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7/*Math.PI*2*/, false);
 	mode.brushView ? c.fill() : c.stroke();
+	c.globalCompositeOperation = SO;
 }
 
 function drawStart(event) {
+	draw.target = event.target;
 	if (isMouseIn() <= 0) return false;
+
 	cnv.view.focus();
 	event.preventDefault();
 	event.stopPropagation();
@@ -603,27 +625,30 @@ var	y = draw.history, i = y.layer, sf = select.shapeFlags[select.shape.value];
 	if ((draw.btn = event.which) != 1 && draw.btn != 3) pickColor();
 	else {
 		draw.active = 1, y = {draw:0, temp:0};
-		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date();
+		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date;
 		if (!interval.timer) {
 			interval.timer = setInterval(timeElapsed, 1000);
 			interval.save = setInterval(autoSave, 60000);
 		}
+	var	i = (event.which == 1)?1:0, j, t = tools[1-i]
+	,	b = ((sf & 4) ? 0 : t.blur)
+	,	pf = ((sf & 8) && (mode.shape || !mode.step))
+	,	fig = ((sf & 2) && (mode.shape || pf));
+		draw.clip = t.clip;
+		for (i in (t = mode.erase ? DRAW_HELPER : {
+			lineWidth: (((sf & 4) || (pf && !mode.step))?1:t.width)
+		,	fillStyle: (fig ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
+		,	strokeStyle: (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+((sf & 4)?(draw.step?0.33:0.66):t.opacity)+')')
+		,	shadowColor: (b ? 'rgb('+t.color+')' : A0)
+		,	shadowBlur: b
+		})) for (j in y) ctx[j][i] = t[i];
+		updatePosition(event);
 		for (i in draw.o) draw.prev[i] = draw.cur[i];
 		for (i in draw.line) draw.line[i] = false;
 		for (i in select.lineCaps) {
 			t = select.options[i][select[i].value];
 			for (j in y) ctx[j][i] = t;
 		}
-	var	i = (event.which == 1)?1:0, j, t = tools[1-i]
-	,	pf = ((sf & 8) && (mode.shape || !mode.step))
-	,	fig = ((sf & 2) && (mode.shape || pf));
-		for (i in (t = mode.erase ? DRAW_HELPER : {
-			lineWidth: (((sf & 4) || (pf && !mode.step))?1:t.width)
-		,	fillStyle: (fig ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
-		,	strokeStyle: (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+((sf & 4)?(draw.step?0.33:0.66):t.opacity)+')')
-		,	shadowColor: (t.blur ? 'rgb('+t.color+')' : A0)
-		,	shadowBlur: t.blur
-		})) for (j in y) ctx[j][i] = t[i];
 		ctx.draw.beginPath();
 		ctx.draw.moveTo(draw.cur.x, draw.cur.y);
 	}
@@ -653,13 +678,14 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 		draw.line.back =	!(draw.line.started = true);
 	}
 	if (mode.limitFPS) {
-	var	t = +new Date();
+	var	t = +new Date;
 		if (t-draw.refresh > 30) draw.refresh = t; else redraw = false;		//* <- put "> 1000/N" to redraw maximum N FPS
 	}
 	if (redraw && ((i = isMouseIn()) > 0 || draw.active)) {
 		redraw = 0;
 		if (i || (draw.active && !mode.lowQ)) draw.preload(), ++redraw;
 		if (draw.active) {
+			if (!(sf & 4)) ctx.draw.globalCompositeOperation = draw.clip;
 			if ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)) {
 				draw.line.preview = true;
 				if (mode.erase && (sf & 2)) {
@@ -688,8 +714,10 @@ function drawEnd(event) {
 	if (!event || draw.turn) return draw.active = draw.step = draw.btn = draw.turn = 0;
 	if (mode.click == 1 && event.shiftKey) return drawMove(event);
 	if (draw.active) {
+		if (draw.target != cnv.view) return;
+		draw.target = 0;
 	var	s = select.shape.value, sf = select.shapeFlags[s], m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8));
-	//* 2pt line for 4pt curve:
+	//* 2pt line, base for 4pt curve:
 		if (!draw.step && mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
 			draw.step = {
 				prev:{x:draw.prev.x, y:draw.prev.y}
@@ -698,7 +726,7 @@ function drawEnd(event) {
 			return;
 		}
 		for (i in DRAW_HELPER) ctx.temp[i] = DRAW_HELPER[i];
-		draw.time[1] = +new Date();
+		draw.time[1] = +new Date;
 		draw.preload();
 		if (mode.erase) {
 			if (sf & 8) {
@@ -708,8 +736,10 @@ function drawEnd(event) {
 				ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
 				ctx.draw.restore();
 			} else drawShape(ctx.draw, s, 1);
+			++count.erases;
 		} else {
 			ctx.draw.fillStyle = ctx.temp.fillStyle;
+			if (i = (sf & 4) ? 0 : ((ctx.draw.globalCompositeOperation = draw.clip) == DO)) ++count.erases;
 			if (sf & 8) {
 				ctx.draw.closePath();
 				if (mode.shape || !mode.step) ctx.draw.fill();
@@ -725,9 +755,10 @@ function drawEnd(event) {
 			if (sf & 4) used.move = 'Move';
 			else if (!(sf & 8) || mode.step) {
 				ctx.draw.stroke();
-				++count.strokes;
+				if (!i) ++count.strokes;
 			}
 		}
+		ctx.draw.globalCompositeOperation = SO;
 		historyAct();
 		draw.active = draw.step = draw.btn = 0;
 		if (cue.autoSave < 0) autoSave(); else cue.autoSave = 1;
@@ -818,22 +849,21 @@ var	s = draw.step, r = draw.cur, v = draw.prev;
 //* One-click all-screen manipulation *----------------------------------------
 
 function moveScreen(dx, dy, fin) {
-var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape;
+var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape, v = cnv.view;
 	if (z) {
-		d = y.cur();
-		if (!d) return;
-		c = ctx.draw;
+		if (d = y.cur()) (c = ctx.draw).putImageData(d, 0, 0);
+		else return;
 	} else {
 		if (fin) {
-			y.layer = y.layers.length, t = +new Date();
+			y.layer = y.layers.length, t = +new Date;
 			while (--y.layer) moveScreen(dx, dy), historyAct(t);
 			return updateLayers();
 		} else {
 			draw.preload(1);
-		var	c = ctx.upper, d = c.getImageData(0, 0, cnv.view.width, cnv.view.height);
+		var	c = ctx.upper, d = c.getImageData(0, 0, v.width, v.height);
 		}
 	}
-	ctx.temp.clearRect(0, 0, cnv.view.width, cnv.view.height);
+	ctx.temp.clearRect(0, 0, v.width, v.height);
 	if (p) {
 		for (i in {min:0,max:0}) p[i] = {
 			x:Math[i](p.cur.x, p.prev.x)
@@ -844,17 +874,20 @@ var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape;
 		if (n) c.clearRect(p.min.x, p.min.y, p.max.x, p.max.y);
 		ctx.temp.putImageData(d, dx, dy, p.min.x, p.min.y, p.max.x, p.max.y);
 	} else {
-		if (n) c.clearRect(0, 0, cnv.view.width, cnv.view.height);
+		if (n) c.clearRect(0, 0, v.width, v.height);
 		ctx.temp.putImageData(d, dx, dy);
 	}
 	c.drawImage(cnv.temp, 0, 0);
 }
 
-function fillCheck() {
-var	d = ctx.view.getImageData(0, 0, cnv.view.width, cnv.view.height), i = d.data.length;
-	while (--i) if (d.data[i] != d.data[i%4]) return 0;
-//* fill flood confirmed:
-	return 1;
+function fillCheck(c) {
+	if (c && !(c = draw.history.cur())) return [0,0,0,255];
+var	d = (c?c:ctx.view.getImageData(0, 0, cnv.view.width, cnv.view.height)).data, i = d.length, r = [];
+	while (i--)
+	if (i < 4) r[i] = d[i]; else
+	if (d[i] != d[i%4]) return 0;
+//* fill flood confirmed, return its color:
+	return r;
 }
 
 function fillScreen(i,t) {
@@ -863,7 +896,7 @@ function fillScreen(i,t) {
 		if (isNaN(i)) return false;
 		if (i < 0) {
 			if (i == -1) l[0].color = hex2inv(l[0].color);
-			y.layer = l.length, t = +new Date();
+			y.layer = l.length, t = +new Date;
 			while (--y.layer) fillScreen(i,t);
 		} else l[0].color = rgb2hex(tools[i].color);
 		return updateLayers();
@@ -1163,16 +1196,9 @@ function updateSliders(s) {
 			return updateSlider(i);
 		}
 		return updateSlider(prop, s);
-	} else {
-		if (s) updateSlider(s); else
-		for (i in BOW) updateSlider(i);
-		if (draw.o.length) {
-			drawEnd();
-			s = tool.width+4;
-			ctx.draw.putImageData(draw.history.cur(), 0, 0, draw.o.x - s/2, draw.o.y - s/2, s, s);
-			drawCursor();
-		}
 	}
+	if (s) updateSlider(s); else
+	for (i in BOW) updateSlider(i);
 }
 
 function updateShape(s) {
@@ -1204,10 +1230,8 @@ function updateDim(i) {
 			v > (b = select.imgLimits[i][1]) ? b : v)
 		);
 		for (j in cnv) cnv[j][i] = v;
-		if (v > c) {
-		//	draw.view();
-			historyAct(0);
-		}
+		if (v > c) //historyAct(0),
+			draw.view(2);
 	}
 	container.style.minWidth = (v = cnv.view.width)+'px';
 	if (a = outside.restyle) {
@@ -1218,9 +1242,16 @@ function updateDim(i) {
 	}
 }
 
+function updateEraser() {
+var	a = select.affect, i = a.value, a = (i == a.length-1), b = 'button', e = id(b+'E');
+	tool.clip = select.options.affect[i];
+	if (e) setClass(e, b+(a?'-active':''));
+	return a;
+}
+
 function toggleMode(i, keep) {
 	if (i >= 0 && i < modes.length) {
-	var	n = modes[i], v = mode[n];
+	var	n = modes[i], v = mode[n], e;
 		if (!keep) v = mode[n] = !v;
 		if (e = id('check'+modeL[i])) {
 			setClass(e, 'button'+(v?'-active':''));
@@ -1246,33 +1277,44 @@ function toolTweak(prop, value) {
 }
 
 function toolSwap(t) {
+var	i, j, k = select.affect;
+
 //* exchange working sets
 	if (isNaN(t)) {
 		t = tools[0];
 		tool = tools[0] = tools[1];
 		tools[1] = t;
 	} else
-//* restore front set to one of defaults, line shape
+
+//* restore all defaults
+	if (t > TOOLS_REF.length) {
+		for (j in TOOLS_REF)
+		for (i in TOOLS_REF[j]) tools[j][i] = TOOLS_REF[j][i];
+		for (i in select.lineCaps) select[i].value = 0;
+		toolSwap(-1);
+		tool.width = t;
+	} else
+
+//* restore front set to one of defaults + line shape
 	if (t > 0) {
-	var	t = TOOLS_REF[t-1], i;
-		for (i in t) tool[i] = t[i];
+		for (i in (t = TOOLS_REF[t-1])) tool[i] = t[i];
 		updateShape(0);
 	} else
+
 //* drop switches, set shape
 	if (t) {
 		if (mode.shape) toggleMode(1);
 		if (mode.step) toggleMode(2);
 		return updateShape(-t-1);
-//* restore all defaults
+
+//* toggle eraser mode
 	} else {
-		for (t in TOOLS_REF)
-		for (i in TOOLS_REF[t]) tools[t][i] = TOOLS_REF[t][i];
-		for (i in select.lineCaps) select[i].value = 0;
-		toolSwap(-1);
-		tool.width = 3; //* <- arbitrary default
+		return k.value = (k.value > 0?0:k.length-1), updateEraser();
 	}
+	i = select.options.affect.indexOf(tool.clip), k.value = (i < 0?0:i);
 	updateColor(tool.color);
 	updateColor(0,1);
+	updateEraser();
 	updateSliders();
 }
 
@@ -1289,16 +1331,34 @@ var	d = t ? new Date(t+(t >0?0:new Date())) : new Date(), t = ['Hours','Minutes'
 	return y ? t[0]+'-'+t[1]+'-'+t[2]+' '+t[3]+':'+t[4]+':'+t[5] : t.join(':');
 }
 
-function getSendMeta() {
-var	i, j = [], d = [], t = outside.t0;
-	for (i in draw.time) d[i] = parseInt(draw.time[i]) || (i > 0?+new Date():t);
-	for (i in count) if (count[i] > 1 || (i == 'undo' && count[i] > 0)) j.push(count[i]+' '+i);
+function getSendMeta(sz) {
+var	a = ['clip', 'mask', 'lighter', 'xor']
+,	b = ['resize', 'integral']
+,	d = draw.time, h = draw.history.layers, i, j = [], k, l, m = [], n = [], u = [], t = outside.t0;
+	for (i in d) u[i] = parseInt(d[i]) || (i > 0?+new Date:t);
+	for (i in count) if ((k = count[i]) > 1 || (i != 'layers' && k > 0)) j.push(k+' '+(k > 1?i:i.replace(/s+$/i, '')));
 	for (i in used) j.push(used[i]);
-	return Math.floor(t/1000)+','+d.join('-')+','+NS+' '+INFO_VERSION + (j.length?' (used '+j.join(', ')+')':'');
+	for (i in h) {
+		l = h[i];
+		if (l.clip > 0 && m.indexOf(k = a[l.clip    - 2]) < 0) m.push(k);
+		if (l.blur > 0 && m.indexOf(k = b[l.filter || 0]) < 0) n.push(k);
+	}
+	if (m.length) j.push('Composition: '+m.join(', '));
+	if (n.length) j.push('Filter: '+n.join(', '));
+//	return Math.floor(t/1000)+','+u.join('-')+','+NS+' '+INFO_VERSION + (j.length?' (used '+j.join(', ')+')':'');
+	return 't0: '	+Math.floor(t/1000)
+	+'\ntime: '	+u.join('-')
+	+'\napp: '	+NS+' '+INFO_VERSION
+	+(j.length
+	?'\nused: '	+j.join(', '):'')
+	+'\nlength: '	+(sz?sz:
+		'png = '	+ cnv.view.toDataURL().length
+		+', jpg = '	+ cnv.view.toDataURL(IJ).length
+	);
 }
 
 function sendPic(dest, auto) {
-var	a = auto || false, b, c, d, e, f, i, t;
+var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 	draw.view(1);
 	switch (dest) {
 	case 0:
@@ -1309,39 +1369,56 @@ var	a = auto || false, b, c, d, e, f, i, t;
 		if (fillCheck()) return a?c:alert(lang.flood);
 		c = cnv.view.toDataURL();
 		if (!LS) return a?c:alert(lang.no_LS);
-		d = LS[C1R];
+		d = LS[CR[1].R];
 		if (d == c) return a?c:alert(lang.no_change);
-		t = LS[C1T], e = LS[C2R] || 0;
+		t = LS[CR[1].T], e = LS[CR[2].R] || 0, l = LS[CL];
 		if (!a && e == c) {
-			LS[C1R] = e;
-			LS[C1T] = LS[C2T];
-			LS[C2R] = d;
-			LS[C2T] = t;
-			e = LS[C1L];
-			LS[C1L] = LS[C2L];
-			LS[C2L] = e;
+			LS[CR[1].R] = e;
+			LS[CR[1].T] = LS[CR[2].T];
+			LS[CR[1].L] = LS[CR[2].L];
+			LS[CR[2].R] = d;
+			LS[CR[2].T] = t;
+			LS[CR[2].L] = l;
 			alert(lang.found_swap);
 		} else
 		if (a || confirm(lang.confirm_save)) {
-			if (LS[C1T]) {
-				LS[C2R] = d;
-				LS[C2T] = t;
-				LS[C2L] = LS[C1L];
-			}
-			LS[C1R] = c;
-			LS[C1T] = t = draw.time.join('-')+(used.read?'-'+used.read:'');
-			a = draw.history.layers, b = {time: t, layers: []}, e = ['pos', 'last', 'reversable', 'filtered'];
-			for (i in a) {
-				d = {};
-				for (t in a[i]) if (e.indexOf(t) < 0) {
-					if (t == 'data' && (f = a[i][t][a[i].pos])) {
-						ctx.temp.putImageData(f, 0, 0);
-						d[t] = cnv.temp.toDataURL();
-					} else d[t] = a[i][t] || 0;
+			function rem(a) {var r = 'RTL', i = r.length; while (i--) LS.removeItem(CR[a][r[i]]);}
+			try {
+				if (e) rem(2);
+				if (t) {
+					rem(1);
+					LS[CR[2].R] = d;
+					LS[CR[2].T] = t;
+					LS[CR[2].L] = l;
 				}
-				b.layers.push(d);
+				LS[CR[1].R] = c;
+				LS[CR[1].T] = j = draw.time.join('-')+(used.read?'-'+used.read:'');
+				a = draw.history.layers, b = {time: j, layers: []}, e = ['pos', 'last', 'reversable', 'filtered'];
+				for (i in a) {
+					d = {};
+					for (k in a[i]) if (e.indexOf(k) < 0) {
+						if (k == 'data') {
+							if (f = a[i][k][a[i].pos]) {
+								ctx.temp.putImageData(f, 0, 0);
+								d[k] = cnv.temp.toDataURL();
+							} else {
+								d = 0;
+								break;
+							}
+						} else d[k] = a[i][k] || 0;
+					}
+					if (isNaN(d)) b.layers.push(d);
+				}
+				LS[CR[1].L] = JSON.stringify(b);
+			} catch(e) {
+				rem(1), rem(2);
+				try {
+					LS[CR[1].R] = d;
+					LS[CR[1].T] = t;
+					LS[CR[1].L] = l;
+				} catch(i) {rem(1); e.message += '\n'+i.message;}
+				return alert(lang.no_space+'\nError code: '+e.code+', '+e.message), c;
 			}
-			LS[C1L] = JSON.stringify(b);
 			id('saveTime').textContent = unixDateToHMS();
 			cue.autoSave = 0, a = 'AL', d = 'button';
 			for (i in a) if (e = id(d+a[i])) setClass(e, d);
@@ -1351,14 +1428,14 @@ var	a = auto || false, b, c, d, e, f, i, t;
 	case 3:
 	case 4:
 		if (!LS) return alert(lang.no_LS);
-		t = LS[C1T];
+		t = LS[CR[1].T];
 		if (!t) return;
-		d = LS[C1R], i = C1L;
+		d = LS[CR[1].R], i = CR[1].L;
 		if ((d == (c = cnv.view.toDataURL()))
 		|| ((a = draw.history.layer) && draw.history.layers[a].name == unixDateToHMS(+t.split('-')[1],0,1))
 		) {
-			if ((!(t = LS[C2T]) || ((d = LS[C2R]) == c))) return alert(lang.no_change);
-			i = C2L;
+			if ((!(t = LS[CR[2].T]) || ((d = LS[CR[2].R]) == c))) return alert(lang.no_change);
+			i = CR[2].L;
 		}
 //* load flat image to new layer
 		if (dest == 4) {
@@ -1384,13 +1461,13 @@ var	a = auto || false, b, c, d, e, f, i, t;
 			a.title = new Date(t = +t[1]);
 			a.textContent = (t = unixDateToHMS(t,0,1)).split(' ',2)[1];
 			a = b.layers, i = a[0].max = a.length, d = draw.history, d.layers = [a[d.layer = 0]];
-			while (--i) d = a[i], d.z = i, (d.data != 0 ? readPic : newLayer)(d);
+			while (--i) d = a[i], d.z = i, readPic(d);
 		}
 		break;
 	case 5:
 		if (a || ((outside.read || (outside.read = id('read'))) && (a = outside.read.value))) {
-			draw.time = [0, 0];
-			used.read = 'File Read: '+readPic(a);
+	//		draw.time = [0, 0];
+			used.read = 'Read File: '+readPic(a);
 		}
 		break;
 //* send
@@ -1411,16 +1488,17 @@ var	a = auto || false, b, c, d, e, f, i, t;
 				outside.send.appendChild(e);
 			}
 			e = pngData.length;
-			a.txt.value = getSendMeta();
-			a.pic.value = (((i = outside.jp || outside.jpg_pref)
+			d = (((i = outside.jp || outside.jpg_pref)
 				&& (e > i)
 				&& (((c = cnv.view.width * cnv.view.height
 				) <= (d = select.imgRes.width * select.imgRes.height
 				))
 				|| (e > (i *= c/d)))
-				&& (e > (jpgData = cnv.view.toDataURL(IJ)).length)
+				&& (e > (t = (jpgData = cnv.view.toDataURL(IJ)).length))
 			) ? jpgData : pngData);
-			if (mode.debug) alert('jpg = '+(jpgData?jpgData.length:0)+'\npng = '+e+'\npng limit = '+i);
+			a.pic.value = d;
+			a.txt.value = getSendMeta(d.length);
+			if (mode.debug) alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
 			outside.send.submit();
 		}
 	}
@@ -1428,30 +1506,29 @@ var	a = auto || false, b, c, d, e, f, i, t;
 }
 
 function readPic(s) {
-	if (!s.data) s = {
-		name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)
-	,	data: s
-	};
-var	d = 'read-img-'+(+new Date)+'-'+s.name, i = id(d), j, k;
-	if (!i) setId(i = new Image(), d);
-	i.setAttribute('onclick', 'this.parentNode.removeChild(this); return false');
-	i.onload = function () {
+	if (!s || s == 0 || (!s.data && !s.length)) return;
+	if (!s.data) s = {data: s, name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)};
+var	d = draw.time, e = new Image(), t = +new Date, i;
+	for (i in d) if (!d[i]) d[i] = t;
+	e.setAttribute('onclick', 'this.parentNode.removeChild(this); return false');
+	e.onload = function () {
 		delete s.data;
-		for (d in select.imgRes) if (cnv.view[d] < i[d]) {
-			id('img-'+d).value = i[d];
-			for (j in cnv) cnv[j][d] = i[d];
-			if (outside[d[0]+'l']) updateDim(d); else k = 1;
+		for (i in select.imgRes) if (s.z || cnv.view[i] < e[i]) {
+			id('img-'+i).value = e[i];
+			for (d in cnv) cnv[d][i] = e[i];
+			if (outside[i[0]+'l']) updateDim(i), t = 0;
 		}
-		if (k) updateDim();
-		newLayer(s);
+		if (t) updateDim();
+		i = draw.history, j = i.layer;
+		if (j > 0 && !i.layers[j].last && !i.cur()) tweakLayer(s.name,j,1); else newLayer(s);
 		ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
-		ctx.draw.drawImage(i, 0, 0);
+		ctx.draw.drawImage(e, 0, 0);
 		historyAct(s.z ? draw.time[1] : null);
 		cue.autoSave = 0;
-		if (d = i.parentNode) d.removeChild(i);
+		if (d = e.parentNode) d.removeChild(e);
 	}
-	draw.container.appendChild(i);
-	return i.src = s.data, s.name;
+	draw.container.appendChild(e);
+	return e.src = s.data, s.name;
 }
 
 //* Hot keys *-----------------------------------------------------------------
@@ -1468,12 +1545,24 @@ function browserHotKeyPrevent(event) {
 	: false;
 }
 
+function hotWheel(event) {
+	if (browserHotKeyPrevent(event)) {
+	var	d = event.deltaY || event.detail || event.wheelDelta;
+		toolTweak(
+			event.shiftKey	?'G':(
+			event.altKey	?'B':(
+			event.ctrlKey	?'O':'W')), d < 0?0:-1);
+		if (mode.debug) text.debug.innerHTML += ' d='+d;
+	}
+	return false;
+}
+
 function hotKeys(event) {
 	if (browserHotKeyPrevent(event)) {
 		function c(s) {return s.charCodeAt(0);}
 	var	n = event.keyCode - c('0');
 		if ((n?n:n=10) > 0 && n < 11) {
-		var	k = [event.altKey, event.ctrlKey, 1];
+		var	k = [event.shiftKey, event.altKey, event.ctrlKey, 1];
 			for (i in k) if (k[i]) return toolTweak(k = BOWL[i], RANGE[k].step < 1 ? n/10 : (n>5 ? (n-5)*10 : n));
 		} else
 		if (event.altKey)
@@ -1486,8 +1575,11 @@ function hotKeys(event) {
 		case 40:case c('I'):	moveLayer(-1);	break;
 		case 37:case c('T'):	moveLayer();	break;
 		case 39:case c('Y'):	moveLayer(1);	break;
+			case c('A'):	toolSwap(3);	break;
+			case c('S'):	toggleMode(5);	break;
 		//	case c('G'):	toggleMode(8);	break;
 
+			case c('G'):
 			case c('B'):
 			case c('O'):
 			case c('W'):	toolTweak(String.fromCharCode(event.keyCode), -1);
@@ -1497,7 +1589,7 @@ function hotKeys(event) {
 			case 38:	selectLayer(-2,0,1);break;
 			case 40:	selectLayer(-1,0,1);break;
 			case 37:	selectLayer('top',0,1);break;
-			case 39:	selectLayer(1,0,1);
+			case 39:	selectLayer(0,0,1);
 		} else
 		switch (event.keyCode) {
 			case 27:	drawEnd();	break;	//* Esc
@@ -1511,16 +1603,15 @@ function hotKeys(event) {
 			case c('H'):	fillScreen(-2);	break;
 			case c('V'):	fillScreen(-3);	break;
 			case c('S'):	toolSwap();	break;
+			case c('E'):	toolSwap(0);	break;
 			case c('A'):	toolSwap(1);	break;
 			case c('K'):	toolSwap(2);	break;
-			case c('E'):	toolSwap(-2);	break;
-			case c('G'):	toolSwap(0);	break;
+		//	case c('G'):	toolSwap(3);	break;
 
 			case 8:
 if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *, 8=bksp
 			case c('L'):	toggleMode(1);	break;
 			case c('U'):	toggleMode(2);	break;
-			case 121:	toggleMode(5);	break;
 
 			case 112:	resetAside();	break;	//* F1
 			case 120:	sendPic(0);	break;	//* F9
@@ -1538,30 +1629,21 @@ if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *,
 			case c('Y'):	updateShape(4);	break;
 			case c('M'):	updateShape(5);	break;
 
+			case c('G'):
 			case c('B'):
 			case c('O'):
 			case c('W'):	toolTweak(String.fromCharCode(event.keyCode), 0); break;
 
 			case 106: case 42:
-text.debug.innerHTML = getSendMeta()+replaceAll(
+				for (i = 1, k = ''; i < 3; i++) k +=
+'<br>Save'+i+'.time: '+LS[CR[i].T]+(LS[CR[i].R]?', pic size: '+LS[CR[i].R].length:'')+(LS[CR[i].L]?', layers sum: '+LS[CR[i].L].length:'');
+				text.debug.innerHTML = getSendMeta()+'<br>'+replaceAll(
 "\n<a href=\"javascript:var s=' ',t='';for(i in |)t+='\\n'+i+' = '+(|[i]+s).split(s,1);alert(t);\">self.props</a>"+
 "\n<a href=\"javascript:var t='',o=|.o;for(i in o)t+='\\n'+i+' = '+o[i];alert(t);\">self.outside</a>"+
-(outside.read?'':'\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS)
-+'<br>Save1.time: '+LS[C1T]+(LS[C1R]?', size: '+LS[C1R].length:'')+(LS[C1L]?', layers: '+LS[C1L].length:'')
-+'<br>Save2.time: '+LS[C2T]+(LS[C2R]?', size: '+LS[C2R].length:'')+(LS[C2L]?', layers: '+LS[C2L].length:''); break;
+(outside.read?'':'<br>\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS)+CR+','+CT+','+CL+k; break;
 
 			default: if (mode.debug) text.debug.innerHTML += '\n'+String.fromCharCode(event.keyCode)+'='+event.keyCode;
 		}
-	}
-	return false;
-}
-
-function hotWheel(event) {
-	if (browserHotKeyPrevent(event)) {
-	var	d = event.deltaY || event.detail || event.wheelDelta
-	,	b = event.altKey?'B':(event.ctrlKey?'O':'W');
-		toolTweak(b, d < 0?0:-1);
-		if (mode.debug) text.debug.innerHTML += ' d='+d;
 	}
 	return false;
 }
@@ -1609,7 +1691,11 @@ var	t = '</td><td>', r = '</td></tr>	<tr><td>', a, b = 'turn: ', c = draw.step, 
 }
 
 function updatePosition(event) {
-var	i, o = ((select.shapeFlags[select.shape.value] & 4) || ((draw.active?ctx.draw.lineWidth:tool.width) % 2) ? DRAW_PIXEL_OFFSET : 0);	//* <- not a 100% fix yet
+var	i = select.shapeFlags[select.shape.value], d = tool.grid, o = (
+	!  ((i & 2) && mode.shape && !mode.step)
+	&& ((i & 4) || ((draw.active?ctx.draw.lineWidth:tool.width) % 2))
+	? DRAW_PIXEL_OFFSET : 0);	//* <- maybe not a 100% fix yet
+
 	draw.o.x = (draw.m.x = event.pageX) - draw.container.offsetLeft;
 	draw.o.y = (draw.m.y = event.pageY) - draw.container.offsetTop;
 	if (draw.pan && !(draw.turn && draw.turn.pan)) for (i in draw.o) draw.o[i] -= draw.pan[i];
@@ -1621,7 +1707,10 @@ var	i, o = ((select.shapeFlags[select.shape.value] & 4) || ((draw.active?ctx.dra
 		draw.o.y = Math.sin(r.a)*r.d + cnv.view.height/2;
 		o = 0;
 	}
-	for (i in draw.o) draw.cur[i] = o + draw.o[i];
+	for (i in draw.o) {
+		if (d > 0) draw.o[i] = Math.round(draw.o[i]/d)*d;
+		draw.cur[i] = o + draw.o[i];
+	}
 }
 
 function getCursorRad(r, x, y) {
@@ -1753,7 +1842,7 @@ var	margin = 2, off = getOffsetXY(draw.container), x = off.x + cnv.view.offsetWi
 
 function init() {
 	if (isTest()) document.title += ': '+NS+' '+INFO_VERSION;
-var	a = {B:'RTS',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style = '', s = '&nbsp;';
+var	a = {B:'GRST',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style = '', s = '&nbsp;';
 	for (i in a)
 	for (j in a[i]) RANGE[a[i][j]] = RANGE[i];
 
@@ -1777,19 +1866,21 @@ var	a = {B:'RTS',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style
 var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 	while (wit--) if ((e = wnd[wit]).id) {
 		style += '\n#'+e.id+' header i::before {content:"'+lang.windows[k = reId(e)]+'";}';
-		a = '<a href="javascript:;" onClick="', c = '<header draggable="true">'+a+'toggleView(this.parentNode.parentNode)">[ x ]</a><i>:</i></header>\n';
+		a = '<a href="javascript:;" onClick="', l = '" title="';
+		c = '<header draggable="true">'+a+'toggleView(this.parentNode.parentNode)">[ x ]</a><i>:</i></header>\n';
 
 //* Add content as text *------------------------------------------------------
 
 		if (k == 'color') {
-			c += '<div class="selects">'+lang.hex+': <input type="text" id="color-text" onChange="updateColor()" title="'+lang.hex_hint+'"> '
+			c += '<div class="selects">'+lang.hex+': <input type="text" id="color-text" onChange="updateColor()'+l+lang.hex_hint+'"> '
 			+lang.palette+': <select id="palette" onChange="updatePalette()"></select>'
 			+'</div><div id="colors"></div>';
 		} else
+
 		if (k == 'info') {
 			d = '';
 			for (i in select.imgRes) d += (d?' x ':'')
-+'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')" title="'+lang.size_hint+select.imgLimits[i]+'">';
++'<input type="text" value="'+o[i[0]]+'" id="img-'+i+'" onChange="updateDim(\''+i+'\')'+l+lang.size_hint+select.imgLimits[i]+'">';
 
 			b = '<abbr title="', f = '<i class="rf">', g = f+s+b
 +NS.toUpperCase()+', '+INFO_ABBR+', '+lang.info_pad+', '+INFO_DATE
@@ -1802,18 +1893,21 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 				.replace(/\{([^=};]+)(?:=([^=};]+))?;([^}]+)}/g, a+'$1($2)">$3</a>')
 				.replace(/\[([^\];]+);([^\]]+)]/g, '<span id="$1">$2</span>')
 +':	'+f+b+(new Date())+'" id="saveTime">'+lang.info_no_save+'</abbr>.</i>'
-+'<br>	'+a+'toggleView(\'timer\')" title="'+lang.show_hint+'">'+lang.info_time+'</a>'
++'<br>	'+a+'toggleView(\'timer\')'+l+lang.show_hint+'">'+lang.info_time+'</a>'
 +':	'+f+'<span id="timer">'+lang.info_no_time+'</span>.</i><br>'+lang.info_drop+g+'</p>';
 		} else
+
 		if (k == 'layer') {
-			c += '<div id="'+k+'s"></div><div id="filter"><hr><div id="'+k+'-sliders"></div><i>'
-+lang.blurType+':<br><select id="blurType" onChange="tweakLayer(this)"></select></i></div>';
+			c += '<div id="'+k+'s"></div><div id="filters"><hr><div id="'+k+'-sliders"></div>'
++'<select id="filter" onChange="tweakLayer(this)'+l+lang.filter+'"></select><br>'
++'<!--select id="compose" onChange="tweakLayer(this,-1,1)'+l+lang.compose+'"></select--></div>';
 		} else
+
 		if (k == 'tool') {
-			d = '<br><select id="', b = '"></select>', l = select.lineCaps;
-			c += '<div class="selects"><div class="rf">'+lang.shape+':'+d+'shape" onChange="updateShape(this)'+b;
-			for (i in l) c += d+i+'" title="'+(l[i] || i)+b;
-			c += '</div><div id="'+k+'-sliders">';
+			d = '<select id="', b = '"></select><br>', j = select.lineCaps;
+			c += '<div class="selects"><div class="rf">'+d+'shape" onChange="updateShape(this)'+l+lang.shape+b;
+			for (i in j) c += d+i+l+(j[i] || i)+b;
+			c += d+'affect" onChange="updateEraser()'+l+lang.compose+b+'</div><div id="'+k+'-sliders">';
 			i = BOW.length;
 			while (i--) c += getSlider(BOWL[i]);
 			c += '</div></div>';
@@ -1853,7 +1947,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 			return bf ? e.insertBefore(c, bf) : e.appendChild(c);
 		}
 
-		b = 'button', c = 'color', d = 'sendPic(', f = 'fillScreen(', g = 'toggleMode(', h = 'check', j = 'toolSwap(';
+		a = 'Alt+', b = 'button', c = 'color', d = 'sendPic(', f = 'fillScreen(', g = 'toggleMode(', h = 'check', j = 'toolSwap(';
 		if (k == 'info') {
 			btnArray([
 //* subtitle, hotkey, pictogram, function, id
@@ -1870,13 +1964,13 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ]]);
 		} else
 		if (k == 'layer') {
-			a = id(k+'-sliders'), d = 'ART', h = '';
-			i = d.length; while (i--) h += getSlider(d[i], i == 2);
-			setClass(a, 'rf ri');
-			setContent(a, h);
+			m = id(k+'-sliders'), d = 'ART', n = '';
+			i = d.length; while (i--) n += getSlider(d[i], i == 2);
+			setClass(m, 'rf ri');
+			setContent(m, n);
 			i = d.length; while (i--) setSlider(d[i]);
 
-			a = 'Alt+', d = 'moveLayer(', h = 'historyAct(', l = 'layer', n = 'newLayer(';
+			d = 'moveLayer(', h = 'historyAct(', l = 'layer', n = 'newLayer(';
 			btnArray([
 //* subtitle, hotkey, pictogram, function, id
 	['new'	,a+'L','&#x25A1;'	,n+')'
@@ -1901,19 +1995,19 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],
 0,	['undo'	,'Z'	,'&#x2190;'	,h+'-1)',b+'U'
 ],	['redo'	,'X'	,'&#x2192;'	,h+'1)'	,b+'R'
-//],1,	['global',a+'G','&#x25A4;'	,g+'7)',k+'G'
-]], e.firstElementChild.nextSibling).appendChild(a = id('sliderT'));
-			setClass(a, 'rf ri');
+//],1,	['global',a+'G','&#x25A4;'	,g+'7)' ,h+'G'
+]], e.firstElementChild.nextSibling).appendChild(m = id('sliderT'));
+			setClass(m, 'rf ri');
 		} else
 		if (k == 'tool') {
 			btnArray([
 //* subtitle, hotkey, pictogram, function, id
 -9,	['pencil','A'	,'i'		,j+'1)'
 ],	['chalk' ,'K'	,'&#x25CB;'	,j+'2)'
-],	['eraser','E'	,'&#x25CC;'	,j+'-2)'
-],	['reset' ,'G'	,'&#x25CE;'	,j+'0)'
+],	['reset' ,a+'A'	,'&#x25CE;'	,j+'3)'
 ],
-1,	['cursor'		,'F10'	,'&#x25CF;'			,g+'5)'	,h+'V'
+1,	['eraser','E'	,'&#x25CC;'	,j+'0)'	,b+'E'
+],	['cursor',a+'S'	,'&#x25CF;'	,g+'5)'	,h+'V'
 ],
 1,	['line|area|copy'	,'L'	,'&ndash;|&#x25A0;|&#x25EB;'	,g+'1)'	,h+'L'
 ],	['curve|outline|rect'	,'U'	,'~|&#x25A1;|&#x25AF;'	,g+'2)'	,h+'U'
@@ -1950,7 +2044,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 	draw.container = id('load'), b = 'button', i = (a = 'JP').length, h = /^header$/i;
 	while (i--) if (e = id(b+a[i])) setEvent(e, 'onmouseover', 'updateSaveFileSize(this)');
 
-	for (i in (a = {L:C1L, A:C1T})) if (!LS || !LS[a[i]]) setClass(id(b+i), b+'-disabled');
+	for (i in (a = {L:CL, A:CT})) if (!LS || !LS[a[i]]) setClass(id(b+i), b+'-disabled');
 
 	for (i in (a = ['a', 'input', 'select', 'p', b]))
 	for (c in (b = container.getElementsByTagName(a[i])))
@@ -1963,19 +2057,18 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 
 	generatePalette(1, 85, 0);
 	a = select.options, c = select.translated || a, f = (LS && LS.lastPalette && palette[LS.lastPalette]) ? LS.lastPalette : 1;
-	for (b in a) {
-		e = select[b] = id(b);
-		for (i in a[b]) (
-			e.options[e.options.length] = new Option(c[b][i], i)
-		).selected = (b == 'palette'?(i == f):!i);
-	}
+	a.affect = a.compose, c.affect = c.compose;
+	for (b in a) if (e = select[b] = id(b))
+	for (i in a[b]) (
+		e.options[e.options.length] = new Option((c[b]?c:a)[b][i], i)
+	).selected = (b == 'palette'?(i == f):!i);
 
 //* Get ready to work *--------------------------------------------------------
 
 	toggleView('hotkeys');
 	id('style').innerHTML += style;
 
-	toolSwap(0);
+	toolSwap(3);
 	updatePalette();
 	updateViewport();
 	resetAside();
@@ -1984,7 +2077,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 //* External config *----------------------------------------------------------
 
 function isTest() {
-	if (C1T) return !o.send;
+	if (CR[0] !== 'C') return !o.send;
 var	o = outside, v = id('vars'), e, i, j, k
 ,	f = o.send = id('send')
 ,	r = o.read = id('read'), a = [v,f,r];
@@ -2003,22 +2096,23 @@ var	o = outside, v = id('vars'), e, i, j, k
 		}
 		break;	//* <- no care about the rest
 	}
-	CR = (o.saveprfx?o.saveprfx:NS)+CR;
-	C1T = (C1R = CR+'y')+CT, C1L = C1R+CL;
-	C2T = (C2R = CR+'2')+CT, C2L = C2R+CL;
-	o.t0 = o.t0 ? o.t0+'000' : +new Date();
+	k = 'y2', i = k.length, j = (o.saveprfx?o.saveprfx:NS)+CR, CR = [];
+	while (i) CR[i--] = {R:e = j+k[i], T:e+CT, L:e+CL};
+	CT = CR[1].T, CL = CR[1].L;
+	o.t0 = o.t0 > 0 ? o.t0+'000' : +new Date;
 	if (!o.undo || isNaN(o.undo) || o.undo < 3) o.undo = 123; else o.undo = parseInt(o.undo);
 	if (!o.lang) o.lang = document.documentElement.lang || 'en';
 
 //* translation: Russian *-----------------------------------------------------
 
 	if (o.lang == 'ru')
-select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
+select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы линий'}
 , select.translated = {
 	shape	: ['линия', 'многоугольник', 'прямоугольник', 'круг', 'овал', 'сдвиг']
-,	lineCap	: ['круг <->', 'бочка', 'квадрат']
-,	lineJoin: ['круг -x-', 'срез', 'угол']
-,	blurType: ['масштаб', 'интеграл']
+,	lineCap	: ['круг <->', 'срез |-|', 'квадрат [-]']
+,	lineJoin: ['круг -x-', 'срез \\_/', 'угол V']
+,	filter	: ['масштаб', 'интеграл']
+,	compose	: ['поверх', 'под', 'в пределах', 'предел (маска)', 'свет', 'исключение', 'стёрка']
 ,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент']
 }, lang = {
 	lang: ['язык', 'Русский']
@@ -2026,9 +2120,10 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 ,	flood:		'Полотно пусто.'
 ,	confirm_send:	'Отправить рисунок в сеть?'
 ,	confirm_save:	'Сохранить слои в память браузера?'
-,	confirm_load:	'Вернуть слои из память браузера?'
+,	confirm_load:	'Вернуть слои из памяти браузера?'
 ,	found_swap:	'Рисунок был в запасе, поменялись местами.'
 ,	no_LS:		'Локальное Хранилище (память браузера) недоступно.'
+,	no_space:	'Ошибка сохранения, нет места.'
 ,	no_files:	'Среди файлов не найдено изображений.'
 ,	no_layers:	'Позиция в памяти не содержит слоёв.'
 ,	no_form:	'Назначение недоступно.'
@@ -2048,14 +2143,16 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 		,	blur:	'Радиус размытия слоя.'
 		,	alpha:	'Непрозрачность слоя при наложении.'
 		,	undo:	'История отмен слоя.'
-}},	tool: {	B:	'Тень'
+}},	tool: {	G:	'Шаг сетки'
+	,	B:	'Тень'
 	,	O:	'Непрозрачность'
 	,	W:	'Толщина'
 	,	T:	'Расслоение'
 	,	R:	'Размытие'
 	,	S:	'Насыщенность'
 },	shape:		'Форма'
-,	blurType:	'Фильтр'
+,	filter:		'Фильтр'
+,	compose:	'Режим наложения'
 ,	palette:	'Палитра'
 ,	hex:		'Код'
 ,	hex_hint:	'Формат ввода — #a, #f90, #ff9900, или 0,123,255'
@@ -2064,15 +2161,15 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 ,	info: [	'{toggleView=\'hotkeys\';Управление}: [hotkeys;(указатель над полотном)'
 	,,	'C / средний клик = подобрать цвет с рисунка.'
 	,	'Q / P / R / T / Y / M = выбор формы.'
-	,	'E = полигон-стёрка.'
-	,,	'1-10 / колесо мыши / (Alt +) W = толщина кисти.'
-	,	'Ctrl + 1-10 / колесо / (Alt +) O = прозрачность.'
-	,	'Alt + 1-10 / колесо / (Alt +) B = размытие тени.'
-	,,	'Shift + стрелки = выбирать слой.'
-	,	'Alt + стрелки = двигать слой по списку.'
-	,,	'Ctrl + тяга = поворот полотна, Home = {updateViewport;сброс}.'
-	,	'Alt + тяга = масштаб, Shift + т. = сдвиг рамки.'
-	,	']F1 = {resetAside;вернуть} панельки по местам.-'
+	,,	'1-10 / колесо мыши	/ (Alt +) W = толщина кисти.'
+	,	'Ctrl	+ 1-10 / колесо / (Alt +) O = прозрачность.'
+	,	'Alt	+ 1-10 / колесо / (Alt +) B = размытие тени.'
+	,	'Shift	+ 1-10 / колесо / (Alt +) G = шаг сетки.'
+	,,	'Shift	+ стрелки = выбирать слой.'
+	,	'Alt	+ стрелки = двигать слой по списку.'
+	,,	'Ctrl	+ тяга = поворот полотна, Home = {updateViewport;сброс}.'
+	,	'Alt	+ тяга = масштаб, Shift + т. = сдвиг рамки.'
+	,,	']F1 = {resetAside;вернуть} панельки по местам.-'
 	,	'Автосохранение раз в минуту'
 ],	info_no_save:	'ещё не было'
 ,	info_no_time:	'ещё нет'
@@ -2090,7 +2187,7 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 	},	flip_v:	{sub:'перевер.',t:'Перевернуть полотно вверх дном.'
 	},	pencil:	{sub:'каранд.',	t:'Инструмент — тонкий простой карандаш.'
 	},	chalk:	{sub:'мел',	t:'Инструмент — толстый белый карандаш.'
-	},	eraser:	{sub:'стёрка',	t:'Инструмент — лассо удаления.'
+	},	eraser:	{sub:'стёрка',	t:'Переключить режим инструмента на стёрку / обратно на обычный.'
 	},	swap:	{sub:'смена',	t:'Поменять инструменты местами.'
 	},	reset:	{sub:'сброс',	t:'Сбросить инструменты к начальным.'
 	},	line:	{sub:'прямая',	t:'Прямая линия 1 зажатием.'
@@ -2127,7 +2224,10 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 
 //* translation: English *-----------------------------------------------------
 
-else o.lang = 'en', lang = {
+else o.lang = 'en'
+, select.translated = {
+	compose	: ['above', 'under', 'clip', 'mask', 'light', 'exclude', 'eraser']
+}, lang = {
 	lang: ['language', 'English']
 ,	bad_id:		'Invalid case.'
 ,	flood:		'Canvas is empty.'
@@ -2136,6 +2236,7 @@ else o.lang = 'en', lang = {
 ,	confirm_load:	'Restore layers from your browser memory?'
 ,	found_swap:	'Found image at slot 2, swapped slots.'
 ,	no_LS:		'Local Storage (browser memory) not supported.'
+,	no_space:	'Saving failed, not enough space.'
 ,	no_layers:	'Save position has no layer data.'
 ,	no_files:	'No image files found.'
 ,	no_form:	'Destination unavailable.'
@@ -2155,14 +2256,16 @@ else o.lang = 'en', lang = {
 		,	blur:	'Layer blur radius.'
 		,	alpha:	'Layer opacity ratio.'
 		,	undo:	'Layer undo history.'
-}},	tool: {	B:	'Shadow'
+}},	tool: {	G:	'Grid step'
+	,	B:	'Shadow'
 	,	O:	'Opacity'
 	,	W:	'Width'
 	,	T:	'Separation'
 	,	R:	'Blur'
 	,	S:	'Saturation'
 },	shape:		'Shape'
-,	blurType:	'Filter'
+,	filter:		'Filter'
+,	compose:	'Composition mode'
 ,	palette:	'Palette'
 ,	hex:		'Code'
 ,	hex_hint:	'Valid formats — #a, #f90, #ff9900, or 0,123,255'
@@ -2171,15 +2274,15 @@ else o.lang = 'en', lang = {
 ,	info: [	'{toggleView=\'hotkeys\';Hot keys}: [hotkeys;(mouse over image only)'
 	,,	'C / mouse mid = pick color from image.'
 	,	'Q / P / R / T / Y / M = select shape.'
-	,	'E = polygon-eraser.'
-	,,	'1-10 / mouse wheel / (Alt +) W = brush width.'
-	,	'Ctrl + 1-10 / wheel / (Alt +) O = brush opacity.'
-	,	'Alt + 1-10 / wheel / (Alt +) B = brush shadow blur.'
-	,,	'Shift + arrows = select layer.'
-	,	'Alt + arrows = move layer on the list.'
-	,,	'Ctrl + drag = rotate canvas, Home = {updateViewport;reset}.'
-	,	'Alt + drag = zoom, Shift + d. = move canvas.'
-	,	']F1 = {resetAside;reset} floating panels.-'
+	,,	'1-10 / mouse wheel	/ (Alt +) W = brush width.'
+	,	'Ctrl	+ 1-10 / wheel	/ (Alt +) O = brush opacity.'
+	,	'Alt	+ 1-10 / wheel	/ (Alt +) B = brush shadow blur.'
+	,	'Shift	+ 1-10 / wheel	/ (Alt +) O = grid step.'
+	,,	'Shift	+ arrows = select layer.'
+	,	'Alt	+ arrows = move layer on the list.'
+	,,	'Ctrl	+ drag = rotate canvas, Home = {updateViewport;reset}.'
+	,	'Alt	+ drag = zoom, Shift + d. = move canvas.'
+	,,	']F1 = {resetAside;reset} floating panels.-'
 	,	'Autosave every minute, last saved'
 ],	info_no_save:	'not yet'
 ,	info_no_time:	'no yet'
@@ -2197,7 +2300,7 @@ else o.lang = 'en', lang = {
 	},	flip_v:	{sub:'flip ver.',t:'Flip image vertically.'
 	},	pencil:	'Set tool to sharp black.'
 	,	chalk:	'Set tool to large white.'
-	,	eraser:	'Set tool to lasso eraser.'
+	,	eraser:	'Set tool mode to eraser / back to normal.'
 	,	swap:	'Swap your tools.'
 	,	reset:	'Reset both tools.'
 	,	line:	'Draw straight line with 1 drag.'
@@ -2216,7 +2319,7 @@ else o.lang = 'en', lang = {
 May not work in some browsers until set to load and show new images automatically.'
 	,	loadd:	'Load image copy from your browser memory to a new layer, 2 slots in a queue. \r\n\
 May not work in some browsers until set to load and show new images automatically.'
-	,	read:	'Load image local file to a new layer. \r\n\
+	,	read:	'Load image from your local file to a new layer. \r\n\
 May not work at all, especially if sketcher itself is not started from disk. \r\n\
 Instead, it is recommended to drag and drop files from another program.'
 	,	done:	'Finish and send image to server.'
@@ -2280,7 +2383,7 @@ document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 #|-colors table {margin: 2px 0 0 0; border-collapse: collapse;}\
 #|-colors td {margin: 0; padding: 0; height: 16px;}\
 #|-debug td {width: 234px;}\
-#|-filter {height: 66px;}\
+#|-filters {height: 66px;}\
 #|-layers .|-slide p:first-child {margin-top: 0;}\
 #|-layers .|-slide p:last-child {margin-bottom: 0;}\
 #|-layers .|-slide {max-height: 314px; overflow-y: auto;}\
@@ -2339,4 +2442,4 @@ document.addEventListener('DOMContentLoaded', init, false);
 
 }; //* <- END global wrapper
 
-function showProps(o, z /*incl.zero*/) {var i,t=''; for(i in o)if(z||o[i])t+='\n'+i+'='+o[i]; alert(t); return o;}
+//function showProps(o, z /*incl.zero*/) {var i,t=''; for(i in o)if(z||o[i])t+='\n'+i+'='+o[i]; alert(t); return o;}

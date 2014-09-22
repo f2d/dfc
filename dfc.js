@@ -1,11 +1,11 @@
 ﻿var dfc = new function () {
 
 var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
-,	INFO_VERSION = 'v0.9.43'
-,	INFO_DATE = '2013-04-01 — 2014-08-14'
+,	INFO_VERSION = 'v0.9.45'
+,	INFO_DATE = '2013-04-01 — 2014-09-22'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 ,	A0 = 'transparent', IJ = 'image/jpeg', BOTH_PANELS_HEIGHT = 640
-,	CR = 'CanvasRecover', CT = 'Time', C1R, C1T, C2R, C2T, DRAW_PIXEL_OFFSET = -0.5
+,	CR = 'CanvasRecover', CT = 'Time', DRAW_PIXEL_OFFSET = -0.5
 ,	LS = window.localStorage || localStorage
 
 ,	TOOLS_REF = [
@@ -20,7 +20,7 @@ var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align t
 
 ,	flushCursor = false, neverFlushCursor = true
 ,	mode = {debug:	false
-	,	shape:	false	//* <- straight line	/ fill area
+	,	shape:	false	//* <- straight line	/ fill area	/ copy
 	,	step:	false	//* <- curve line	/ erase area	/ rect pan
 	,	lowQ:	false
 	,	brushView:	false
@@ -100,9 +100,6 @@ var	NS = 'dfc'	//* <- namespace prefix, change here and above; BTW, tabs align t
 	,	history: {pos:0, last:0
 		,	cur: function() {return this.data[this.pos];}
 		,	act: function(i) {
-//* 0: Write: Refresh
-//* 1: Read: Back
-//* 2: Read: Forward
 			var	t = this, d = t.data.length - 1;
 				if (i) {
 					if (i < 0 && t.pos > 0) --t.pos; else
@@ -290,7 +287,11 @@ var	i, t = '', p = ['-moz-','-webkit-','-o-',''];
 }
 
 function updatePosition(event) {
-var	i, o = ((select.shapeFlags[select.shape.value] & 4) || ((draw.active?c2d.lineWidth:tool.width) % 2) ? DRAW_PIXEL_OFFSET : 0);	//* <- not a 100% fix yet
+var	i = select.shapeFlags[select.shape.value], o = (
+	!  ((i & 2) && mode.shape && !mode.step)
+	&& ((i & 4) || ((draw.active?c2d.lineWidth:tool.width) % 2))
+	? DRAW_PIXEL_OFFSET : 0);	//* <- maybe not a 100% fix yet
+
 	draw.o.x = event.pageX - draw.field.offsetLeft;
 	draw.o.y = event.pageY - draw.field.offsetTop;
 	if (draw.pan && !(draw.turn && draw.turn.pan)) for (i in draw.o) draw.o[i] -= draw.pan[i];
@@ -363,14 +364,11 @@ var	sf = select.shapeFlags[select.shape.value];
 	if ((draw.btn = event.which) != 1 && draw.btn != 3) pickColor();
 	else {
 		draw.active = 1;
-		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date();
+		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date;
 		if (!interval.timer) {
 			interval.timer = setInterval(timeElapsed, 1000);
 			interval.save = setInterval(autoSave, 60000);
 		}
-		for (i in draw.o) draw.prev[i] = draw.cur[i];
-		for (i in draw.line) draw.line[i] = false;
-		for (i in select.lineCaps) c2s[i] = c2d[i] = select.options[i][select[i].value];
 	var	i = (event.which == 1 ? 1 : 0), t = tools[1-i]
 	,	pf = ((sf & 8) && (mode.shape || !mode.step))
 	,	fig = ((sf & 2) && (mode.shape || pf));
@@ -381,6 +379,10 @@ var	sf = select.shapeFlags[select.shape.value];
 		,	shadowColor: (t.blur ? 'rgb('+t.color+')' : A0)
 		,	shadowBlur: t.blur
 		})) c2s[i] = c2d[i] = t[i];
+		updatePosition(event);
+		for (i in draw.o) draw.prev[i] = draw.cur[i];
+		for (i in draw.line) draw.line[i] = false;
+		for (i in select.lineCaps) c2s[i] = c2d[i] = select.options[i][select[i].value];
 		c2d.beginPath();
 		c2d.moveTo(draw.cur.x, draw.cur.y);
 	}
@@ -409,7 +411,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s]
 		draw.line.back =	!(draw.line.started = true);
 	}
 	if (mode.limitFPS) {
-	var	t = +new Date();
+	var	t = +new Date;
 		if (t-draw.refresh > 30) draw.refresh = t; else redraw = false;		//* <- put "> 1000/N" to redraw maximum N FPS
 	}
 	if (redraw) {
@@ -439,7 +441,7 @@ function drawEnd(event) {
 			draw.step = {prev:{x:draw.prev.x, y:draw.prev.y}, cur:{x:draw.cur.x, y:draw.cur.y}};	//* <- normal straight line as base
 			return;
 		}
-		draw.time[1] = +new Date();
+		draw.time[1] = +new Date;
 		draw.screen();
 		c2d.fillStyle = c2s.fillStyle;
 		if (sf & 8) {
@@ -805,10 +807,19 @@ var	d = (t ? new Date(t+(t > 0 ? 0 : new Date())) : new Date());
 function timeElapsed() {text.timer.textContent = unixDateToHMS(timer += 1000, 1);}
 function autoSave() {if (mode.autoSave && cue.autoSave && !(cue.autoSave = (draw.active?-1:0))) sendPic(2,true);}
 
-function sendMeta() {
-var	i, j = [];
+function sendMeta(sz) {
+var	d = draw.time, i, j = [], u = [], t = outside.t0;
+	for (i in d) u[i] = parseInt(d[i]) || (i > 0?+new Date:t);
 	for (i in used) j.push(used[i]);
-	return outside.t0 +','+ draw.time.join('-') +','+ NS +' '+ INFO_VERSION + (j.length?' (used '+j.join(', ')+')':'');
+	return 't0: '	+Math.floor(t/1000)
+	+'\ntime: '	+u.join('-')
+	+'\napp: '	+NS+' '+INFO_VERSION
+	+(j.length
+	?'\nused: '	+j.join(', '):'')
+	+'\nlength: '	+(sz?sz:
+		'png = '	+ canvas.toDataURL().length
+		+', jpg = '	+ canvas.toDataURL(IJ).length
+	);
 }
 
 function sendPic(dest, auto) {
@@ -823,23 +834,35 @@ var	a = auto || false, c, d, e, i, t;
 		if (fillCheck()) return a?c:alert(lang.flood);
 		c = canvas.toDataURL();
 		if (!LS) return a?c:alert(lang.no_LS);
-		d = LS[C1R];
+		d = LS[CR[1].R];
 		if (d == c) return a?c:alert(lang.no_change);
-		t = LS[C1T], e = LS[C2R] || 0;
+		t = LS[CR[1].T], e = LS[CR[2].R] || 0;
 		if (!a && e == c) {
-			LS[C1R] = e;
-			LS[C1T] = LS[C2T];
-			LS[C2R] = d;
-			LS[C2T] = t;
+			LS[CR[1].R] = e;
+			LS[CR[1].T] = LS[CR[2].T];
+			LS[CR[2].R] = d;
+			LS[CR[2].T] = t;
 			alert(lang.found_swap);
 		} else
 		if (a || confirm(lang.confirm_save)) {
-			if (LS[C1T]) {
-				LS[C2R] = d;
-				LS[C2T] = t;
+			function rem(a) {var r = 'RT', i = r.length; while (i--) LS.removeItem(CR[a][r[i]]);}
+			try {
+				if (e) rem(2);
+				if (t) {
+					rem(1);
+					LS[CR[2].R] = d;
+					LS[CR[2].T] = t;
+				}
+				LS[CR[1].R] = c;
+				LS[CR[1].T] = draw.time.join('-')+(used.read?'-'+used.read:'');
+			} catch(e) {
+				rem(1), rem(2);
+				try {
+					LS[CR[1].R] = d;
+					LS[CR[1].T] = t;
+				} catch(i) {rem(1); e.message += '\n'+i.message;}
+				return alert(lang.no_space+'\nError code: '+e.code+', '+e.message), c;
 			}
-			LS[C1R] = c;
-			LS[C1T] = draw.time.join('-')+(used.read?'-'+used.read:'');
 			id('saveTime').textContent = unixDateToHMS();
 			setClass(id('buttonL'), 'button');
 			cue.autoSave = 0;
@@ -848,11 +871,11 @@ var	a = auto || false, c, d, e, i, t;
 //* load
 	case 3:
 		if (!LS) return alert(lang.no_LS);
-		t = LS[C1T];
+		t = LS[CR[1].T];
 		if (!t) return;
-		d = LS[C1R];
+		d = LS[CR[1].R];
 		if (d == (c = canvas.toDataURL())) {
-			if ((!(t = LS[C2T]) || ((d = LS[C2R]) == c))) return alert(lang.no_change);
+			if ((!(t = LS[CR[2].T]) || ((d = LS[CR[2].R]) == c))) return alert(lang.no_change);
 		}
 		if (confirm(lang.confirm_load)) {
 			t = t.split('-');
@@ -864,8 +887,8 @@ var	a = auto || false, c, d, e, i, t;
 		break;
 	case 4:	
 		if (a || ((outside.read || (outside.read = id('read'))) && (a = outside.read.value))) {
-			draw.time = [0, 0];
-			used.read = 'File Read: '+readPic(a);
+	//		draw.time = [0, 0];
+			used.read = 'Read File: '+readPic(a);
 		}
 		break;
 //* send
@@ -886,16 +909,17 @@ var	a = auto || false, c, d, e, i, t;
 				outside.send.appendChild(e);
 			}
 			e = pngData.length;
-			a.txt.value = sendMeta();
-			a.pic.value = (((i = outside.jp || outside.jpg_pref)
+			d = (((i = outside.jp || outside.jpg_pref)
 				&& (e > i)
 				&& (((c = canvas.width * canvas.height
 				) <= (d = select.imgRes.width * select.imgRes.height
 				))
 				|| (e > (i *= c/d)))
-				&& (e > (jpgData = canvas.toDataURL(IJ)).length)
+				&& (e > (t = (jpgData = canvas.toDataURL(IJ)).length))
 			) ? jpgData : pngData);
-			if (mode.debug) alert('jpg = '+(jpgData?jpgData.length:0)+'\npng = '+e+'\npng limit = '+i);
+			a.pic.value = d;
+			a.txt.value = sendMeta(d.length);
+			if (mode.debug) alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
 			outside.send.submit();
 		}
 	}
@@ -903,23 +927,21 @@ var	a = auto || false, c, d, e, i, t;
 }
 
 function readPic(s) {
-	if (!s.data) s = {
-		name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)
-	,	data: s
-	};
-var	d = 'read-img'+(+new Date)+'-'+s.name, i = id(d);
-	if (!i) setId(i = new Image(), d);
-	i.setAttribute('onclick', 'return this.parentNode.removeChild(this) && false;');
-	i.onload = function () {
-		for (d in select.imgRes) id('img-'+d).value = canvasShape[d] = canvas[d] = i[d];
+	if (!s || s == 0 || (!s.data && !s.length)) return;
+	if (!s.data) s = {data: s, name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)};
+var	d = draw.time, e = new Image(), t = +new Date, i;
+	for (i in d) if (!d[i]) d[i] = t;
+	e.setAttribute('onclick', 'this.parentNode.removeChild(this); return false');
+	e.onload = function () {
+		for (i in select.imgRes) id('img-'+i).value = canvasShape[i] = canvas[i] = e[i];
 		updateDim();
-		c2d.drawImage(i,0,0);
+		c2d.drawImage(e,0,0);
 		historyAct();
 		cue.autoSave = 0;
-		i.parentNode.removeChild(i);
+		if (d = e.parentNode) d.removeChild(e);
 	}
-	draw.field.appendChild(i);
-	return i.src = s.data, s.name;
+	draw.field.appendChild(e);
+	return e.src = s.data, s.name;
 }
 
 function dragOver(event) {
@@ -963,7 +985,7 @@ function hotKeys(event) {
 		function c(s) {return s.charCodeAt(0);}
 	var	n = event.keyCode - c('0');
 		if ((n?n:n=10) > 0 && n < 11) {
-		var	k = [event.altKey, event.ctrlKey, 1];
+		var	k = [event.altKey, event.ctrlKey, 1], i;
 			for (i in k) if (k[i]) return toolTweak(BOWL[i], RANGE[i].step < 1 ? n/10 : (n>5 ? (n-5)*10 : n));
 		} else
 		switch (event.keyCode) {
@@ -1009,10 +1031,12 @@ if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *,
 			case c('W'): toolTweak(String.fromCharCode(event.keyCode), event.altKey?-1:0); break;
 
 			case 106: case 42:
-text.debug.innerHTML = sendMeta()+replaceAll(
+				for (i = 1, k = ''; i < 3; i++) k +=
+'<br>Save'+i+'.time: '+LS[CR[i].T]+(LS[CR[i].R]?', size: '+LS[CR[i].R].length:'');
+				text.debug.innerHTML = sendMeta()+'<br>'+replaceAll(
 "\n<a href=\"javascript:var s=' ',t='';for(i in |)t+='\\n'+i+' = '+(|[i]+s).split(s,1);alert(t);\">|.props</a>"+
 "\n<a href=\"javascript:var t='',o=|.o;for(i in o)t+='\\n'+i+' = '+o[i];alert(t);\">|.outside</a>"+
-(outside.read?'':'\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS); break;
+(outside.read?'':'<br>\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS)+CR+','+CT+k; break;
 
 			default: if (mode.debug) text.debug.innerHTML += '\n'+String.fromCharCode(event.keyCode)+'='+event.keyCode;
 		}
@@ -1163,7 +1187,7 @@ d+'right'+e+n+d+'bottom'+e+n+d+'debug'+e+'\n');
 	}
 	for (name in mode) if (mode[modes[i = modes.length] = name]) toggleMode(i,1);
 
-	if (!LS || !LS[C1T]) setClass(id('buttonL'), 'button-disabled');
+	if (!LS || !LS[CT]) setClass(id('buttonL'), 'button-disabled');
 
 	i = (a = 'JP').length;
 	while (i--) if (b = id('button'+a[i])) setEvent(b, 'onmouseover', 'updateSaveFileSize(this)');
@@ -1220,7 +1244,7 @@ var	letters = [0, 0, 0], l = p.length;
 
 
 function isTest() {
-	if (C1T) return !o.send;
+	if (CR[0] !== 'C') return !o.send;
 var	o = outside, v = id('vars'), e, i, j, k
 ,	f = o.send = id('send')
 ,	r = o.read = id('read'), a = [v,f,r];
@@ -1239,27 +1263,28 @@ var	o = outside, v = id('vars'), e, i, j, k
 */		}
 		break;	//* <- no care about the rest
 	}
-	CR = (o.saveprfx?o.saveprfx:NS)+CR;
-	C1T = (C1R = CR+'y')+CT;
-	C2T = (C2R = CR+'2')+CT;
-	if (!o.t0) o.t0 = Math.floor((+new Date())/1000);
+	k = 'y2', i = k.length, j = (o.saveprfx?o.saveprfx:NS)+CR, CR = [];
+	while (i) CR[i--] = {R:e = j+k[i], T:e+CT};
+	CT = CR[1].T;
+	o.t0 = o.t0 > 0 ? o.t0+'000' : +new Date;
 	if (!o.undo || isNaN(o.undo) || o.undo < 3) o.undo = 123; else o.undo = parseInt(o.undo);
 	if (!o.lang) o.lang = document.documentElement.lang || 'en';
 	if (o.lang == 'ru')
 select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 , select.translated = {
 	shape	: ['линия', 'многоугольник', 'прямоугольник', 'круг', 'овал', 'сдвиг']
-,	lineCap	: ['круг', 'бочка', 'квадрат']
-,	lineJoin: ['круг', 'срез', 'угол']
+,	lineCap	: ['круг <->', 'срез |-|', 'квадрат [-]']
+,	lineJoin: ['круг -x-', 'срез \\_/', 'угол V']
 ,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент']
 }, lang = {
 	bad_id:		'Ошибка выбора.'
 ,	flood:		'Полотно пусто.'
 ,	confirm_send:	'Отправить рисунок в сеть?'
-,	confirm_save:	'Сохранить рисунок в Локальное Хранилище?'
-,	confirm_load:	'Вернуть рисунок из Локального Хранилища?'
+,	confirm_save:	'Сохранить рисунок в память браузера?'
+,	confirm_load:	'Вернуть рисунок из памяти браузера?'
 ,	found_swap:	'Рисунок был в запасе, поменялись местами.'
-,	no_LS:		'Локальное Хранилище недоступно.'
+,	no_LS:		'Локальное Хранилище (память браузера) недоступно.'
+,	no_space:	'Ошибка сохранения, нет места.'
 ,	no_files:	'Среди файлов не найдено изображений.'
 ,	no_form:	'Назначение недоступно.'
 ,	no_change:	'Нет изменений.'
@@ -1312,10 +1337,12 @@ select.lineCaps = {lineCap: 'край', lineJoin: 'сгиб'}
 },	fps:	{sub:'п.кадры',	t:'Уменьшить нагрузку, пропуская кадры.'
 },	png:	{sub:'сохр.png',t:'Сохранить рисунок в PNG файл.'
 },	jpeg:	{sub:'сохр.jpg',t:'Сохранить рисунок в JPEG файл.'
-},	save:	{sub:'сохран.',	t:'Сохранить рисунок в Локальное Хранилище, 2 последние позиции по очереди.'
-},	load:	{sub:'загруз.',	t:'Вернуть рисунок из Локального Хранилища, 2 последние позиции по очереди. \n\
+},	save:	{sub:'сохран.',	t:'Сохранить рисунок в память браузера, 2 последние позиции по очереди.'
+},	load:	{sub:'загруз.',	t:'Вернуть рисунок из памяти браузера, 2 последние позиции по очереди. \r\n\
 Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
-},	read:	{sub:'зг.файл',	t:'Прочитать локальный файл. Может не сработать вообще, особенно при запуске самой рисовалки не с диска.'
+},	read:	{sub:'зг.файл',	t:'Прочитать локальный файл. \r\n\
+Может не сработать вообще, особенно при запуске самой рисовалки не с диска. \r\n\
+Вместо этого рекомендуется перетаскивать файлы из других программ.'
 },	done:	{sub:'готово',	t:'Завершить и отправить рисунок в сеть.'
 },	info:	{sub:'помощь',	t:'Показать или скрыть информацию.'
 }}};
@@ -1323,10 +1350,11 @@ else lang = {
 	bad_id:		'Invalid case.'
 ,	flood:		'Canvas is empty.'
 ,	confirm_send:	'Send image to server?'
-,	confirm_save:	'Save image to your Local Storage?'
-,	confirm_load:	'Restore image from your Local Storage?'
+,	confirm_save:	'Save image to your browser memory?'
+,	confirm_load:	'Restore image from your browser memory?'
 ,	found_swap:	'Found image at slot 2, swapped slots.'
-,	no_LS:		'Local Storage not supported.'
+,	no_LS:		'Local Storage (browser memory) not supported.'
+,	no_space:	'Saving failed, not enough space.'
 ,	no_files:	'No image files found.'
 ,	no_form:	'Destination unavailable.'
 ,	no_change:	'Nothing changed.'
@@ -1379,10 +1407,12 @@ else lang = {
 ,	fps:	'Limit FPS when drawing to use less CPU.'
 ,	png:	'Save image as PNG file.'
 ,	jpeg:	'Save image as JPEG file.'
-,	save:	'Save image copy to your Local Storage, two slots in a queue.'
-,	load:	'Load image copy from your Local Storage, two slots in a queue. \n\
+,	save:	'Save image copy to your browser memory, two slots in a queue.'
+,	load:	'Load image copy from your browser memory, two slots in a queue. \r\n\
 May not work in some browsers until set to load and show new images automatically.'
-,	read:	'Load image from your local file. May not work at all, especially if sketcher itself is not started from disk.'
+,	read:	'Load image from your local file. \r\n\
+May not work at all, especially if sketcher itself is not started from disk. \r\n\
+Instead, it is recommended to drag and drop files from another program.'
 ,	done:	'Finish and send image to server.'
 ,	info:	'Show/hide information.'
 }};
