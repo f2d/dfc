@@ -1,59 +1,82 @@
-﻿//* Global wrapper *-----------------------------------------------------------
+﻿
+//* Global wrapper; set namespace at the end *---------------------------------
 
-var milf = new function () {
-var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align to 8 spaces
+(function(NS) { if (!window[NS]) window[NS] = null, window[NS] = new function() {
 
 //* Configuration *------------------------------------------------------------
 
-,	INFO_VERSION = 'v1.12'
-,	INFO_DATE = '2014-07-16 — 2014-10-15'
+var	INFO_VERSION = 'v1.16.10'	//* needs complete rewrite, long ago
+,	INFO_DATE = '2014-07-16 — 2021-01-17'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
 ,	A0 = 'transparent', IJ = 'image/jpeg', SO = 'source-over', DO = 'destination-out'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers', DL
 ,	LS = this.LS = window.localStorage || localStorage
-,	DRAW_PIXEL_OFFSET = -0.5
-,	DRAW_HELPER = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123,123,123,0.5)', globalCompositeOperation: SO}
+,	DRAW_PIXEL_OFFSET = 0.5, CANVAS_BORDER = 1
+,	DRAW_HELPER = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123, 123, 123, 0.5)', globalCompositeOperation: SO}
 
-,	mode = {debug:	false
-	,	shape:	false	//* <- straight line	/ fill area	/ copy
-	,	step:	false	//* <- curve		/ outline	/ part
+,	mode = {debug:	false	//* <- safe to define here
+	,	shape:	false	//* <- safe to define here;	straight line	/ fill area	/ copy
+	,	step:	true	//* <- safe to define here;	curve		/ outline	/ part
 	,	lowQ:	false
 	,	erase:	false
-	,	brushView:	false
+	,	brushView:	false	//* <- safe to define here
 	,	limitFPS:	false
 	,	autoSave:	true
 	,	globalHistory:	false
-	}, modes = [], modeL = 'DLUQEVFAG'
+	}
+,	MODE_NAMES = []
+,	MODE_LETTERS = 'DLUQEVFAG'
+,	SHAPE_HOTKEYS = 'NJPR..YM'
 
+,	selectedSlider = 'W'
+,	SLIDER_LETTERS = 'PGBOW'
+,	SLIDER_NAMES = ['subpixel', 'grid', 'blur', 'opacity', 'width']
 ,	RANGE = {
-		B: {min: 0   , max: 100, step: 1}
+		P: {min: 0.01, max: 1  , step: 0.01}
+	,	G: {min: 1   , max: 100, step: 1}
+	,	B: {min: 0   , max: 100, step: 1}
 	,	O: {min: 0.01, max: 1  , step: 0.01}
 	,	W: {min: 1   , max: 100, step: 1}
-	}, BOW = ['grid', 'blur', 'opacity', 'width'], BOWL = 'GBOW'
+	}
 
+,	DEFAULT_TOOL_WIDTH = 2
+,	TOOLS_ALIGN_LETTERS = 'GP'
+,	TOOLS_ALIGN = ['grid', 'subpixel']
 ,	TOOLS_REF = [
-		{grid: 1, blur: 0, opacity: 1.00, width:  1, clip: SO, color: '0,0,0'}		//* <- draw
-	,	{grid: 0, blur: 0, opacity: 1.00, width: 20, clip: DO, color: '255,255,255'}	//* <- back
-	], tools = [{}, {}], tool = tools[0]
+		{align: 'grid', subpixel: 0.8, grid: 1, blur: 0, opacity: 1.00, width:  1, clip: SO, color: '0, 0, 0'}		//* <- draw
+	,	{align: 'grid', subpixel: 1,   grid: 1, blur: 0, opacity: 1.00, width: 20, clip: DO, color: '255, 255, 255'}	//* <- back
+	]
+,	tools = [{}, {}]
+,	tool = tools[0]
 
 ,	select = {
 		imgRes: {width:640, height:360}
-	,	imgLimits: {width:[64,640], height:[64,800]}
+	,	imgLimits: {width:[64,32767], height:[64,32767]}
 	,	lineCaps: {lineCap:0, lineJoin:0}
-	,	shapeFlags: [1,10,2,2,2,4]
-	,	clipBorder: ['', '#123', '#5ea', '#5ae', '#ff0', '#f40']
+	,	shapeFig: [1,1,6,2,3,4,5]
+	,	shapeFlags: [1,10,66,2,2,2,66,20,28,50]
+/* flags (sum parts, be careful; such a mess, for now):
+1 = path, mode: step 1 line, step 2 curve
+2 = area, mode: outline, fill, erase
+4 = move, mode: copy, step 1 area
+8 = path, closed polygon
+16 = hide lineStyle
+32 = show textStyle; click once to draw
+64 = step 2 for all MODE_NAMES; click same point twice -> not 1 pixel drawn
+*/
+	,	clipBorder: ['', '#123', '#5ea']//, '#5ae', '#ff0', '#f40']
 	,	options: {
-			shape	: ['line', 'poly', 'rectangle', 'circle', 'ellipse', 'pan']
+			shape	: ['line', 'freehand poly', 'regular poly', 'rectangle', 'circle', 'ellipse', 'radiance', 'pan'/*, 'lasso', 'text'*/]
 		,	lineCap	: ['round', 'butt', 'square']
 		,	lineJoin: ['round', 'bevel', 'miter']
 		,	filter	: ['scale', 'integral']
+		,	font	: ['normal', 'compact', 'monospace']
 		,	compose	: [SO, 'destination-over', 'source-atop', 'destination-atop', 'lighter', 'xor', DO]
-		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient']
+		,	palette	: ['history', 'auto', 'legacy', 'Touhou', 'gradient', 'wheel']
 	}}
 
 ,	PALETTE_COL_COUNT = 16	//* <- used if no '\n' found, for example - unformatted history
-,	palette = [(LS && LS.historyPalette) ? JSON.parse(LS.historyPalette) : ['#f']
-
+,	palette = [['#f']
 //* '\t' = title, '\n' = line break + optional title, '\r' = special cases, '#f00' = hex color field, anything else = title + plaintext spacer
 	, [	'#f', '#d', '#a', '#8', '#5', '#2', '#0',				'#a00', '#740', '#470', '#0a0', '#074', '#047', '#00a', '#407', '#704'
 	, '\n',	'#7f0000', '#007f00', '#00007f', '#ff007f', '#7fff00', '#007fff', '#3', '#e11', '#b81', '#8b1', '#1e1', '#1b8', '#18b', '#11e', '#81b', '#b18'
@@ -96,11 +119,14 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 	,	'Reisen', '#dcc3ff', '#2e228c', '#e94b6d'
 	, '\n', 'etc'
 
-	], '\rg']
+	], '\rg', '\rw']
 
 //* Set up (don't change) *----------------------------------------------------
 
-,	o12 = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)	//* <- broken forever, sadly
+,	CUSTOM_CURSOR_DOT = false
+,	TITLE_LINE_BREAK = ' \r\n'
+,	noShadowBlurCurve = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)	//* <- broken forever, sadly
+,	noBorderRadius = /^Opera.* Version\D*1\d\.\d+$/i.test(navigator.userAgent)
 ,	abc = 'abc'.split('')
 ,	regLastNum = /^.*\D(\d+)$/
 ,	regHex = /^#*[0-9a-f]{6}$/i
@@ -110,16 +136,46 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 ,	regTipBrackets = /[ ]*\([^)]+\)$/
 ,	regFunc = /\{[^.]+\.([^(]+)\(/
 ,	regLimit = /^(\d+)\D+(\d+)$/
+,	regHotKey = /^[A-Z\d]$/
 
+,	t0 = +new Date
 ,	self = this, outside = this.o = {}, lang, container
 ,	fps = 0, ticks = 0, timer = 0, loading = 0
-,	interval = {fps:0, timer:0, save:0}, text = {debug:0, timer:0}
-,	ctx = {}, cnv = {view:0, draw:0, lower:0, current:0, upper:0, filter:0, temp:0}
-,	used = {}, cue = {upd:{}}, count = {layers:0, strokes:0, erases:0, undo:0}
+,	interval = o0('fps,timer,save'), cue = {upd:{}}, hue
+,	text = o0('debug,timer')
+,	cnv = o0('view,draw,lower,current,upper,filter,temp'), ctx = {}
+,	count = o0('layers,strokes,erases,undo'), used = {}, used_shape = {}
+,	postingInProgress
 
 ,	draw = {m:{}, o:{}, cur:{}, prev:{}
-	,	refresh:0, time: [0, 0]
-	,	line: {started:0, back:0, preview:0}
+	,	refresh: 0
+	,	gridOffset: o0('x,y')
+	,	line: o0('started,back,preview')
+	,	time: {
+			activeSum: 0
+		,	all: [0,0]
+		,	act: function(i) {
+			var	a = this.all, t = +new Date, i = (i?t0:t);
+				if (!a[0]) {
+					a[0] = this.activeStart = i;
+					a[1] = t;
+				} else {
+					if (!this.activeStart) this.activeStart = i; else
+					if (t-a[1] > this.idle) {
+						this.activeSum = this.sum(t);
+						this.activeStart = t;
+					}
+				}
+				return t;
+			}
+		,	sum: function(t) {
+				return (
+					this.activeStart
+					? (this.all[1] || t || +new Date) - this.activeStart
+					: 0
+				) + this.activeSum;
+			}
+		}
 	,	history: {layer:0, layers:[{show:1, color:'#f'}]
 		,	cur: function(t) {
 				return ((t || (t = this.layer)) && (t = this.layers[t]) ? t.data[t.pos] : 0);
@@ -142,10 +198,8 @@ var	NS = 'milf'	//* <- namespace prefix, change here and above; BTW, tabs align 
 					else if (t.reversable) return 0;
 					else t.reversable = 1, draw.view();
 					if (i !== 0) {
-						if (t.pos < d) {
-							t.last = ++t.pos;
-							for (i = t.last+1; i < d; i++) delete t.data[i];
-						} else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];
+						if (t.pos < d) t.data.length = t.last = ++t.pos;
+						else for (i = 0; i < d; i++) t.data[i] = t.data[i+1];
 					}
 					(t.data[t.pos] = ctx.draw.getImageData(0, 0, cnv.view.width, cnv.view.height)).date = dt;
 				}
@@ -237,7 +291,7 @@ var	y = draw.history, c = y.layer, y = c?[0,y.layers[c]]:y.layers, a = 'UR', b =
 	for (i in a) {
 		k = d;
 		for (j in y) if (j > 0 && y[j].pos != (i > 0?y[j].last:0)) {k = b; break;}
-		setClass(id(b+a[i]), k);
+		setClass(getElemById(b+a[i]), k);
 	}
 	cue.upd = {J:1,P:1};
 }
@@ -315,14 +369,14 @@ var	u = (y.layer != x || ui_rewrite);
 	if (x) {
 	var	a = {A:'alpha',R:'blur'}, x = y.layers[x];
 		for (i in a) {
-			z = id('slider'+i).lastElementChild, z.value = x[a[i]] || 0;
+			z = getElemById('slider'+i).lastElementChild, z.value = x[a[i]] || 0;
 			if (u) updateSliders(z);
 		}
 		a = ['compose','filter'];
-		for (i in a) if (z = id(a[i])) z.value = x[i] || 0;
+		for (i in a) if (z = getElemById(a[i])) z.value = x[i] || 0;
 	}
 //* show/hide:
-	z = id('layers');
+	z = getElemById('layers');
 	while (z = z.nextSibling) z.style.display = (x?'':'none');
 }
 
@@ -339,7 +393,7 @@ var	y = draw.history, d = y.layers;
 
 var	v = d[i][['name','blur','alpha'][--t]] = (typeof e === 'object' ? e.value : e);
 	if (t && i
-	&& (e = id('layer'+i))
+	&& (e = getElemById('layer'+i))
 	&& (e = e.lastElementChild.lastElementChild.previousSibling)
 	&& (t === 2 || (e = e.previousSibling))
 	&& (e.textContent != v)) {
@@ -348,13 +402,13 @@ var	v = d[i][['name','blur','alpha'][--t]] = (typeof e === 'object' ? e.value : 
 }
 
 function updateLayers(ui_tweak, scroll) {
-var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
+var	a, b = 'button', j, k, l = 'layer', d, e = getElemById('layers')
 ,	y = draw.history, c = y.layer, z = y.layers, i = z.length
 ,	h = z[0].color = hex2fix(z[0].color), hi = isRgbDark(hex2rgb(h))?'#fff':'#000';
 
 	function getHistPos(a) {return /*((d = a.data[a.pos])?d.date:null)+'-'+*/a.pos+'/'+a.last;}
 
-	if (ui_tweak && id(l+0) && z[1]) {
+	if (ui_tweak && getElemById(l+0) && z[1]) {
 //* DOM fix:
 		j = e.getElementsByTagName('p'), k = j.length;
 		while (k--) if (a = z[parseInt(j[k].id.match(regLastNum)[1])]) {
@@ -377,7 +431,7 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 				d.color = hi;
 			}
 		}
-		if (i = id(l+c)) i.className = i.className.replace(b, b+'-active');
+		if (i = getElemById(l+c)) i.className = i.className.replace(b, b+'-active');
 	} else {
 //* HTML reset, slower, resets scroll:
 		j = (i > 1?'<hr><div class="slide">':''), k = '<i title="';
@@ -406,10 +460,10 @@ var	a, b = 'button', j, k, l = 'layer', d, e = id('layers')
 		i = c+5, a = true;
 		if (i > j) i = j; else
 		if (i < 10) i = 1, a = false;
-		if (i = id(l+i)) i.scrollIntoView(a);	//* <- param: none/true=alignWithTop, false=Bottom
+		if (i = getElemById(l+i)) i.scrollIntoView(a);	//* <- param: none/true=alignWithTop, false=Bottom
 	}
 	i = j, j = {U:i,T:i, D:1,B:1,M:1, C:0,E:0}, d = b+'-disabled';
-	for (i in j) setClass(id(l+i), (!c || c == j[i]) ?d:b);
+	for (i in j) setClass(getElemById(l+i), (!c || c == j[i]) ?d:b);
 	updateHistoryButtons(), draw.view(2);
 }
 
@@ -558,17 +612,21 @@ var	c = ii.context, d = ii.imageData, p = ii.pixels;
 //* Strokes and shapes *-------------------------------------------------------
 
 function drawCursor() {
-var	c = ctx[mode.brushView?'draw':'view'], d = tool.grid;
-	if (d > 1) {
-	var	m, n = Math.floor(tool.width / d), o = draw.o, v = (n < 1 ? (n = 1) : n)*d, w = v+DRAW_PIXEL_OFFSET, v = v-DRAW_PIXEL_OFFSET;
+var	c = ctx[mode.brushView?'draw':'view']
+,	g = (tool.align === 'grid' ? tool.grid : 1);
+	if (g > 1) {
+	var	m, n = Math.floor(tool.width/g), o = draw.o, v = (n < 1?(n = 1):n)*g, p = DRAW_PIXEL_OFFSET, w = v+p, v = v-p;
 		for (i in DRAW_HELPER) c[i] = DRAW_HELPER[i];
 		c.beginPath();
-		for (i = -n; i <= n; i++) {
-			m = i*d+DRAW_PIXEL_OFFSET;
+		for (i = -n; i <= n; i++) if (i) {
+			m = i*g+p;
 			c.moveTo(o.x+m, o.y-v);
 			c.lineTo(o.x+m, o.y+w);
 			c.moveTo(o.x-v, o.y+m);
 			c.lineTo(o.x+w, o.y+m);
+		} else {
+			c.moveTo(o.x+p, 0), c.lineTo(o.x+p, cnv.draw.height);
+			c.moveTo(0, o.y+p), c.lineTo(cnv.draw.width, o.y+p);
 		}
 		c.stroke();
 	}
@@ -583,26 +641,41 @@ var	c = ctx[mode.brushView?'draw':'view'], d = tool.grid;
 		c.lineWidth = 1;
 	}
 	c.beginPath();
-	c.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7/*Math.PI*2*/, false);
+	c.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7);
 	mode.brushView ? c.fill() : c.stroke();
 	c.globalCompositeOperation = SO;
 }
 
-function drawStart(event) {
-	draw.target = event.target;
+function drawStart(evt) {
+	draw.evt = evt = evt || window.event;
+
+	try {
+		showProps(evt,1,1);	//* <- check if permission denied to read some property
+	} catch (err) {
+		return;			//* <- against FireFox catching clicks on page scrollbar
+	}
+
+	if (!draw.step || (draw.target && draw.target !== evt.target)) drawEnd(evt);
 	if (isMouseIn() <= 0) return false;
 
-	cnv.view.focus();
-	event.preventDefault();
-	event.stopPropagation();
-	event.cancelBubble = true;
+	eventStop(evt).preventDefault();
+	draw.target = evt.target;
+//	cnv.view.focus();
 
 //* Special actions:
-	if (draw.btn && (draw.btn != event.which)) return drawEnd();
-	if (mode.click) return ++mode.click, drawEnd(event);
-	if (event.altKey) draw.turn = {prev: draw.zoom, zoom: 1}; else
-	if (event.ctrlKey) draw.turn = {prev: draw.angle, angle: 1}; else
-	if (event.shiftKey) draw.turn = {prev: draw.pan ? {x: draw.pan.x, y: draw.pan.y} : {x:0,y:0}, pan: 1};
+
+	if (draw.btn && (draw.btn != evt.which)) return drawEnd();
+	if (mode.click) return ++mode.click, drawEnd(evt);
+
+var	s = draw.shape = select.shape.value
+,	sf = draw.shapeFlags = select.shapeFlags[s]
+,	fig = draw.shapeFig = select.shapeFig[s]
+	;
+
+	if (evt.altKey && (draw.step && mode.step && mode.shape && (sf & 1))); else	//* <- line+curve
+	if (evt.altKey) draw.turn = {prev: draw.zoom, zoom: 1}; else
+	if (evt.ctrlKey) draw.turn = {prev: draw.angle, angle: 1}; else
+	if (evt.shiftKey) draw.turn = {prev: draw.pan ? {x: draw.pan.x, y: draw.pan.y} : {x:0,y:0}, pan: 1};
 	if (mode.debug && draw.turn && !draw.turn.pan) {
 		for (i in DRAW_HELPER) ctx.view[i] = DRAW_HELPER[i];
 		ctx.view.beginPath();
@@ -611,60 +684,82 @@ function drawStart(event) {
 		ctx.view.lineTo(cnv.view.width/2, cnv.view.height/2);
 		ctx.view.stroke();
 	}
-	updatePosition(event);
+	updatePosition(evt);
 	if (draw.turn) return draw.turn.origin = getCursorRad();
 
 //* Drawing on cnv.draw:
-var	y = draw.history, i = y.layer, sf = select.shapeFlags[select.shape.value];
-	if (!(!i && (sf & 4)) && !(i && y.layers[i].show)) return false;
+
+var	y = draw.history, i = y.layer;
+
+	if ((i || fig) && !(i && y.layers[i].show)) return false;
 
 	if (draw.step) {
-		if (mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
+		if (
+			(mode.step && (
+				(mode.shape && (sf & 1))	//* <- line+curve
+				|| !fig				//* <- move+area
+			)) | (sf & 64)				//* <- any mode
+		) {
 			for (i in draw.o) draw.prev[i] = draw.cur[i];
-			return draw.step.done = 1;
-		} else draw.step = 0;
-	}
-//	if (event.shiftKey) mode.click = 1;	//* <- draw line/form chains, badly, forget for now
 
-	if ((draw.btn = event.which) != 1 && draw.btn != 3) pickColor();
-	else {
-		draw.active = 1, y = {draw:0, temp:0};
-		if (!draw.time[0]) draw.time[0] = draw.time[1] = +new Date;
-		if (!interval.timer) {
-			interval.timer = setInterval(timeElapsed, 1000);
-			interval.save = setInterval(autoSave, 60000);
+			draw.step.swap = evt.altKey;
+			draw.step.done = 1;
+
+			return;
+		} else {
+			draw.step = 0;
 		}
-	var	i = (event.which == 1)?1:0, j, t = tools[1-i]
-	,	b = ((sf & 4) ? 0 : t.blur)
-	,	pf = ((sf & 8) && (mode.shape || !mode.step))
-	,	fig = ((sf & 2) && (mode.shape || pf));
-		draw.clip = t.clip;
-		for (i in (t = mode.erase ? DRAW_HELPER : {
-			lineWidth: (((sf & 4) || (pf && !mode.step))?1:t.width)
-		,	fillStyle: (fig ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
-		,	strokeStyle: (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+((sf & 4)?(draw.step?0.33:0.66):t.opacity)+')')
-		,	shadowColor: (b ? 'rgb('+t.color+')' : A0)
-		,	shadowBlur: b
-		})) for (j in y) ctx[j][i] = t[i];
-		updatePosition(event);
-		for (i in draw.o) draw.prev[i] = draw.cur[i];
-		for (i in draw.line) draw.line[i] = false;
-		for (i in select.lineCaps) {
-			t = select.options[i][select[i].value];
-			for (j in y) ctx[j][i] = t;
-		}
-		ctx.draw.beginPath();
-		ctx.draw.moveTo(draw.cur.x, draw.cur.y);
 	}
+//	if (evt.shiftKey) mode.click = 1;	//* <- draw line/form chains, meh, forget for now
+
+	if ((draw.btn = evt.which) != 1 && draw.btn != 3) return pickColor(), drawEnd();
+
+//* Start drawing:
+
+	draw.active = draw.time.act(), y = {draw:0, temp:0};
+	if (!interval.timer) {
+		interval.timer = setInterval(timeElapsed, 1000);
+		interval.save = setInterval(autoSave, 60000);
+	}
+var	i = (evt.which == 1)?1:0, j, t = tools[1-i]
+,	b = (fig ? t.blur : 0)
+,	pf = ((sf & 8) && (mode.shape || !mode.step))
+,	sh = ((sf & 2) && (mode.shape || pf));
+	draw.clip = t.clip;
+	for (i in (t = mode.erase ? DRAW_HELPER : {
+		lineWidth: ((!fig || (pf && !mode.step))?1:t.width)
+	,	fillStyle: (sh ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
+	,	strokeStyle: (sh && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+(fig?t.opacity:(draw.step?0.33:0.66))+')')
+	,	shadowColor: (b ? 'rgb('+t.color+')' : A0)
+	,	shadowBlur: b
+	})) for (j in y) ctx[j][i] = t[i];
+	updatePosition(evt);		//* <- update pixel offset based on tool width && draw.active
+	for (i in draw.o) draw.prev[i] = draw.cur[i];
+	for (i in draw.line) draw.line[i] = false;
+	for (i in select.lineCaps) {
+		t = select.options[i][select[i].value];
+		for (j in y) ctx[j][i] = t;
+	}
+	if (sf & 32) return drawEnd(evt);
+	ctx.draw.beginPath();
+	ctx.draw.moveTo(draw.cur.x, draw.cur.y);
 }
 
-function drawMove(event) {
-	if (mode.click == 1 && !event.shiftKey) return mode.click = 0, drawEnd(event);
+function drawMove(evt) {
+	draw.evt = evt = evt || window.event;
 
-	updatePosition(event);
+	if (mode.click == 1 && !evt.shiftKey) return mode.click = 0, drawEnd(evt);
+
+	if (evt.type.indexOf('mouse') === 0) {
+		updatePosition(evt);
+	}
+
 	if (draw.turn) return updateViewport(draw.turn.pan?1:draw.turn.delta = getCursorRad() - draw.turn.origin);
 
-var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
+var	s = draw.shape
+,	sf = draw.shapeFlags
+,	fig = draw.shapeFig
+,	redraw = true, i
 ,	newLine = (draw.active && !((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)));
 
 	if (mode.click) mode.click = 1;
@@ -673,7 +768,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 			drawShape(ctx.draw, s);
 		} else
 		if (draw.line.back = mode.step) {
-			if (o12) ctx.draw.shadowColor = A0, ctx.draw.shadowBlur = 0;	//* <- shadow, once used with CurveTo + stroke(), totally breaks for given cnv.view in Opera 12
+			if (noShadowBlurCurve) ctx.draw.shadowColor = A0, ctx.draw.shadowBlur = 0;
 			if (draw.line.started) ctx.draw.quadraticCurveTo(draw.prev.x, draw.prev.y, (draw.cur.x + draw.prev.x)/2, (draw.cur.y + draw.prev.y)/2);
 		} else ctx.draw.lineTo(draw.cur.x, draw.cur.y);
 		draw.line.preview =	!(draw.line.started = true);
@@ -689,7 +784,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 		redraw = 0;
 		if (i || (draw.active && !mode.lowQ)) draw.preload(), ++redraw;
 		if (draw.active) {
-			if (!(sf & 4)) ctx.draw.globalCompositeOperation = draw.clip;
+			if (fig) ctx.draw.globalCompositeOperation = draw.clip;
 			if ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)) {
 				draw.line.preview = true;
 				if (mode.erase && (sf & 2)) {
@@ -698,7 +793,7 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 				} else {
 					ctx.temp.clearRect(0, 0, cnv.view.width, cnv.view.height);
 					ctx.temp.beginPath();
-					drawShape(ctx.temp, (mode.step && (sf & 4) && (!draw.step || !draw.step.done))?2:s);
+					drawShape(ctx.temp, s);
 					ctx.temp.stroke();
 					ctx.draw.drawImage(cnv.temp, 0, 0), ++redraw;
 				}
@@ -714,15 +809,28 @@ var	redraw = true, s = select.shape.value, sf = select.shapeFlags[s], i
 	if (newLine) for (i in draw.o) draw.prev[i] = draw.cur[i];
 }
 
-function drawEnd(event) {
-	if (!event || draw.turn) return draw.active = draw.step = draw.btn = draw.turn = 0;
-	if (mode.click == 1 && event.shiftKey) return drawMove(event);
+function drawEnd(evt) {
+	if (!evt || draw.turn) return draw.active = draw.step = draw.btn = draw.turn = 0, draw.view(1);
+
+	draw.evt = evt = evt || window.event;
+	if (mode.click == 1 && evt.shiftKey) return drawMove(evt);
 	if (draw.active) {
 		if (draw.target != cnv.view) return;
-		draw.target = 0;
-	var	s = select.shape.value, sf = select.shapeFlags[s], m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8));
+
+	var	s = draw.shape
+	,	sf = draw.shapeFlags
+	,	fig = draw.shapeFig
+	,	m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8))
+		;
+
 	//* 2pt line, base for 4pt curve:
-		if (!draw.step && mode.step && ((mode.shape && (sf & 1)) || (sf & 4))) {
+
+		if (!draw.step && (
+			(mode.step && (
+				(mode.shape && (sf & 1))	//* <- line+curve
+				|| (sf & 4)			//* <- move+area
+			)) || (sf & 64)				//* <- any mode
+		)) {
 			draw.step = {
 				prev:{x:draw.prev.x, y:draw.prev.y}
 			,	cur:{x:draw.cur.x, y:draw.cur.y}
@@ -730,7 +838,7 @@ function drawEnd(event) {
 			return;
 		}
 		for (i in DRAW_HELPER) ctx.temp[i] = DRAW_HELPER[i];
-		draw.time[1] = +new Date;
+		draw.time.all[1] = +new Date;
 		draw.preload();
 		if (mode.erase) {
 			if (sf & 8) {
@@ -743,20 +851,20 @@ function drawEnd(event) {
 			++count.erases;
 		} else {
 			ctx.draw.fillStyle = ctx.temp.fillStyle;
-			if (i = (sf & 4) ? 0 : ((ctx.draw.globalCompositeOperation = draw.clip) == DO)) ++count.erases;
+			if (i = (fig ? ((ctx.draw.globalCompositeOperation = draw.clip) == DO) : 0)) ++count.erases;
 			if (sf & 8) {
 				ctx.draw.closePath();
 				if (mode.shape || !mode.step) ctx.draw.fill();
 				used.poly = 'Poly';
 			} else
-			if (m && draw.line.preview) {
+			if ((sf & 64) || (m && draw.line.preview)) {
 				drawShape(ctx.draw, s);
-				if (!(sf & 4)) used.shape = 'Shape';
+				if (fig) ++used_shape[select.options.shape[s]];//used.shape = 'Shape';
 			} else
 			if (m || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
 				ctx.draw.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
 			}
-			if (sf & 4) used.move = 'Move';
+			if (!fig) used.move = 'Move';
 			else if (!(sf & 8) || mode.step) {
 				ctx.draw.stroke();
 				if (!i) ++count.strokes;
@@ -766,88 +874,244 @@ function drawEnd(event) {
 		historyAct();
 		draw.active = draw.step = draw.btn = 0;
 		if (cue.autoSave < 0) autoSave(); else cue.autoSave = 1;
-		if (mode.click && event.shiftKey) return mode.click = 0, drawStart(event);
+		if (mode.click && evt.shiftKey) return mode.click = 0, drawStart(evt);
 	}
+	draw.target = 0;
 	updateDebugScreen();
 }
 
 function drawShape(c, i, clear) {
-var	s = draw.step, r = draw.cur, v = draw.prev;
-	switch (parseInt(i)) {
-	//* rect
-		case 2:	if (s) {
-			//* show pan source area
-				c.strokeRect(s.prev.x, s.prev.y, s.cur.x-s.prev.x, s.cur.y-s.prev.y);
-			} else if (clear) ctx.draw.clearRect(v.x, v.y, r.x-v.x, r.y-v.y);
-			else {
-				if (c.fillStyle != A0)
-				c.fillRect(v.x, v.y, r.x-v.x, r.y-v.y);
-				c.strokeRect(v.x, v.y, r.x-v.x, r.y-v.y);
-			}
-			break;
-	//* circle
-		case 3:
-		var	xCenter = (v.x+r.x)/2
-		,	yCenter = (v.y+r.y)/2
-		,	radius = Math.sqrt(Math.pow(r.x-xCenter, 2) + Math.pow(r.y-yCenter, 2));
-			c.moveTo(xCenter+radius, yCenter);
-			c.arc(xCenter, yCenter, radius, 0, 7, false);
-			if (clear) {
-				ctx.draw.save();
-				ctx.draw.clip();
-				ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
-				ctx.draw.restore();
-			} else if (c.fillStyle != A0) c.fill();
-			c.moveTo(r.x, r.y);
-			break;
-	//* ellipse
-		case 4:
-		var	xCenter = (v.x+r.x)/2
-		,	yCenter = (v.y+r.y)/2
-		,	xRadius = Math.abs(r.x-xCenter)
-		,	yRadius = Math.abs(r.y-yCenter), qx = 1, qy = 1;
-			if (xRadius > 0 && yRadius > 0) {
-				c.save();
-				if (xRadius > yRadius) c.scale(1, qy = yRadius/xRadius); else
-				if (xRadius < yRadius) c.scale(qx = xRadius/yRadius, 1);
-				c.moveTo((xCenter+xRadius)/qx, yCenter/qy);
-				c.arc(xCenter/qx, yCenter/qy, Math.max(xRadius, yRadius), 0, 7, false);
-				c.restore();
-				if (clear) {
-					ctx.draw.save();
-					ctx.draw.clip();
-					ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
-					ctx.draw.restore();
-				} else if (c.fillStyle != A0) c.fill();
-			}
-			c.moveTo(r.x, r.y);
-			break;
+var	cd = ctx.draw, v = draw.prev, r = draw.cur
+,	ct = ctx.temp, s = draw.step, evt = draw.evt
+,	fig = select.shapeFig[i] || (mode.step && !(s && s.done)?2:0);
+
+	function circle(r, c, a, b) {
+		(c?c:c = ct).moveTo(
+		(a?a:a = x)+r,
+		(b?b:b = y));
+		c.arc(a, b, r, 0, 7);
+	}
+
+	switch (fig) {
 	//* pan
-		case 5:	if (v.x != r.x
-			|| (v.y != r.y)) moveScreen(r.x-v.x, r.y-v.y, c != ctx.temp);
-			break;
+		case 0:	if (v.x != r.x
+			|| (v.y != r.y)) moveScreen(r.x-v.x, r.y-v.y, c != ct);
+		break;
 	//* line
-		default:if (s) {
-			var	d = r, old = propSwap(ctx.temp, DRAW_HELPER);
-				ctx.temp.beginPath();
-				if (s.prev.x != v.x || s.prev.y != v.y) {
-					ctx.temp.moveTo(d.x, d.y), d = v;
-					ctx.temp.lineTo(d.x, d.y);
+		case 1:	if (s) {
+			var	d = r
+			,	w = s.prev
+			,	u = s.cur
+			,	old = propSwap(ct, DRAW_HELPER)
+				;
+
+		//* control point 1 phantom
+
+				ct.moveTo(u.x, u.y);
+				ct.lineTo(w.x, w.y);
+
+		//* control point 2 phantom
+
+				if (w.x != v.x || w.y != v.y) {
+					ct.moveTo(d.x, d.y), d = v;
+					ct.lineTo(d.x, d.y);
 				}
-				ctx.temp.moveTo(s.cur.x, s.cur.y);
-				ctx.temp.lineTo(s.prev.x, s.prev.y);
-				ctx.temp.stroke();
-				propSwap(ctx.temp, old);
-				ctx.temp.beginPath();
+
+				propSwap(ct, old, 0);
 		//* curve
-				c.moveTo(s.prev.x, s.prev.y);
-				c.bezierCurveTo(s.cur.x, s.cur.y, d.x, d.y, r.x, r.y);
+			var	swapKey = (evt && evt.altKey)
+			,	swapPoint1 = (s.done ? s.swap : swapKey)
+			,	swapPoint2 = (s.done ? !swapKey : swapKey)
+			,	linePoint1 = (swapPoint1 ? u : w)
+			,	ctrlPoint1 = (swapPoint1 ? w : u)
+			,	ctrlPoint2 = (swapPoint2 ? r : d)
+			,	linePoint2 = (swapPoint2 ? d : r)
+				;
+
+				c.moveTo(linePoint1.x, linePoint1.y);
+				c.bezierCurveTo(
+					ctrlPoint1.x, ctrlPoint1.y
+				,	ctrlPoint2.x, ctrlPoint2.y
+				,	linePoint2.x, linePoint2.y
+				);
 			} else {
 		//* straight
 				c.moveTo(v.x, v.y);
 				c.lineTo(r.x, r.y);
 			}
+		break;
+	//* rect
+		case 2:	if (s) {
+			//* show pan source area
+				c.strokeRect(s.prev.x, s.prev.y, s.cur.x-s.prev.x, s.cur.y-s.prev.y);
+			} else if (clear) cd.clearRect(v.x, v.y, r.x-v.x, r.y-v.y);
+			else {
+				if (c.fillStyle != A0)
+				c.fillRect(v.x, v.y, r.x-v.x, r.y-v.y);
+				c.strokeRect(v.x, v.y, r.x-v.x, r.y-v.y);
+			}
+		break;
+	//* circle
+		case 3:
+		var	xCenter = (v.x+r.x)/2
+		,	yCenter = (v.y+r.y)/2
+		,	radius = dist(r.x-xCenter, r.y-yCenter);
+			if (radius > 0) {
+				circle(radius, c, xCenter, yCenter);
+				if (clear) insideClear(cd);
+				else if (c.fillStyle != A0) c.fill();
+			}
+		break;
+	//* ellipse
+		case 4:
+		var	xCenter = (v.x+r.x)/2
+		,	yCenter = (v.y+r.y)/2
+		,	xRadius = Math.abs(r.x-xCenter)
+		,	yRadius = Math.abs(r.y-yCenter), x = 1, y = 1;
+			if (xRadius > 0 && yRadius > 0) {
+				if (c.ellipse) {
+					c.moveTo(xCenter+xRadius, yCenter);
+					c.ellipse(xCenter, yCenter, xRadius, yRadius, 0, 0, 7);
+				} else {
+					c.save();
+					if (xRadius > yRadius) c.scale(x, y = yRadius/xRadius); else
+					if (xRadius < yRadius) c.scale(x = xRadius/yRadius, y);
+					c.moveTo((xCenter+xRadius)/x, yCenter/y);
+					c.arc(xCenter/x, yCenter/y, Math.max(xRadius, yRadius), 0, 7);
+					c.restore();
+				}
+				if (clear) insideClear(cd);
+				else if (c.fillStyle != A0) c.fill();
+			}
+		break;
+	//* polar figures
+		case 5:
+		case 6:	if (s) {
+			var	x = s.prev.x, y = s.prev.y, GEAR = (fig == 5)
+			,	r1 =		dist(s.cur.x-x, s.cur.y-y)	//* <- 1st radius (at releasing 1st click)
+			,	r2 =		dist(r.x-x, r.y-y)		//* <- always current (2nd or 3rd)
+			,	r3 = (s.done ?	dist(v.x-x, v.y-y) : r2);	//* <- 2nd or current (2nd click down)
+
+				function r2far() {
+					return dist(
+						Math.max(cnv.draw.width-x, x)
+					,	Math.max(cnv.draw.height-y, y)	//* <- "infinite" ray length = to farthest image corner + outline width
+					)+tool.width;
+				}
+
+				if (GEAR) {
+					if (r3 < r1+1) r3 = r2far()*10;	//* <- for later out-of-border moves
+					if (r2 > r3) r2 = 0;
+				} else	if (r1 < 1) r1 = r2far();	//* <- just as a 1-click default; infinity is not needed here
+				if (r3 > 1) {
+				var	a1 =		Math.atan2(s.cur.y-y, s.cur.x-x)
+				,	a2 =		Math.atan2(r.y-y, r.x-x)
+				,	a3 = (s.done ?	Math.atan2(v.y-y, v.x-x) : a2)
+				,	a = ang_btw(a1, a3)
+				,	b = Math.abs(a), d = Math.PI, h = d/2
+				,	w = Math.ceil(tool.width+2)				//* <- minimum ray width, pixels
+				,	i = Math.floor(d/Math.max(Math.abs(b-h), w/h/r3))	//* <- ray count to fit angular width
+			//	,	i = Math.ceil(b/d*360)					//* <- ray count by angle fraction (max 360 rays here)
+				,	R2G1 = ((!GEAR || s.done) && r2 > 1 && r2 > r1)
+				,	R1G3 = (r1 > r3)
+				,	r4 = (GEAR && R2G1?r2:r1)
+				,	j = (GEAR || !R1G3)?2:3					//* <- minimum ray count
+				;	d /= i = Math.max(i, j);
+				}
+				old = propSwap(ct, DRAW_HELPER);
+
+				if (!s.done) {
+				var	rm = Math.max(r2-4, 4)
+				,	rn = rm+8
+				,	am = a1+(b > h?Math.PI:0)
+				,	an = ((a < 0) != (b > h)?-h:h)
+				,	k = Math.min(90, Math.floor(rm/3))
+				;	function r2line(a) {
+						c.moveTo(x + Math.cos(a)*rm, y + Math.sin(a)*rm);
+						c.lineTo(x + Math.cos(a)*rn, y + Math.sin(a)*rn);
+					}
+					while (++j < k) r2line(am + an*(1-2/j));	//* <- possible ray count marks phantom
+					r2line(am + an);
+					r2line(am);					//* <- 90 degree marks
+				}
+
+				if (GEAR) {
+			//* radiance, cog wheel
+					if (r3 > 1 && R2G1) circle(r1);			//* <- base circle phantom
+
+					propSwap(ct, old, 0);
+
+					if (r3 > 1) {
+						if (!R2G1) h = a2-d, c.moveTo(x + Math.cos(h)*r3, y + Math.sin(h)*r3);	//* <- start linked
+						while (i--) {
+							a = a2 + d*i*2, b = a-d, h = (R2G1?b:a+d);
+							if (R2G1) c.moveTo(x + Math.cos(h)*r3, y + Math.sin(h)*r3);	//* <- start isolated
+							c.arc(x, y, r4, h, a,!R2G1);
+							c.arc(x, y, r3, a, b, true);		//* <- arc adds lineTo itself by standard, wanted or not
+						}
+					} else if (	r1 > 1 && r2 < r1) circle(r1, c);	//* <- base circle, no cogs
+					if (s.done &&	r2 > 1 && r2 < r1) circle(r2, c);	//* <- hole inside
+				} else {
+			//* regular polygon, star
+					if (R1G3) {
+				//* fixed spike length + autoconnect peaks
+						R2G1 = 0;
+						if (s.done) {
+							if (i > 4) {
+								a = Math.PI/i;
+								j = Math.floor((i-3)/2)+1;	//* <- max peak connection variants
+								while (--j) {
+									b = h = r1*Math.cos(a*(j+1))/Math.cos(a*j);
+									if (r2 > r1) h += r1;
+									circle(h);		//* <- snap levels phantom
+									if (!R2G1 && r2 < h) R2G1 = 1, r4 = b;
+								}
+							}
+						} else {
+							j = d*2, h = Math.PI*2, a = h+(h+a2)%j;
+							while ((a -= j) >= 0) {
+								ct.moveTo(x, y);
+								ct.lineTo(x + Math.cos(a)*r1, y + Math.sin(a)*r1);	//* <- ray count phantom
+							}
+						}
+						r2 = r1;
+					} else if (r2 != r1)
+				//* variable spike length
+					circle(r2);
+					circle(r1);				//* <- base radius phantom
+
+					propSwap(ct, old, 0);
+
+					c.moveTo(x + Math.cos(a2)*r2, y + Math.sin(a2)*r2);
+					while (i--) {
+						a = a2 + d*i*2, b = a+d;
+						if (!R1G3 || R2G1)
+						c.lineTo(x + Math.cos(b)*r4, y + Math.sin(b)*r4);
+						c.lineTo(x + Math.cos(a)*r2, y + Math.sin(a)*r2);
+					}
+				}
+			} else circle(dist(r.x-v.x, r.y-v.y), c, v.x, v.y);	//* <- base radius, 1st step
+
+			if (clear) insideClear(cd);
+			else if (c.fillStyle != A0) c.fill('evenodd');
+		break;
 	}
+	c.moveTo(r.x, r.y);
+}
+
+function insideClear(c) {
+	c.save();
+	c.clip();
+	c.clearRect(0, 0, cnv.view.width, cnv.view.height);
+	c.restore();
+}
+
+function propSwap(a, b, c, r) {
+	if ((!r && !c && c !== null ? (r = 'stroke') : r) && a[r]) a[r]();
+	r = {};
+	for (i in b) r[i] = a[i], a[i] = b[i];
+	if ((c?c:c = 'beginPath') && a[c]) a[c]();
+	return r;
 }
 
 //* One-click all-screen manipulation *----------------------------------------
@@ -884,14 +1148,25 @@ var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape,
 	c.drawImage(cnv.temp, 0, 0);
 }
 
-function fillCheck(c) {
-	if (c && !(c = draw.history.cur())) return [0,0,0,255];
-var	d = (c?c:ctx.view.getImageData(0, 0, cnv.view.width, cnv.view.height)).data, i = d.length, r = [];
-	while (i--)
-	if (i < 4) r[i] = d[i]; else
-	if (d[i] != d[i%4]) return 0;
-//* fill flood confirmed, return its color:
-	return r;
+function fillCheck(c, returnRGBA) {
+	if (c && !(c = draw.history.cur())) {
+		return returnRGBA ? [0,0,0,255] : true;
+	}
+
+var	d = (
+		c || (
+			draw.view()
+		,	ctx.view.getImageData(0, 0, cnv.view.width, cnv.view.height)
+		)
+	).data
+,	i = d.length
+	;
+
+	while (i-- > 4) if (d[i] !== d[i%4]) return false;
+
+//* fill flood confirmed:
+
+	return returnRGBA ? d.slice(0,4) : true;
 }
 
 function fillScreen(i,t) {
@@ -911,8 +1186,10 @@ function fillScreen(i,t) {
 	} else
 	if (!i) {
 		used.fill = 'Fill';
+		ctx.draw.globalCompositeOperation = (getElemById('lineStyle').style.display == 'none' ? SO : tool.clip);
 		ctx.draw.fillStyle = 'rgb(' + tools[i].color + ')';
 		ctx.draw.fillRect(0, 0, cnv.view.width, cnv.view.height);
+		ctx.draw.globalCompositeOperation = SO;
 	} else {
 		draw.preload(), historyAct(-t || false), d = y.cur(), z = l[z];
 		if (!d) return;
@@ -946,22 +1223,50 @@ function fillScreen(i,t) {
 	historyAct(t);
 }
 
-function pickColor(keep, c, event) {
-	if (c) {
-//* gradient palette:
-	var	d = c.ctx.getImageData(0, 0, c.width, c.height), o = getOffsetXY(c);
-		c = (event.pageX - o.x
-		+   (event.pageY - o.y)*c.width)*4;
-	} else {
-		c = (Math.floor(draw.o.x) + Math.floor(draw.o.y)*cnv.view.width)*4;
-//* current layer:
-		d = draw.history.cur();
-//* whole image:
-		if (!d) draw.view(1), d = ctx.view.getImageData(0, 0, cnv.view.width, cnv.view.height);
+function pickColor(evt, e, keep) {
+	// evt = evt || window.event;	//* <- breaks getting data without cursor when picking color from canvas
+
+	if (e && e.ctx) c = e; else
+	if (evt) {
+		if (e && e.length) d = e; else
+		if (evt === 1) keep = 1; else
+		if (evt.ctx) c = evt; else
+		if ((e = evt.target) && e.ctx) c = e;
 	}
-	d = d.data, c = (d[c]*65536 + d[c+1]*256 + d[c+2]).toString(16);
-	while (c.length < 6) c = '0'+c; c = '#'+c;
-	return keep ? c : updateColor(c, event);
+//* from gradient palette:
+	if (c) {
+		eventStop(evt);
+	var	d = getOffsetXY(c)
+	,	x = evt.pageX - CANVAS_BORDER - d.x
+	,	y = evt.pageY - CANVAS_BORDER - d.y
+	,	w = c.width
+	,	h = c.height
+		;
+		if (x < 0) x = 0; else if (x >= w) x = w-1;
+		if (y < 0) y = 0; else if (y >= h) y = h-1;
+		d = c.ctx.getImageData(x,y, 1,1).data;
+		c = 0;
+	} else
+//* from drawing container:
+	if (!d) {
+	var	c = 0
+	,	x = Math.floor(draw.o.x)
+	,	y = Math.floor(draw.o.y)
+		;
+//* current layer:
+		if (d = draw.history.cur()) c = (x + y*cnv.view.width)*4;
+//* whole image:
+		else draw.view(1), d = ctx.view.getImageData(x,y, 1,1);
+		d = d.data;
+	}
+	if (d) {
+		c = rgb2hex(d, c);
+		if ((e = keep) && e.tagName) {
+			e.style.backgroundColor = c;
+			e.rgbArray = hue = c = d;
+		}
+		return keep ? c : updateColor(c, evt);
+	}
 }
 
 //* Color conversions *--------------------------------------------------------
@@ -990,11 +1295,20 @@ function hex2rgb(v) {
 	+', '+ parseInt(v.substr(4,2), 16);
 }
 
-function rgb2hex(v) {
+function rgb2hex(v, i) {
+	if (v && !v.split) {
+		if (k = v.length) {
+		var	c = 0, i = orz(i), k = Math.min(k, i+3);
+			for (; i < k; i++) c = c*256 + v[i];
+			c = c.toString(16);
+		} else c = '';
+		while (c.length < 6) c = '0'+c;
+		return '#'+c;
+	}
 	if (!reg255.test(v)) return false;
 	v = v.split(reg255split);
 var	h = '#', i, j;
-	for (i in v) h += ((j = parseInt(v[i]).toString(16)).length == 1) ? '0'+j : j;
+	for (i in v) h += ((j = Math.min(255, parseInt(v[i])).toString(16)).length == 1) ? '0'+j : j;
 	return h;
 }
 
@@ -1004,11 +1318,36 @@ var	a = v.split(reg255split), v = 0, i;
 	return v < 380;
 }
 
+function setToolHue(redraw) {
+var	a = tool.color.split(reg255split).map(orz)
+,	i = a.length
+	;
+	while (--i) if (a[i] != a[0]) {
+	var	i = a.length
+	,	j = Math.min.apply(null, a)
+	,	k = Math.max.apply(null, a)-j
+		;
+		while (i--) a[i] -= j;
+		if (k < 255) {
+			i = a.length;
+			j = 255/k;
+			while (i--) if (a[i] > 0) a[i] = Math.floor(a[i]*j);
+		}
+		i = a.length;
+		while (i--) if (!hue || a[i] != hue[i]) {
+			hue = a;
+			if (redraw && (i = getElemById('color-wheel-box'))) i.redrawBoxGradient(hue);
+			return;
+		}
+		return;
+	}
+}
+
 //* Layout changes *-----------------------------------------------------------
 
 function updateColor(value, i) {
 var	t = tools[(!i || (isNaN(i) && i.which != 3))?0:1]
-,	c = id('color-text')
+,	c = getElemById('color-text')
 ,	v = value || c.value;
 
 //* check format:
@@ -1019,7 +1358,7 @@ var	t = tools[(!i || (isNaN(i) && i.which != 3))?0:1]
 		if (value != '') t.color = hex2rgb(v);
 	} else return c.style.backgroundColor = 'red';
 
-	if (t == tool) c.value = v, c.style.backgroundColor = '';
+	if (t == tool) c.value = v, c.style.backgroundColor = '', setToolHue(1);
 
 //* put on top of history palette:
 var	p = palette[0], found = p.length;
@@ -1033,67 +1372,203 @@ var	p = palette[0], found = p.length;
 	}
 
 //* update buttons:
-	i = id(t == tool?'colorF':'colorB');
+	i = getElemById(t == tool?'colorF':'colorB');
 	i.style.color = isRgbDark(t.color)?'#fff':'#000';		//* <- inverted font color
 	i.style.background = 'rgb(' + t.color + ')';
 	return v;
 }
 
 function updatePalette() {
-var	pt = id('colors'), c = select.palette.value, p = palette[c];
+
+	function drawGradient(cnv, fun, etc) {
+	var	ctx = cnv.ctx = cnv.getContext('2d')
+	,	w = cnv.width
+	,	h = cnv.height
+	,	d = ctx.createImageData(w,h)
+	,	b,x,y = h
+		;
+		while (y--) {
+			x = w;
+			while (x--) {
+				b = fun(x,y, w,h, etc);
+				i = (x + y*w)*4;
+				d.data[i  ] = b[0];
+				d.data[i+1] = b[1];
+				d.data[i+2] = b[2];
+				d.data[i+3] = 255;
+			}
+		}
+		ctx.putImageData(d, 0,0);
+	}
+
+	function linearBlend(from, to, frac, max) {
+		if (frac <= 0) return from;
+		if (frac >= max) return to;
+	var	i = to.length
+	,	j = frac/max
+	,	k = 1-j
+	,	r = []
+		;
+		while (i--) r[i] = Math.round(from[i]*k + to[i]*j);
+		return r;
+	}
+
+	function getBoxGradientPixel(x,y, w,h, hue) {
+		return linearBlend(
+			linearBlend(hue, gray[2], x,w)
+		,	linearBlend(gray[0], gray[1], x,w)
+		,	y,h
+		);
+	}
+
+	function getRainbowWheelGradientPixel(x,y, w,h) {
+	var	m = Math.PI*2
+	,	a = Math.atan2(y - h/2, x - w/2) + m/3
+	,	i = 0
+	,	d = m/l
+		;
+		if (a < 0) a += m;
+		while (a > d) a -= d, ++i;
+		return linearBlend(rgb[i], rgb[++i < l?i:0], a,d);
+	}
+
+	function getRainbowBoxGradientPixel(x,y, w,h, sat) {
+	var	i = 0
+	,	d = w/l
+		;
+		while (x > d) x -= d, ++i;
+	var	c = linearBlend(rgb[i], rgb[++i < l?i:0], x,d);
+		if (d = sat[1]) c = linearBlend(gray[1], c, sat[0], d);
+		if (y == y2) return c;
+		return linearBlend(c, gray[y < y2?0:2], Math.abs(y-y2), y2);
+	}
+
+	function pickHue(evt) {
+		evt = evt || window.event;
+
+		if (evt.type === 'mousemove' && (!draw.target || draw.target != evt.target)) return;
+		eventStop(evt).preventDefault();
+		if (!draw.target) draw.target = getElemById('color-wheel-round');
+	var	hue = pickColor(evt, draw.target, getElemById('color-wheel-hue'));
+		drawGradient(getElemById('color-wheel-box'), getBoxGradientPixel, hue);
+	}
+
+	function pickCorner(evt) {
+		evt = evt || window.event;
+
+		pickColor(evt, evt.target.rgbArray);
+	}
+
+	function redrawBoxGradient(hue) {
+	var	e = getElemById('color-wheel-hue');
+		e.style.backgroundColor = rgb2hex(hue);
+		e.rgbArray = hue;
+		drawGradient(getElemById('color-wheel-box'), getBoxGradientPixel, hue);
+	}
+
+var	pt = getElemById('colors')
+,	c = select.palette.value
+,	p = palette[c]
+	;
 	if (LS) LS.lastPalette = c;
 	clearContent(pt);
 
 	if (p[0] == '\r') {
-		c = p[1];
+	var	c = p[1]
+	,	rgb = [
+			[255,  0,  0]
+		,	[255,255,  0]
+		,	[  0,255,  0]
+		,	[  0,255,255]
+		,	[  0,  0,255]
+		,	[255,  0,255]
+		]
+	,	gray = [
+			[  0,  0,  0]
+		,	[127,127,127]
+		,	[255,255,255]
+		]
+	,	l = rgb.length
+	,	f = 'return false;'
+		;
 		if (c == 'g') {
-			c = document.createElement('canvas'), c.ctx = c.getContext('2d'), c.width = 300, c.height = 133;
-		var	hues = [[255,  0,  0]
-			,	[255,255,  0]
-			,	[  0,255,  0]
-			,	[  0,255,255]
-			,	[  0,  0,255]
-			,	[255,  0,255]
-		],	bw = [	[  0,  0,  0]
-			,	[127,127,127]
-			,	[255,255,255]
-		],	l = hues.length, f = 'return false;';
-
-			function linearBlend(from, to, frac, max) {
-				if (frac <= 0) return from;
-				if (frac >= max) return to;
-			var	i = to.length, j = frac/max, k = 1-j, r = [];
-				while (i--) r[i] = Math.round(from[i]*k + to[i]*j);
-				return r;
-			}
+			setContent(pt, getSlider('S')+'<br>');
+			setSlider('S');
+			setId(c = cre('canvas', pt), 'gradient');
+		var	x = c.width = 300
+		,	y = c.height = 133
+		,	y2 = Math.floor(y/2)
+			;
 
 			(c.updateSat = function (sat) {
-			var	x = c.width, y = c.height, y2 = Math.floor(y/2), h, i, j, k = Math.ceil(c.width/l)
-			,	d = c.ctx.createImageData(x, y);
-				while (x--) {
-					h = linearBlend(hues[y = Math.floor(x/k)], hues[(y+1)%l], x%k, k);
-					if (!isNaN(sat)) h = linearBlend(bw[1], h, sat, RANGE.S.max);
-					y = c.height;
-					while (y--) {
-						j = linearBlend(h, bw[y < y2?0:2], Math.abs(y-y2), y2);
-						i = (x+y*c.width)*4;
-						d.data[i  ] = j[0];
-						d.data[i+1] = j[1];
-						d.data[i+2] = j[2];
-						d.data[i+3] = 255;
-					}
-				}
-				c.ctx.putImageData(d, 0, 0);
+				drawGradient(c, getRainbowBoxGradientPixel, [sat, isNaN(sat) ? 0 : RANGE.S.max]);
 			})();
 
 			c.setAttribute('onscroll', f);
 			c.setAttribute('oncontextmenu', f);
-			c.addEventListener('mousedown', function (event) {pickColor(0, c, event || window.event);}, false);
-			setId(c, 'gradient');
-			setContent(pt, getSlider('S')+'<br>');
-			setSlider('S');
+			c.onmousedown = pickColor;
+		} else
+		if (c == 'w') {
+		var	border = CANVAS_BORDER
+		,	pad = 0
+		,	outerDiam = 304 - (pad + border)*2
+		,	innerDiam = Math.floor((outerDiam - border*2) * 0.75)
+		,	innerBoxWidth = Math.floor((w = innerDiam - border*2) / Math.sqrt(2))
+		,	p = 'color-wheel'
+		,	b = setId(cre('div'	, clearContent(pt)), p)
+		,	c = setId(cre('canvas'	, b), p+'-round')
+		,	d = setId(cre('div'	, b), p+'-inner')
+		,	e = setId(cre('canvas'	, d), p+'-box')
+		,	w = Math.round(w/2)
+			;
+			b.style.width = b.style.height = outerDiam+'px';
+			d.style.width = d.style.height = innerDiam+'px';
+			d.style.top = d.style.left = (Math.floor((outerDiam - innerDiam)/2 - border) + pad)+'px';
+			e.style.top = e.style.left = (Math.floor((innerDiam - innerBoxWidth)/2 - border))+'px';
+			e.width = e.height = innerBoxWidth;
+			c.width = c.height = outerDiam - border*2;
+
+			setToolHue();
+			if (!hue) hue = rgb[0];
+
+			drawGradient(c, getRainbowWheelGradientPixel);
+			drawGradient(e, getBoxGradientPixel, hue);
+
+			b.onmousemove =
+			c.onmousedown = pickHue;
+			d.onmousedown = pickCorner;
+			e.onmousedown = pickColor;
+			e.redrawBoxGradient = redrawBoxGradient;
+
+		var	a = [b,c,d,e]
+		,	i = a.length
+			;
+			while (i--) {
+				q = a[i];
+				q.setAttribute('onscroll', f);
+				q.setAttribute('oncontextmenu', f);
+			}
+		var	a = [
+				['bottom', 'left']
+			,	['bottom', 'right']
+			,	['top', 'right']
+			,	['top', 'left']
+			]
+		,	i = a.length
+			;
+			while (i--) {
+			var	q = a[i]
+			,	b = cre('div', d, e)
+			,	k = q.length
+				;
+				for (var j = 0; j < k; j++) b.style[q[j]] = 0;
+				if (i < gray.length) q = gray[i];
+				else q = hue, setId(b, p+'-hue');
+				b.style.backgroundColor = rgb2hex(b.rgbArray = q);
+				b.style.width = b.style.height = w+'px';
+			}
 		} else c = 'TODO';
-		pt.appendChild(c.tagName ? c : document.createTextNode(c));
+		if (!c.tagName) setContent(pt, c);
 	} else {
 	var	tbl = document.createElement('table'), tr, td, fill, t = '', colCount = 0, autoRows = true;
 		for (i in p) if (p[i][0] == '\n') {autoRows = false; break;}
@@ -1131,7 +1606,6 @@ var	pt = id('colors'), c = select.palette.value, p = palette[c];
 }
 
 //* safe palette constructor, step recomended to be: 1, 3, 5, 15, 17, 51, 85, 255
-
 function generatePalette(p, step, slice) {
 	if (!(p = palette[p])) return;
 var	letters = [0, 0, 0], l = p.length;
@@ -1152,17 +1626,33 @@ var	letters = [0, 0, 0], l = p.length;
 }
 
 function getSlider(b,z) {
-var	i, g = RANGE[b], c = '<i id="slider'+b+'"><input type="range" id="range'+b+'" onChange="updateSliders(this)';
-	for (i in g) c += '" '+i+'="'+g[i];
-	return c+'" value="'+(z?g.min:g.max)+'"><span> '+lang.tool[b]+'</span></i>';
+var	g = RANGE[b]
+,	c = '<i id="slider'+b+'"><input type="range" id="range'+b+'" onChange="updateSliders(this)'
+	;
+
+	for (i in g) {
+		c += '" '+i+'="'+g[i];
+	}
+
+var	i = SLIDER_LETTERS.indexOf(b);
+
+	return (
+		c+'" value="'+(z?g.min:g.max)+'"><span> '
+		+lang.tool[b]
+		+(
+			i >= 0
+			? ' ['+(b === 'P' ? 'G' : SLIDER_LETTERS[i])+']'
+			: ''
+		)+'</span></i>'
+	);
 }
 
 function setSlider(b) {
-var	r = 'range', s = 'slider', t = 'text', c = id(r+b), d,e;
+var	r = 'range', s = 'slider', t = 'text', c = getElemById(r+b), d,e;
 	if (c.type != r) c.type = t;
 	else {
 		setClass(d = document.createElement('i'), s);
-		d.textContent = (e = (r = id(s+b)).lastElementChild).textContent;
+		d.textContent = (e = (r = getElemById(s+b)).lastElementChild).textContent;
 		r.removeChild(e);
 		r.insertBefore(d, r.firstElementChild);
 
@@ -1175,11 +1665,11 @@ var	r = 'range', s = 'slider', t = 'text', c = id(r+b), d,e;
 }
 
 function updateSlider(i,e) {
-var	k = e?i:BOWL[i]
-,	s = id('range'+k)
-,	t = id('text'+k) || s
+var	k = e?i:SLIDER_LETTERS[i]
+,	s = getElemById('range'+k)
+,	t = getElemById('text'+k) || s
 ,	r = e?s:RANGE[k]
-,	v = e?parseFloat(e.value):tool[i = BOW[i]];
+,	v = e?parseFloat(e.value):tool[i = SLIDER_NAMES[i]];
 	if (v < r.min) v = r.min; else
 	if (v > r.max) v = r.max;
 	if (r.step < 1) v = parseFloat(v).toFixed(2);
@@ -1187,7 +1677,7 @@ var	k = e?i:BOWL[i]
 		if (i == 'A') tweakLayer(v, draw.history.layer, 3); else
 		if (i == 'R') tweakLayer(v, draw.history.layer, 2); else
 		if (i == 'T') draw.shift = v, draw.view(2); else
-		if (i == 'S') (e = id('gradient')) ? e.updateSat(v) : alert('sat: '+v);
+		if (i == 'S') (e = getElemById('gradient')) ? e.updateSat(v) : alert('sat: '+v);
 	} else tool[i] = v;
 	s.value = t.value = v;
 }
@@ -1195,22 +1685,40 @@ var	k = e?i:BOWL[i]
 function updateSliders(s) {
 	if (s && s.id) {
 	var	prop = s.id[s.id.length-1];
-		for (i in BOW) if (prop == BOWL[i]) {
-			tool[BOW[i]] = parseFloat(s.value);
+		for (i in SLIDER_NAMES) if (prop == SLIDER_LETTERS[i]) {
+			tool[SLIDER_NAMES[i]] = parseFloat(s.value);
 			return updateSlider(i);
 		}
 		return updateSlider(prop, s);
 	}
 	if (s) updateSlider(s); else
-	for (i in BOW) updateSlider(i);
+	for (i in SLIDER_NAMES) updateSlider(i);
 }
 
 function updateShape(s) {
-	if (!isNaN(s)) select.shape.value = s, s = 0;
-	s = select.shapeFlags[(s?s:s=select.shape).value];
-var	a = id('warn'), b = a.firstElementChild, c = [], i;
-	for (i in abc) if (!(s & (1<<i))) c.push(abc[i]);
-	setClass(a, (mode.erase = !(mode.shape || mode.step || !(s & 2)))?'red':'');
+	if (!isNaN(s)) {
+		select.shape.value = s;
+		s = 0;
+	}
+
+var	s = orz((s||select.shape).value)
+,	sf = select.shapeFlags[s]
+,	fig = select.shapeFig[s]
+	;
+
+	if (
+		!draw.active
+	&&	!draw.step
+	) {
+		draw.shape = s;
+		draw.shapeFlags = sf;
+		draw.shapeFig = fig;
+	}
+
+var	a = getElemById('warn'), b = a.firstElementChild, c = [], f = {lineStyle:16, textStyle:32}, i;
+	for (i in f) getElemById(i).style.display = ((!(sf & f[i]) == !(f[i] < 32))?'none':'');
+	for (i in abc) if (!(sf & (1<<i))) c.push(abc[i]);
+	setClass(a, (mode.erase = !(mode.shape || mode.step || !(sf & 2)))?'red':'');
 	setClass(container, s = c.join(' '));
 	do {
 		c = b.firstElementChild;
@@ -1228,7 +1736,7 @@ var	i = e.id.slice(-1);
 
 function updateDim(i) {
 	if (i) {
-	var	a = id('img-'+i), b, c = cnv.view[i], j, v = parseInt(a.value) || 0;
+	var	a = getElemById('img-'+i), b, c = cnv.view[i], j, v = parseInt(a.value) || 0;
 		a.value = v = (
 			v < (b = select.imgLimits[i][0]) ? b : (
 			v > (b = select.imgLimits[i][1]) ? b : v)
@@ -1237,51 +1745,112 @@ function updateDim(i) {
 		if (v > c) //historyAct(0),
 			draw.view(2);
 	}
-	container.style.minWidth = (v = cnv.view.width)+'px';
-	if (a = outside.restyle) {
-		v += 24;
-		if (!(c = id(i = 'restyle'))) setId(container.parentNode.insertBefore(c = document.createElement('style'), container), i);
-		if ((b = outside.restmin) && ((b = eval(b).offsetWidth) > v)) v = b;
-		c.innerHTML = a+'{max-width:'+v+'px;}';
+	c = container.style, b = 'minWidth', a = (v = cnv.view.width)+'px';
+	if (c[b] != a) {
+		c[b] = a;
+		if (a = outside[i = 'resize_style']) {
+			v += 24;
+			if ((e = outside.resize_min_id) && (e = document.getElementById(e)) && (e = e.offsetWidth) && e > v) v = e;
+			c = getElemById(i) || setId(cre('style'), i);
+			c.innerHTML = a+'{max-width:'+v+'px;}';
+		}
 	}
 }
 
 function updateEraser() {
-var	a = select.affect, i = a.value, a = (i == a.length-1), b = 'button', e = id(b+'E');
+var	a = select.affect, i = a.value, a = (i == a.length-1), b = 'button', e = getElemById(b+'E');
 	tool.clip = select.options.affect[i];
 	if (e) setClass(e, b+(a?'-active':''));
 	return a;
 }
 
-function toggleMode(i, keep) {
-	if (i >= 0 && i < modes.length) {
-	var	n = modes[i], v = mode[n], e;
-		if (!keep) v = mode[n] = !v;
-		if (e = id('check'+modeL[i])) {
-			setClass(e, 'button'+(v?'-active':''));
-			if (e.parentNode.id == NS+'-warn') updateShape();
-		}
-		if (n == 'debug') {
-			text.debug.textContent = '';
-			interval.fps ? clearInterval(interval.fps) : (interval.fps = setInterval(fpsCount, 1000));
-		}
-	} else alert(lang.bad_id);
-}
+function updateSelectedSlider(s) {
+	selectedSlider = s;
 
-function toolTweak(prop, value) {
-	for (i in BOW) if (prop == BOWL[i]) {
-	var	b = BOW[i];
-		if (value > 0) tool[b] = value;
-		else {
-		var	v = new Number(tool[b]), s = RANGE[prop].step;
-			tool[b] = value ? v-s : v+s;
-		}
-		return updateSliders(i);
+	for (var i in SLIDER_LETTERS) {
+	var	k = SLIDER_LETTERS[i];
+		setClass(getElemById('slider' + k), (s == k ? 'active' : ''));
 	}
 }
 
-function toolSwap(t) {
-var	i, j, k = select.affect;
+function updateAlign() {
+var	e,i = TOOLS_ALIGN.indexOf(tool.align);
+
+	if (i >= 0) {
+		if (TOOLS_ALIGN_LETTERS.indexOf(selectedSlider) >= 0) {
+			updateSelectedSlider(TOOLS_ALIGN_LETTERS[i]);
+		}
+
+		if (e = getElemById('sliderG')) e.style.display = (i?'none':'');
+		if (e = getElemById('sliderP')) e.style.display = (i?'':'none');
+		if (e = getElemById('checkP')) setClass(e, 'button'+(i?'-active':''));
+	}
+}
+
+function toggleMode(i, v) {
+var	e,n = i;
+
+	if (
+		n === 'P'
+	||	TOOLS_ALIGN.indexOf(n) >= 0
+	) {
+		i = (
+			(
+				isNaN(v)
+				? (1 - TOOLS_ALIGN.indexOf(v || tool.align))
+				: v
+			) > 0 ? 1 : 0
+		);
+
+		tool.align = TOOLS_ALIGN[i];
+		updateAlign();
+
+		return;
+	}
+
+	if (isNaN(i)) i = MODE_LETTERS.indexOf(n);
+	if (i < 0)    i = MODE_NAMES.indexOf(n);
+	if (i < 0 || i >= MODE_NAMES.length) {
+		return alert(lang.bad_id+'\n\nid='+i+'\nk='+v+','+n+'\nlen='+MODE_NAMES.length+'\n'+MODE_NAMES.join('\n'));
+	}
+
+	n = MODE_NAMES[i];
+	v = mode[n] = (isNaN(v) ? !mode[n] : v > 0);
+
+	if (e = getElemById('check'+MODE_LETTERS[i])) {
+		setClass(e, 'button'+(v?'-active':''));
+		if (e.parentNode.id == NS+'-warn') updateShape();
+	}
+	if (n == 'debug') {
+		text.debug.textContent = '';
+		interval.fps ? clearInterval(interval.fps) : (interval.fps = setInterval(fpsCount, 1000));
+	}
+}
+
+function toolTweak(prop, value) {
+var	i = SLIDER_LETTERS.indexOf(prop);
+
+	if (i < 0) {
+		return alert(lang.bad_id+'\nNo '+prop+' in '+SLIDER_LETTERS), false;
+	}
+
+var	b = SLIDER_NAMES[i];
+
+	if (
+		value === Infinity
+	||	value === -Infinity
+	) {
+	var	v = new Number(tool[b]), s = RANGE[prop].step;
+		tool[b] = (value < 0 ? v-s : v+s);
+	} else {
+		tool[b] = value;
+	}
+
+	return updateSliders(i);
+}
+
+function toolSwap(t, k) {
+var	i, j, a = select.affect;
 
 //* exchange working sets
 	if (isNaN(t)) {
@@ -1295,8 +1864,8 @@ var	i, j, k = select.affect;
 		for (j in TOOLS_REF)
 		for (i in TOOLS_REF[j]) tools[j][i] = TOOLS_REF[j][i];
 		for (i in select.lineCaps) select[i].value = 0;
-		toolSwap(-1);
-		tool.width = t;
+		toolSwap(-1, k);
+		tool.width = DEFAULT_TOOL_WIDTH;
 	} else
 
 //* restore front set to one of defaults + line shape
@@ -1307,17 +1876,17 @@ var	i, j, k = select.affect;
 
 //* drop switches, set shape
 	if (t) {
-		if (mode.shape) toggleMode(1);
-		if (mode.step) toggleMode(2);
+		if (!k) for (i in {shape:0, step:0}) if (mode[i]) toggleMode(i);
 		return updateShape(-t-1);
 
 //* toggle eraser mode
 	} else {
-		return k.value = (k.value > 0?0:k.length-1), updateEraser();
+		return a.value = (a.value > 0?0:a.length-1), updateEraser();
 	}
-	i = select.options.affect.indexOf(tool.clip), k.value = (i < 0?0:i);
+	i = select.options.affect.indexOf(tool.clip), a.value = (i < 0?0:i);
 	updateColor(tool.color);
 	updateColor(0,1);
+	updateAlign();
 	updateEraser();
 	updateSliders();
 }
@@ -1339,32 +1908,43 @@ var	d = t ? new Date(t+(t >0?0:new Date())) : new Date(), t = ['Hours','Minutes'
 function getSendMeta(sz) {
 var	a = ['clip', 'mask', 'lighter', 'xor']
 ,	b = ['resize', 'integral']
-,	c = ', ', d = draw.time, i, j = [], m = [], n = [], u = [], t = outside.t0;
-	for (i in d) j[i] = parseInt(d[i]) || (i > 0?+new Date:t);
-	for (i in count) if ((d = count[i]) > 1 || (i != 'layers' && d > 0)) u.push(d+' '+(d > 1?i:i.replace(/s+$/i, '')));
+,	i,j = ', ', k,m = [], n = [], u = [], s = []
+,	t = +new Date;
+	for (i in count) if ((k = count[i]) > 1 || (i != 'layers' && k > 0)) u.push(k+' '+(k > 1?i:i.replace(/s+$/i, '')));
+	for (i in used_shape) s.push(i);
 	for (i in used) u.push(used[i]);
 	draw.history.layers.map(function(v) {
 		if (v.clip > 0 && m.indexOf(k = a[v.clip    - 2]) < 0) m.push(k);
 		if (v.blur > 0 && n.indexOf(k = b[v.filter || 0]) < 0) n.push(k);
 	});
-	if (m.length) u.push('Composition: '+m.join(c));
-	if (n.length) u.push('Filter: '+n.join(c));
-//	return Math.floor(t/1000)+','+u.join('-')+','+NS+' '+INFO_VERSION + (j.length?' (used '+j.join(c)+')':'');
-	return 't0: '	+Math.floor(t/1000)
-	+'\ntime: '	+j.join('-')
-	+'\napp: '	+NS+' '+INFO_VERSION
-	+(u.length
-	?'\nused: '	+u.join(c):'')
-	+'\nlength: '	+(sz?sz:
-		'png = '	+ cnv.view.toDataURL().length
-		+', jpg = '	+ cnv.view.toDataURL(IJ).length
-	);
+	for (i in (a = {Shape:s, Composition:m, Filter:n})) if (a[i].length) u.push(i+': '+a[i].join(j));
+	a = [
+		'open_time: '+t0+'-'+t
+	,	'draw_time: '+draw.time.all.join('-')
+	,	'active_time: '+draw.time.sum()
+	,	'app: '+NS+' '+INFO_VERSION
+	,	'pixels: '+cnv.view.width+'x'+cnv.view.height
+	,	'bytes: '+(
+			sz || [
+				'png = '+ cnv.view.toDataURL().length
+			,	'jpg = '+ cnv.view.toDataURL(IJ).length
+			].join(j)
+		)
+	];
+	if (u.length) a.push('used: '+u.join(j));
+	return a.join('\n');
 }
 
 function getSaveLayers(c) {
 var	skip = ['pos', 'last', 'reversable', 'filtered', 'data']
-,	a = [], d = '-', i
-,	b = {time: draw.time.join(d)+(used.read?d+used.read:'')};
+,	a = [], i,t,d = '-'
+,	b = {
+		time: (
+			(t = draw.time).all.join(d)
+		+	(t.activeStart ? '='+t.sum() : '')
+		+	(used.read ? d+used.read : '')
+		)
+	};
 	if (c) b.meta = getSendMeta();
 	draw.history.layers.map(function(v,k) {
 		c = {};
@@ -1383,28 +1963,88 @@ var	skip = ['pos', 'last', 'reversable', 'filtered', 'data']
 function readSavedLayers(b) {
 	if (!b.time || !b.layers) return false;
 	for (i in count) count[i] = 0;
-var	a = id('saveTime'), d = draw.history, j = '-', i = b.time.split(j);
-	if (i.length > 2) used.read = i.slice(2).join(j);
-	draw.time = i.slice(0,2);
-	a.title = new Date(i = +i[1]);
-	a.textContent = unixDateToHMS(i,0,1).split(' ',2)[1];
+var	d = draw.history
+,	dt = draw.time
+,	i,j = '-'
+,	a = b.time.split(j)
+,	t = dt.all = a.slice(0,2).map(orz)
+	;
+	dt.activeStart = dt.activeSum = 0;
+	if (a.length > 2) used.read = a.slice(2).join(j);
+	if (a[1].indexOf('=') >= 0) dt.activeSum = orz(a[1].split('=', 2)[1]);
+	if (!dt.activeSum) dt.activeSum = t[1]-t[0];
+	t = t[1];
+	a = getElemById('saveTime');
+	a.title = new Date(t);
+	a.textContent = unixDateToHMS(t,0,1).split(' ',2)[1];
 	a = b.layers, i = j = a[d.layer = 0].max = a.length, d.layers = [a[0]];
 	while (--i) d = a[i], d.z = i, readPic(d);
 	return j;
 }
 
-function saveDL(content, suffix) {
+function getSaveFileName(j) {
+	return unixDateToHMS(0,0,2)+'_'+draw.time.all.join('-')+(j || '.json');
+}
+
+function saveDL(data, suffix) {
+
+	function dataToURI(data) {
+		return (data.slice(0,5) == prefix ? data : prefix+type+','+encodeURIComponent(data));
+	}
+
+	function dataToBlob(data) {
+		if (u && u.createObjectURL) {
+			if (data.slice(0, k = prefix.length) == prefix) {
+			var	i = data.indexOf(',')
+			,	meta = data.slice(k,i)
+			,	data = data.slice(i+1)
+			,	k = meta.indexOf(';')
+				;
+				if (k < 0) type = meta, data = decodeURIComponent(data);
+				else {
+					type = meta.slice(0,k);
+					if (meta.slice(k+1) == 'base64') data = atob(data);
+				}
+			}
+			data = Uint8Array.from(MODE_NAMES.map.call(data, function(v) {return v.charCodeAt(0);}));
+			return u.createObjectURL(new Blob([data], {'type': type}));
+		}
+	}
+
+var	u = window.URL || window.webkitURL
+,	data = ''+data
+,	prefix = 'data:'
+,	type = 'text/plain'
+	;
 	if (DL) {
-		container.appendChild(a = document.createElement('a'));
-		a.href = content, a[DL] = unixDateToHMS(0,0,2)+'_'+draw.time.join('-')+suffix;
-		a.click();
-		setTimeout(function() {container.removeChild(a);}, 5678);
-	} else window.open(content, '_blank');
+		try {
+		var	a = cre('a', container)
+		,	blob = dataToBlob(data)
+			;
+			a.href = ''+(blob || dataToURI(data));
+			a[DL] = getSaveFileName(suffix);
+			a.click();
+			setTimeout(function() {
+				if (blob) u.revokeObjectURL(blob);
+				a.parentNode.removeChild(a);
+			}, 12345);
+		} catch(e) {
+			alert('Error code: '+e.code+', '+e.message+'\n\n'+lang.copy_to_save+':\n\n'+data);
+		}
+	} else window.open(dataToURI(data), '_blank');
 }
 
 function sendPic(dest, auto) {
-var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
+var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view;
 	draw.view(1);
+
+	function getTimeToShow(s) {
+		if (!s) return '-';
+	var	a = s.split('-', 2).map(orz), i,t,r = '';
+		for (i = 0; i < 2; i++) r += TITLE_LINE_BREAK+((t = a[i]) ? unixDateToHMS(t,0,1) : '-');
+		return r;
+	}
+
 	switch (dest) {
 	case 0:
 	case 1:	saveDL(c = cnv.view.toDataURL(dest?IJ:''), dest?'.jpg':'.png');
@@ -1426,7 +2066,7 @@ var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 			LS[CR[2].L] = l;
 			alert(lang.found_swap);
 		} else
-		if (a || confirm(lang.confirm_save)) {
+		if (a || confirm(lang.confirm.save + getTimeToShow(t))) {
 			function rem(a) {var r = 'RTL', i = r.length; while (i--) LS.removeItem(CR[a][r[i]]);}
 			try {
 				if (e) rem(2);
@@ -1449,9 +2089,9 @@ var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 				} catch(i) {rem(1); e.message += '\n'+i.message;}
 				return alert(lang.no_space+'\nError code: '+e.code+', '+e.message), c;
 			}
-			id('saveTime').textContent = unixDateToHMS();
+			getElemById('saveTime').textContent = unixDateToHMS();
 			cue.autoSave = 0, a = 'AL', d = 'button';
-			for (i in a) if (e = id(d+a[i])) setClass(e, d);
+			for (i in a) if (e = getElemById(d+a[i])) setClass(e, d);
 		}
 		break;
 //* loading
@@ -1469,35 +2109,53 @@ var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 		}
 //* load flat image to new layer
 		if (dest == 4) {
-			t = t.split('-'), c = unixDateToHMS(i = +t[1],0,1);
-			if (t.length > 2) used.read = t.slice(2).join('-');
-			if (draw.time[0] < parseInt(t[0])) draw.time[0] = t[0];
-			if (draw.time[1] > parseInt(t[1])) {
-				draw.time[1] = t[1];
-				a = id('saveTime');
+		var	dt = draw.time, a = t.split('-'), t = a.slice(0,2).map(orz), i = t[1], c = unixDateToHMS(i,0,1);
+			if (a.length > 2) used.read = a.slice(2).join('-');
+			if (dt.all[0] > t[0]) dt.all[0] = t[0];
+			if (dt.all[1] < t[1]) {
+				dt.all[1] = t[1];
+				a = getElemById('saveTime');
 				a.title = new Date(i);
 				a.textContent = c.split(' ',2)[1];
 			}
+			draw.time.act(1);
 			readPic({name:c, data:d});
 			used.LS = 'Local Storage';
 		} else
 //* load project
 		if (!LS[i] || (b = JSON.parse(LS[i])).time != t) alert(lang.no_layers); else
-		if (confirm(lang.confirm_load)) used = {LS:'Local Storage'}, readSavedLayers(b);
+		if (confirm(lang.confirm.load + getTimeToShow(t))) {
+			draw.time.act(1);
+			used = {LS:'Local Storage'}, readSavedLayers(b);
+		}
 		break;
 	case 5:
 	case 6:
-		if (a || ((outside.read || (outside.read = id('read'))) && (a = outside.read.value))) {
+		if (a || ((outside.read || (outside.read = getElemById('read'))) && (a = outside.read.value))) {
 	//		draw.time = [0, 0];
 			if (dest == 5) a = readPic(a);
 			else {
 				try {
-					readSavedLayers(JSON.parse(a.data)), a = a.name;
+					if (
+						(b = a.data)
+					&&	(i = b.indexOf('{')) >= 0
+					&&	(j = b.lastIndexOf('}')) >= 0
+					&&	(b = b.slice(i, j+1))
+					&&	readSavedLayers(JSON.parse(b))
+					) {
+						a = a.name;
+					} else if (confirm(lang.bad_data+TITLE_LINE_BREAK+lang.confirm.reprint)) {
+						b = JSON.stringify(b, null, '\t');
+						saveDL(b);
+					}
 				} catch(e) {
 					alert(lang.bad_data), a = '';
 				}
 			}
-			if (a.length) used.read = 'Read File: '+a;
+			if (a.length) {
+				draw.time.act(1);
+				used.read = 'Read File: '+a;
+			}
 		}
 		break;
 //* save project text as file
@@ -1507,45 +2165,61 @@ var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 		var	bb = new BlobBuilder();
 			bb.append(b);
 		var	blob = bb.getBlob('text/plain');
-			saveAs(blob, draw.time.join('-')+'.json');
+			saveAs(blob, getSaveFileName());
 		} catch(e) {
-			try {
-				saveDL('data:text/plain,'+encodeURIComponent(b), '.json');
-			} catch(d) {
-				alert(lang.copy_to_save+':\n\n'+b);
-			}
+			saveDL(b);
 		}
 		break;
 //* send
 	default:
-		if (dest) alert(lang.bad_id); else
+		if (dest) alert(lang.bad_id+'\n\nid='+dest+'\na='+auto); else
 		if (!outside.send) alert(lang.no_form); else
-		if (fillCheck()) alert(lang.flood); else
-		if (confirm(lang.confirm_send)) {
-			if (!outside.send.tagName) {
-				setId(e = document.createElement('form'), 'send');
-				e.setAttribute('method', (outside.send.length && outside.send.toLowerCase() == 'get')?'get':'post');
-				container.appendChild(outside.send = e);
+		if (fillCheck()) alert(lang.flood); else {
+			a = select.imgLimits, c = 'send';
+			for (i in a) if (v[i] < a[i][0] || v[i] > a[i][1]) c = 'size';
+		}
+		if (c && confirm(lang.confirm[c])) {
+			if ((f = outside.send) && f.tagName) clearContent(f);
+			else {
+				setId(e = cre('form', container), 'send');
+				if (!f.length || f.toLowerCase() != 'get') e.setAttribute('method', 'post');
+				outside.send = f = e;
 			}
-		var	pngData = sendPic(2, 1), jpgData, a = {txt:0,pic:0};
-			for (i in a) if (!(a[i] = id(i))) {
-				setId(e = a[i] = document.createElement('input'), e.name = i);
-				e.type = 'hidden';
-				outside.send.appendChild(e);
+		var	pngData = sendPic(2,-1), jpgData, a = {txt:0,pic:0};
+			for (i in a) if (!(a[i] = getElemById(i))) {
+				setId(e = a[i] = cre('input', f), e.name = i).type = 'hidden';
 			}
-			e = pngData.length;
-			d = (((i = outside.jp || outside.jpg_pref)
-				&& (e > i)
-				&& (((c = cnv.view.width * cnv.view.height
-				) <= (d = select.imgRes.width * select.imgRes.height
-				))
-				|| (e > (i *= c/d)))
-				&& (e > (t = (jpgData = cnv.view.toDataURL(IJ)).length))
+			e = pngData.length, d = select.imgRes;
+			c = v.width * v.height;
+			d = d.width * d.height;
+			d = ((
+				(i = outside.jpg)
+			&&	e > i
+			&&	((c <= d) || (e > (i *= c/d)))
+			&&	e > (t = (jpgData = v.toDataURL(IJ)).length)
 			) ? jpgData : pngData);
+			if (mode.debug) alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
 			a.pic.value = d;
 			a.txt.value = getSendMeta(d.length);
-			if (mode.debug) alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
-			outside.send.submit();
+			f.encoding = f.enctype = 'multipart/form-data';
+
+			try {
+				postingInProgress = true;
+
+				if (
+					(i = outside.check)
+				&&	(e = document.getElementById(i))
+				) {
+					e.setAttribute('data-id', f.id);
+					e.click();
+				} else {
+					f.submit();
+				}
+			} catch (error) {
+				console.log(error);
+
+				postingInProgress = false;
+			}
 		}
 	}
 	return c;
@@ -1554,14 +2228,20 @@ var	a = auto || false, b, c, d, e, f, i, j, k, l, t;
 function readPic(s) {
 	if (!s || s == 0 || (!s.data && !s.length)) return;
 	if (!s.data) s = {data: s, name: (0 === s.indexOf('data:') ? s.split(',', 1) : s)};
-var	d = draw.time, e = new Image(), t = +new Date, i, lcd = id('lcd');
-	if (!lcd) setId(lcd = document.createElement('div'), 'lcd'), container.parentNode.insertBefore(lcd, container);
-	for (i in d) if (!d[i]) d[i] = t;
+var	e = new Image(), i = 'lcd', lcd = getElemById(i);
+	if (!lcd) setId(lcd = document.createElement('div'), i), container.parentNode.insertBefore(lcd, container);
 	setRemove(e);
+
+	function setLCD() {
+		lcd.textContent = lang.loading+': '+loading;
+		lcd.style.lineHeight = cnv.view.height+'px';
+	}
+
 	e.onload = function () {
 		delete s.data;
+	var	d,t = 1;
 		for (i in select.imgRes) if (s.z || cnv.view[i] < e[i]) {
-			id('img-'+i).value = e[i];
+			getElemById('img-'+i).value = e[i];
 			for (d in cnv) cnv[d][i] = e[i];
 			if (outside[i[0]+'l']) updateDim(i), t = 0;
 		}
@@ -1570,141 +2250,264 @@ var	d = draw.time, e = new Image(), t = +new Date, i, lcd = id('lcd');
 		if (j > 0 && !i.layers[j].last && !i.cur()) tweakLayer(s.name,j,1); else newLayer(s);
 		ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
 		ctx.draw.drawImage(e, 0, 0);
-		historyAct(s.z ? draw.time[1] : null);
+		historyAct(s.z ? draw.time.all[1] : null);
 		cue.autoSave = 0;
 		if (d = e.parentNode) d.removeChild(e);
-		if (--loading < 1) loading = 0, container.style.visibility = lcd.textContent = '';//, lcd.style.display = 'none';
-		else lcd.textContent = lang.loading+': '+loading;
+		if (--loading < 1) loading = 0, container.style.visibility = lcd.textContent = '';
+		else setLCD();
 	}
-	if (!(mode.debug || text.debug.innerHTML) && ++loading > 1) {
-		container.style.visibility = 'hidden';
-		lcd.textContent = lang.loading+': '+loading;//, lcd.style.display = '', lcd.style.minHeight = cnv.view.height;
-	}
+
+	if (!(mode.debug || text.debug.innerHTML) && ++loading > 1) container.style.visibility = 'hidden', setLCD();
 	draw.container.appendChild(e);
 	return e.src = s.data, s.name;
 }
 
 //* Hot keys *-----------------------------------------------------------------
 
-function mouseClickBarrier(event) {
-	event.stopPropagation();
-	event.cancelBubble = true;
-	return false;
-}
+function addEventListeners(e, funcByEventName) {
+	for (var i in funcByEventName) {
+		try {
+			e.addEventListener(i, funcByEventName[i], { capture: true, passive: false });
+		} catch (error) {
+			console.error(error);
 
-function browserHotKeyPrevent(event) {
-	return ((!draw.active && isMouseIn() > 0) || (event.keyCode == 27))
-	? ((event.returnValue = false) || event.preventDefault() || true)
-	: false;
-}
-
-function hotWheel(event) {
-	if (browserHotKeyPrevent(event)) {
-	var	d = event.deltaY || event.detail || event.wheelDelta;
-		toolTweak(
-			event.shiftKey	?'G':(
-			event.altKey	?'B':(
-			event.ctrlKey	?'O':'W')), d < 0?0:-1);
-		if (mode.debug) text.debug.innerHTML += ' d='+d;
+			e.addEventListener(i, funcByEventName[i], true);
+		}
 	}
+}
+
+function mouseClickBarrier(evt) {
+	evt = evt || window.event;
+
+	evt.stopPropagation();
+	evt.cancelBubble = true;
+
 	return false;
 }
 
-function hotKeys(event) {
-	if (!loading && browserHotKeyPrevent(event)) {
-		function c(s) {return s.charCodeAt(0);}
-	var	n = event.keyCode - c('0');
-		if ((n?n:n=10) > 0 && n < 11) {
-		var	k = [event.shiftKey, event.altKey, event.ctrlKey, 1];
-			for (i in k) if (k[i]) return toolTweak(k = BOWL[i], RANGE[k].step < 1 ? n/10 : (n>5 ? (n-5)*10 : n));
-		} else
-		if (event.altKey)
-		switch (event.keyCode) {
-			case c('L'):	newLayer();	break;
-			case c('C'):	newLayer(1);	break;
-			case c('M'):	newLayer(-1);	break;
-			case c('E'):	moveLayer('del');break;
+function browserHotKeyPrevent(evt) {
+	evt = evt || window.event;
 
-		case 38:case c('U'):	moveLayer(0);	break;
-		case 40:case c('I'):	moveLayer(-1);	break;
-		case 37:case c('T'):	moveLayer();	break;
-		case 39:case c('Y'):	moveLayer(1);	break;
+	if (
+		isMouseIn() > 0
+	||	evt.keyCode == 27
+	) {
+		evt = eventStop(evt);
+		evt.returnValue = false;
+		evt.preventDefault();
 
-			case c('A'):	toolSwap(3);	break;
-			case c('S'):	toggleMode(5);	break;
-		//	case c('G'):	toggleMode(8);	break;
+		return evt;
+	}
+}
 
-			case c('G'):
-			case c('B'):
-			case c('O'):
-			case c('W'):	toolTweak(String.fromCharCode(event.keyCode), -1);
-		} else
-		if (event.shiftKey)
-		switch (event.keyCode) {
-			case 38:	selectLayer(-2,0,1);break;
-			case 40:	selectLayer(-1,0,1);break;
-			case 37:	selectLayer('top',0,1);break;
-			case 39:	selectLayer(0,0,1);
-		} else
-		switch (event.keyCode) {
-			case 27:	drawEnd();	break;	//* Esc
-			case 36: updateViewport();	break;	//* Home
-			case c('Z'):	historyAct(-1);	break;
-			case c('X'):	historyAct(1);	break;
-			case c('C'):	pickColor();	break;
-			case c('F'):	fillScreen(0);	break;
-			case c('D'):	fillScreen(1);	break;
-			case c('I'):	fillScreen(-1);	break;
-			case c('H'):	fillScreen(-2);	break;
-			case c('V'):	fillScreen(-3);	break;
-			case c('S'):	toolSwap();	break;
-			case c('E'):	toolSwap(0);	break;
-			case c('A'):	toolSwap(1);	break;
-			case c('K'):	toolSwap(2);	break;
-		//	case c('G'):	toolSwap(3);	break;
+function stopScroll(evt) {
+	browserHotKeyPrevent(evt);
 
-			case 8:
-if (text.debug.innerHTML.length)	toggleMode(0);	break;	//* 45=Ins, 42=106=Num *, 8=bksp
-			case c('L'):	toggleMode(1);	break;
-			case c('U'):	toggleMode(2);	break;
+	return false;
+}
 
-			case 112:	resetAside();	break;	//* F1
-			case 120:	sendPic(0);	break;	//* F9
-		//	case 118:	sendPic(1);	break;
-			case 113:	sendPic(2);	break;
-			case 114:	sendPic(3);	break;
-			case 115:	sendPic(4);	break;
-			case 117:	sendPic(5);	break;
-			case 118:	sendPic(7);	break;
-			case 119:	sendPic();	break;
+function hotWheel(evt) {
+	if (evt = browserHotKeyPrevent(evt)) {
+	var	delta = evt.deltaY || evt.detail || evt.wheelDelta;
 
-			case c('Q'):	updateShape(0);	break;
-			case c('P'):	updateShape(1);	break;
-			case c('R'):	updateShape(2);	break;
-			case c('T'):	updateShape(3);	break;
-			case c('Y'):	updateShape(4);	break;
-			case c('M'):	updateShape(5);	break;
+		toolTweak(selectedSlider, delta < 0 ? Infinity : -Infinity);
+		drawMove(evt);
 
-			case c('G'):
-			case c('B'):
-			case c('O'):
-			case c('W'):	toolTweak(String.fromCharCode(event.keyCode), 0); break;
+		if (mode.debug) {
+			text.debug.innerHTML += '<br>' + [
+				'slider = ' + selectedSlider
+			,	'type = ' + evt.type
+			,	'delta = ' + delta
+			].join(',\n');
+		}
+	}
 
-			case 106: case 42:
-				for (i = 1, k = ''; i < 3; i++) k += '<br>Save'+i+'.time: '+LS[CR[i].T]
+	return false;
+}
+
+function hotKeys(evt) {
+
+	function getKeyCode(s) { return s.charCodeAt(0); }	//* <- alphanumeric hotkey code from first letter
+
+	if (!loading)
+	if (evt = browserHotKeyPrevent(evt)) {
+		if (
+			!draw.active
+		&&	evt.type === 'keydown'
+		) {
+		var	i,k,n,s = String.fromCharCode(evt.keyCode);
+
+			if (
+				!evt.altKey
+			&&	!evt.ctrlKey
+			&&	!evt.shiftKey
+			) {
+
+//* Select tool shape:
+
+				if ((k = SHAPE_HOTKEYS.indexOf(s)) >= 0) {
+					updateShape(k);
+
+					return drawMove(evt);
+				}
+
+//* Select tool slider, to update using number keys:
+
+				if (s === 'G' && tool.align === 'subpixel') {
+					s = 'P';
+				}
+
+				if (SLIDER_LETTERS.indexOf(s) >= 0) {
+					updateSelectedSlider(s);
+
+					return drawMove(evt);
+				}
+
+//* Update selected tool slider:
+
+			var	keyMinus = (
+					evt.keyCode == 173	//* 173=[-]
+				||	evt.keyCode == 109	//* 109=[Num -]
+				);
+
+			var	keyPlus = (
+					evt.keyCode == 61	//* 173=[=]
+				||	evt.keyCode == 107	//* 109=[Num +]
+				);
+
+				if (keyMinus || keyPlus)  {
+					toolTweak(selectedSlider, keyPlus ? Infinity : -Infinity);
+
+					return drawMove(evt);
+				}
+
+			var	keyNumber = evt.keyCode - getKeyCode('0');
+
+				if (
+					keyNumber >= 0
+				&&	keyNumber <= 10
+				) {
+					n = (
+						!keyNumber && RANGE[selectedSlider].min > 0
+						? 10
+						: keyNumber
+					);
+
+					n = (
+						RANGE[selectedSlider].step < 1
+						? n / 10
+						: n > 5
+						? (n - 5) * 10
+						: n
+					);
+
+					toolTweak(selectedSlider, n);
+
+					return drawMove(evt);
+				}
+			}
+
+			if (evt.altKey)
+			switch (evt.keyCode) {
+				case 38:	moveLayer(0);	return;
+				case 40:	moveLayer(-1);	return;
+				case 37:	moveLayer();	return;
+				case 39:	moveLayer(1);	return;
+
+				case getKeyCode('Delete-layer'):	moveLayer('del');	return;
+				case getKeyCode('L-new-layer'):		newLayer();		return;
+				case getKeyCode('Copy-layer'):		newLayer(1);		return;
+				case getKeyCode('Merge-layer'):		newLayer(-1);		return;
+
+				case getKeyCode('All-default'):		toolSwap(3);		return;
+			//	case getKeyCode('GlobalHistory'):	toggleMode('G');	return;
+				case getKeyCode('G-rough-line'):	toggleMode('P');	return;
+				case getKeyCode('Show-brush-cursor'):	toggleMode('V');	return drawMove(evt);
+			} else
+			if (evt.shiftKey)
+			switch (evt.keyCode) {
+				case 38:	selectLayer(-2,0,1);	return;
+				case 40:	selectLayer(-1,0,1);	return;
+				case 37:	selectLayer('top',0,1);	return;
+				case 39:	selectLayer(0,0,1);	return;
+			} else
+			switch (evt.keyCode) {
+				case 27:	drawEnd();		return;	//* 27=Esc
+				case 36:	updateViewport();	return;	//* 36=Home
+				case 8: if (text.debug.innerHTML.length)toggleMode('D');	return;	//* 8=bksp, 45=Ins
+				case getKeyCode('Line-straight'):	toggleMode('L');	return;
+				case getKeyCode('U-line-curve'):	toggleMode('U');	return;
+
+				case 112:	resetAside();	return;	//* F1
+				case 120:	sendPic(0);	return;	//* F9
+			//	case 118:	sendPic(1);	return;	//* jpeg
+				case 113:	sendPic(2);	return;
+				case 114:	sendPic(3);	return;
+				case 115:	sendPic(4);	return;
+				case 117:	sendPic(5);	return;
+				case 118:	sendPic(7);	return;
+				case 119:	sendPic();	return;
+
+				case getKeyCode('Z-Undo'):		historyAct(-1);	return;
+				case getKeyCode('X-Redo'):		historyAct(1);	return;
+				case getKeyCode('Color-pick'):		pickColor();	return;
+				case getKeyCode('Fill-layer'):		fillScreen(0);	return;
+				case getKeyCode('D-clear-layer'):	fillScreen(1);	return;
+				case getKeyCode('Invert-canvas'):	fillScreen(-1);	return;
+				case getKeyCode('Hor-flip-canvas'):	fillScreen(-2);	return;
+				case getKeyCode('Ver-flip-canvas'):	fillScreen(-3);	return;
+				case getKeyCode('Swap-tools'):		toolSwap();	return;
+				case getKeyCode('Eraser-mode'):		toolSwap(0);	return;
+				case getKeyCode('A-pencil'):		toolSwap(1);	return;
+				// case getKeyCode('K-white'):		toolSwap(2);	return;
+
+				case 42:
+				case 106:	//* 42=106=Num *
+
+					for (i = 1, k = ''; i < 3; i++) k += '<br>Save'+i+'.time: '+LS[CR[i].T]
 +(LS[CR[i].R]?', pic size: '+LS[CR[i].R].length:'')
 +(LS[CR[i].L]?', layers sum: <a href="javascript:alert('+NS+'.LS[\''+CR[i].L+'\'])">'+LS[CR[i].L].length+'</a>':'');
 
-				text.debug.innerHTML = replaceAll(
+					draw.view(1);
+					text.debug.innerHTML = replaceAll(
 "\n<a href=\"javascript:var s=' ',t='';for(i in |)t+='\\n'+i+' = '+(|[i]+s).split(s,1);alert(t);\">self.props</a>"+
 "\n<a href=\"javascript:var t='',o=|.o;for(i in o)t+='\\n'+i+' = '+o[i];alert(t);\">self.outside</a>"+
 (outside.read?'':'<br>\nF6=read: <textarea id="|-read" value="/9.png"></textarea>'), '|', NS)
 +', '+CT+', '+CL+': '+(CR.length || CR)+(loading?', loading: '+loading:'')+k+'<hr>'+getSendMeta().replace(/[\r\n]+/g, '<br>');
-			break;
 
-			default: if (mode.debug) text.debug.innerHTML += '\n'+String.fromCharCode(event.keyCode)+'='+event.keyCode;
+					return;
+			}
 		}
+
+		if (
+			draw.active
+		&&	(
+				evt.type === 'keydown'
+			||	evt.type === 'keyup'
+			)
+		&&	evt.keyCode == 18	//* 16=Shift, 17=Ctrl, 18=Alt
+		&&	draw.step
+		&&	mode.step
+		&&	mode.shape
+		&&	(draw.shapeFlags & 1)	//* <- line+curve in progress
+		) {
+			drawMove(evt);
+
+			return;
+		}
+
+		if (mode.debug) text.debug.innerHTML += '<br>' + [
+			'type = ' + evt.type
+		,	'key = ' + evt.key
+		,	'code = ' + evt.code
+		,	'keyCode = ' + evt.keyCode
+		,	'which = ' + evt.which
+		,	'altKey = ' + evt.altKey
+		,	'ctrlKey = ' + evt.ctrlKey
+		,	'shiftKey = ' + evt.shiftKey
+		].join(',\n');
 	}
+
 	return false;
 }
 
@@ -1725,8 +2528,8 @@ var	i, t = '', p = ['-moz-','-webkit-','-o-',''];
 		draw.zoom = i;
 	} else {
 		draw.angle = draw.turn.prev + delta;
-		draw.a360 = Math.floor(draw.angle*180/Math.PI)%360;
-		draw.arad = draw.a360/180*Math.PI;
+		if (draw.a360 = Math.floor(draw.angle*180/Math.PI)%360) draw.aRad = draw.a360/180*Math.PI;
+		else draw.angle = draw.a360 = draw.aRad = 0;
 	}
 	if (draw.pan) t += 'translate('+draw.pan.x+'px,'+draw.pan.y+'px)';
 	if (draw.angle) t += 'rotate('+draw.a360+'deg)';
@@ -1738,37 +2541,48 @@ var	i, t = '', p = ['-moz-','-webkit-','-o-',''];
 function updateDebugScreen() {
 	if (!mode.debug) return;
 	ticks ++;
-var	t = '</td><td>', r = '</td></tr>	<tr><td>', a, b = 'turn: ', c = draw.step, i;
-	if (a = draw.turn) for (i in a) b += i+'='+a[i]+'; ';
+var	t = '</td><td>', r = '</td></tr>	<tr><td>', a = draw.turn, b = 'turn: ', c = draw.step, i;
+//	if (a) for (i in a) b += i+'='+a[i]+'; ';
 	i = isMouseIn();
 	text.debug.innerHTML = '<table><tr><td>'
-+draw.refresh+t+'1st='+draw.time[0]+t+'last='+draw.time[1]+t+'fps='+fps
++draw.refresh+t+'1st='+draw.time.all.join(d+'last=')+t+'fps='+fps
 +r+'Relative'+t+'x='+draw.o.x+t+'y='+draw.o.y+''+t+i+(i?',rgb='+pickColor(1):'')
-+r+'DrawOfst'+t+'x='+draw.cur.x+t+'y='+draw.cur.y+t+'btn='+draw.btn
++r+'DrawOfst'+t+'x='+draw.cur.x+t+'y='+draw.cur.y+t+'btn='+draw.btn+',active='+draw.active
 +r+'Previous'+t+'x='+draw.prev.x+t+'y='+draw.prev.y+t+'chain='+mode.click+(c?''
-+r+'StpStart'+t+'x='+c.prev.x+t+'y='+c.prev.y
-+r+'Step_End'+t+'x='+c.cur.x+t+'y='+c.cur.y:'')+'</td></tr></table>'+b;
++r+'StpStart'+t+'x='+c.prev.x+t+'y='+c.prev.y+',step1done='+c.done
++r+'Step_End'+t+'x='+c.cur.x+t+'y='+c.cur.y:'')+'</td></tr></table>'+showProps(tool,1,1)+(a?b+showProps(a,1):'');
 }
 
-function updatePosition(event) {
-var	i = select.shapeFlags[select.shape.value], d = tool.grid, o = (
-	!  ((i & 2) && mode.shape && !mode.step)
-	&& ((i & 4) || ((draw.active?ctx.draw.lineWidth:tool.width) % 2))
-	? DRAW_PIXEL_OFFSET : 0);	//* <- maybe not a 100% fix yet
+function updatePosition(evt) {
+	evt = evt || window.event;
 
-	draw.o.x = (draw.m.x = event.pageX) - draw.container.offsetLeft;
-	draw.o.y = (draw.m.y = event.pageY) - draw.container.offsetTop;
+var	sf = draw.shapeFlags
+,	gridOffset = draw.gridOffset
+,	isHandDrawnLine = ((sf & 1) && !mode.shape)
+,	isFillOnlyFigure = ((sf & 2) && mode.shape && !mode.step)
+,	isMoveToolOrEvenWidthLine = ((sf & 4) || ((draw.active ? ctx.draw.lineWidth : tool.width) % 2))
+,	g = (isHandDrawnLine || tool.align === 'grid' ? tool[tool.align] : 1)
+,	i,o = (
+		isMoveToolOrEvenWidthLine && !isFillOnlyFigure
+		? DRAW_PIXEL_OFFSET
+		: 0
+	);	//* <- maybe not a 100% fix yet
+
+	draw.o.x = (draw.m.x = evt.pageX) - CANVAS_BORDER - draw.container.offsetLeft;
+	draw.o.y = (draw.m.y = evt.pageY) - CANVAS_BORDER - draw.container.offsetTop;
 	if (draw.pan && !(draw.turn && draw.turn.pan)) for (i in draw.o) draw.o[i] -= draw.pan[i];
 	if (!draw.turn && (draw.angle || draw.zoom != 1)) {
 	var	r = getCursorRad(2, draw.o.x, draw.o.y);
-		if (draw.angle) r.a -= draw.arad;
+		if (draw.angle) r.a -= draw.aRad;
 		if (draw.zoom != 1) r.d /= draw.zoom;
 		draw.o.x = Math.cos(r.a)*r.d + cnv.view.width/2;
 		draw.o.y = Math.sin(r.a)*r.d + cnv.view.height/2;
 		o = 0;
 	}
 	for (i in draw.o) {
-		if (d > 0) draw.o[i] = Math.round(draw.o[i]/d)*d;
+		if (g && g != 1) {
+			draw.o[i] = Math.round((draw.o[i] - gridOffset[i])/g)*g + gridOffset[i];
+		}
 		draw.cur[i] = o + draw.o[i];
 	}
 }
@@ -1779,10 +2593,10 @@ function getCursorRad(r, x, y) {
 	y = (isNaN(y) ? draw.cur.y : y) - cnv.view.height/2;
 	return (r
 	? {	a:Math.atan2(y, x)
-	,	d:Math.sqrt(x*x+y*y)	//* <- looks stupid, will do for now
+	,	d:dist(y, x)	//* <- looks stupid, will do for now
 	}
 	: (draw.turn.zoom
-		? Math.sqrt(x*x+y*y)
+		? dist(y, x)
 		: Math.atan2(y, x)
 	));
 }
@@ -1793,10 +2607,23 @@ function isMouseIn() {
 		while (i--) if ((e = a[i]).id) {
 			x = parseInt(e.style.left) || 0;
 			y = parseInt(e.style.top) || 0;
-			if (draw.m.x >= x && draw.m.y >= y && draw.m.x < x+e.offsetWidth && draw.m.y < y+e.offsetHeight) return -1;
+
+			if (
+				draw.m.x >= x
+			&&	draw.m.y >= y
+			&&	draw.m.x < x+e.offsetWidth
+			&&	draw.m.y < y+e.offsetHeight
+			) {
+				return -1;
+			}
 		}
 	}
-	return (draw.o.x >= 0 && draw.o.y >= 0 && draw.o.x <= cnv.view.width && draw.o.y <= cnv.view.height)?1:0;
+	return (
+		draw.o.x >= 0
+	&&	draw.o.y >= 0
+	&&	draw.o.x <= cnv.view.width
+	&&	draw.o.y <= cnv.view.height
+	) ? 1 : 0;
 }
 
 function getOffsetXY(e) {
@@ -1817,7 +2644,7 @@ var	x0 = document.body.scrollLeft || document.documentElement.scrollLeft || 0
 }
 
 function putOnTop(e) {
-var	a = document.getElementsByTagName(e.tagName), i = a.length, zTop = 0, z;
+var	a = document.getElementsByTagName(e.tagName), i = a.length, zTop = 100, z;
 	while (i--) if (zTop < (z = parseInt(a[i].style.zIndex))) zTop = z;
 	e.style.zIndex = zTop+1;
 	return e;
@@ -1825,44 +2652,47 @@ var	a = document.getElementsByTagName(e.tagName), i = a.length, zTop = 0, z;
 
 //* Drag and drop *------------------------------------------------------------
 
-function dragStart(event) {
-	event.stopPropagation();
+function dragStart(evt) {
+	evt = evt || window.event;
+	evt.stopPropagation();
 
-var	e = event.target;
+var	e = evt.target;
 	while (!e.id) e = e.parentNode;
 var	c = getOffsetXY(putOnTop(e));
-	event.dataTransfer.setData('text/plain', e.id
-	+','+	(event.pageX - parseInt(c.x))
-	+','+	(event.pageY - parseInt(c.y))
+	evt.dataTransfer.setData('text/plain', e.id
+	+','+	(evt.pageX - parseInt(c.x))
+	+','+	(evt.pageY - parseInt(c.y))
 	);
 }
 
-function dragMove(event) {
-var	d = event.dataTransfer.getData('text/plain'), e;
+function dragMove(evt) {
+	evt = evt || window.event;
+
+var	d = evt.dataTransfer.getData('text/plain'), e;
 	return (d
 	&& (d.indexOf(NS) === 0)
 	&& (d = d.split(',')).length === 3
 	&& (e = document.getElementById(d[0]))
 	)
-	? putInView(e, event.pageX - parseInt(d[1]), event.pageY - parseInt(d[2]))
+	? putInView(e, evt.pageX - parseInt(d[1]), evt.pageY - parseInt(d[2]))
 	: false;
 }
 
-function dragOver(event) {
-	event.stopPropagation();
-	event.preventDefault();
+function dragOver(evt) {
+	evt = eventStop(evt);
+	evt.preventDefault();
 
-var	d = event.dataTransfer.files, e = d && d.length;
-	event.dataTransfer.dropEffect = e?'copy':'move';
-	if (!e) dragMove(event);
+var	d = evt.dataTransfer.files, e = d && d.length;
+	evt.dataTransfer.dropEffect = e?'copy':'move';
+	if (!e) dragMove(evt);
 }
 
-function drop(event) {
-	event.stopPropagation();
-	event.preventDefault();
+function drop(evt) {
+	evt = eventStop(evt);
+	evt.preventDefault();
 
 //* Move windows: you can actually drop simple text strings like "NS-info,0,0"
-	if (dragMove(event));
+	if (dragMove(evt));
 	else
 //* Load images: from http://www.html5rocks.com/en/tutorials/file/dndfiles/
 	if (window.FileReader) {
@@ -1880,7 +2710,7 @@ function drop(event) {
 			return ++k;
 		}
 
-	var	d = event.dataTransfer.files, f, i = (d?d.length:0), j = i, k = 0, r, m = /^image/i;
+	var	d = evt.dataTransfer.files, f, i = (d?d.length:0), j = i, k = 0, r, m = /^image/i;
 		while (i--) if (rr()) return;
 		i = j;
 		while (i--) rr(1);
@@ -1903,11 +2733,32 @@ var	margin = 2, h = 256//Math.max(cnv.view.height, select.imgRes.height)
 	}
 }
 
+//* Check before closing page *------------------------------------------------
+
+function beforeUnload(evt) {
+	if (
+		!postingInProgress
+	&&	!fillCheck()
+	) {
+
+//* Note: given message text won't be used in modern browsers.
+//* https://habr.com/ru/post/141793/
+
+	var	message = lang.confirm.close;
+
+		if (evt = evt || window.event) {
+			evt.returnValue = message;
+		}
+
+		return message;
+	}
+}
+
 //* Initialization *-----------------------------------------------------------
 
 function init() {
 	if (isTest()) document.title += ': '+NS+' '+INFO_VERSION;
-var	a = {B:'GRST',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style = '', s = '&nbsp;';
+var	a = {B:'RST',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style = '', s = '&nbsp;';
 	for (i in a)
 	for (j in a[i]) RANGE[a[i][j]] = RANGE[i];
 	NEW_LAYER = {show:1, alpha: RANGE.A.max, pos: 0, last: 0};
@@ -1917,7 +2768,7 @@ var	a = {B:'GRST',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, styl
 <div id="debug"></div>';
 	for (i in lang.windows) a += '\n<aside id="'+i+'"></aside>';
 
-	setContent(container = id(), a), e = id(c);
+	setContent(container = getElemById(), a), e = getElemById(c);
 	if (!e.getContext) return;
 
 	for (i in cnv) ctx[i] = (cnv[i] = (i == 'view'?e:document.createElement(c))).getContext('2d');
@@ -1970,12 +2821,13 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 		} else
 
 		if (k == 'tool') {
-			d = '<select id="', b = '"></select><br>', j = select.lineCaps;
-			c += '<div class="selects"><div class="rf">'+d+'shape" onChange="updateShape(this)'+l+lang.shape+b;
-			for (i in j) c += d+i+l+(j[i] || i)+b;
-			c += d+'affect" onChange="updateEraser()'+l+lang.compose+b+'</div><div id="'+k+'-sliders">';
-			i = BOW.length;
-			while (i--) c += getSlider(BOWL[i]);
+			d = '<select id="', b = '"></select>', j = select.lineCaps;
+			c += '<div class="selects"><div class="rf">'+d+'shape" onChange="updateShape(this)'+l+lang.shape+b+'<div id="lineStyle">';
+			for (i in j) c += d+i+l+(j[i] || i)+b+'<br>';
+			c += d+'affect" onChange="updateEraser()'+l+lang.compose+b+'</div><div id="textStyle">'
++d+'font'+l+lang.font+b+'<br><textarea placeholder="'+lang.text_hint+'"></textarea></div></div><div id="'+k+'-sliders">';
+			i = SLIDER_NAMES.length;
+			while (i--) c += getSlider(SLIDER_LETTERS[i]);
 			c += '</div></div>';
 		} else c += 'TODO: '+k;
 
@@ -2031,7 +2883,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ]]);
 		} else
 		if (k == 'layer') {
-			m = id(k+'-sliders'), d = 'ART', n = '';
+			m = getElemById(k+'-sliders'), d = 'ART', n = '';
 			i = d.length; while (i--) n += getSlider(d[i], i == 2);
 			setClass(m, 'rf ri');
 			setContent(m, n);
@@ -2062,27 +2914,28 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 ],
 0,	['undo'	,'Z'	,'&#x2190;'	,h+'-1)',b+'U'
 ],	['redo'	,'X'	,'&#x2192;'	,h+'1)'	,b+'R'
-//],1,	['global',a+'G','&#x25A4;'	,g+'7)' ,h+'G'
-]], e.firstElementChild.nextSibling).appendChild(m = id('sliderT'));
+//],1,	['global',a+'G','&#x25A4;'	,g+'"G")' ,h+'G'
+]], e.firstElementChild.nextSibling).appendChild(m = getElemById('sliderT'));
 			setClass(m, 'rf ri');
 		} else
 		if (k == 'tool') {
 			btnArray([
 //* subtitle, hotkey, pictogram, function, id
 -9,	['pencil','A'	,'i'		,j+'1)'
-],	['chalk' ,'K'	,'&#x25CB;'	,j+'2)'
+// ],	['chalk' ,'K'	,'&#x25CB;'	,j+'2)'
 ],	['reset' ,a+'A'	,'&#x25CE;'	,j+'3)'
 ],
-1,	['eraser','E'	,'&#x25CC;'	,j+'0)'	,b+'E'
-],	['cursor',a+'S'	,'&#x25CF;'	,g+'5)'	,h+'V'
+1,	['eraser','E'	,'&#x25CC;'	,j+'0)'		,b+'E'
+],	['rough' ,a+'G'	,'&#x25CD;'	,g+'"P")'	,h+'P'
+],	['cursor',a+'S'	,'&#x25CF;'	,g+'"V")'	,h+'V'
 ],
-1,	['line|area|copy'	,'L'	,'&ndash;|&#x25A0;|&#x25EB;'	,g+'1)'	,h+'L'
-],	['curve|outline|rect'	,'U'	,'~|&#x25A1;|&#x25AF;'	,g+'2)'	,h+'U'
+1,	['line|area|copy'	,'L'	,'&ndash;|&#x25A0;|&#x25EB;'	,g+'"L")'	,h+'L'
+],	['curve|outline|rect'	,'U'	,'~|&#x25A1;|&#x25AF;'		,g+'"U")'	,h+'U'
 ]]);
-			i = id(h+'L');
+			i = getElemById(h+'L');
 			setId(i.parentNode.insertBefore(d = document.createElement('div'), i), 'warn');
-			for (i in (a = 'LU')) d.appendChild(id(h+a[i]));
-			for (i in BOW) setSlider(BOWL[i]);
+			for (i in (a = 'LU')) d.appendChild(getElemById(h+a[i]));
+			for (i in SLIDER_NAMES) setSlider(SLIDER_LETTERS[i]);
 		}
 
 		e.addEventListener('mousedown', mouseClickBarrier, false);
@@ -2092,52 +2945,86 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 
 //* Global events, etc *-------------------------------------------------------
 
-	document.addEventListener('dragover'	, dragOver	, f = false);
-	document.addEventListener('drop'	, drop		, f);
-	document.addEventListener('mousedown'	, drawStart	, f);
-	document.addEventListener('mousemove'	, drawMove	, f);	//* <- using 'document' to prevent negative clipping
-	document.addEventListener('mouseup'	, drawEnd	, f);
-	document.addEventListener('keypress'	, browserHotKeyPrevent, f);
-	document.addEventListener('keydown'	, hotKeys	, f);
-	document.addEventListener('mousewheel'	, e = hotWheel	, f);
-	document.addEventListener('wheel'	, e, f);
-	document.addEventListener('scroll'	, e, f);
-	cnv.view.setAttribute('onscroll'		, f = 'return false;');
-	cnv.view.setAttribute('oncontextmenu'	, f);
 
-	for (name in mode) if (mode[modes[i = modes.length] = name]) toggleMode(i,1);
-	for (i in text) text[i] = id(i);
+	draw.container = getElemById('load'), b = 'button', i = (a = 'JP').length, h = /^header$/i;
+	while (i--) if (e = getElemById(b+a[i])) setEvent(e, 'onmouseover', 'updateSaveFileSize(this)');
 
-	draw.container = id('load'), b = 'button', i = (a = 'JP').length, h = /^header$/i;
-	while (i--) if (e = id(b+a[i])) setEvent(e, 'onmouseover', 'updateSaveFileSize(this)');
-
-	for (i in (a = {L:CL, A:CT})) if (!LS || !LS[a[i]]) setClass(id(b+i), b+'-disabled');
+	for (i in mode) MODE_NAMES.push(i);
+	for (i in text) text[i] = getElemById(i);
+	for (i in (a = {L:CL, A:CT})) if (!LS || !LS[a[i]]) setClass(getElemById(b+i), b+'-disabled');
 
 	for (i in (a = [b, 'input', 'select', 'p', 'a']))
 	for (c in (b = container.getElementsByTagName(a[i])))
 	for (e in (d = ['onchange', 'onclick', 'onmouseover']))
-	if ((f = b[c][d[e]])
-	&& (m = (''+f).match(regFunc))) {
+	if (
+		(f = b[c][d[e]])
+	&&	(m = (''+f).match(regFunc))
+	) {
 		if (!self[f = m[1]]) self[f] = eval(f);
 		if (f == 'toggleView' && !(m = b[c]).title) m.title = lang[h.test(m.parentNode.tagName)?'hide_hint':'show_hint'];
 	}
 
-	d = 'download', DL = (d in b[0]?d:'');
-	a = select.options, c = select.translated || a, f = (LS && LS.lastPalette && palette[LS.lastPalette]) ? LS.lastPalette : 1;
+	if (LS && (i = LS.historyPalette)) palette[0] = JSON.parse(i);
+
+	d = 'download', DL = (d in b[0]?d:''), d = {
+		lineCap : ['<->', '|-|', '[-]']
+	,	lineJoin : ['-x-', '\\_/', 'V']
+	};
+
+	a = select.options, c = select.translated || a, f = (LS && (i = LS.lastPalette) && palette[i]?i:1);
 	a.affect = a.compose, c.affect = c.compose;
-	for (b in a) if (e = select[b] = id(b))
+	for (b in a) if (e = select[b] = getElemById(b))
 	for (i in a[b]) (
-		e.options[e.options.length] = new Option((c[b]?c:a)[b][i], i)
+		e.options[e.options.length] = new Option((c[b]?c:a)[b][i]+(
+			b == 'shape' && regHotKey.test(k = SHAPE_HOTKEYS[i])
+			? ' ['+k+']'
+			: (b in d)
+			? ' '+d[b][i]
+			: ''
+		), i)
 	).selected = (b == 'palette'?(i == f):!i);
+
+	for (i in MODE_NAMES) if (mode[MODE_NAMES[i]]) toggleMode(i, 1);		//* <- only after select lists are defined
+
+	addEventListeners(
+		// canvas
+		cnv.view
+	,	{
+			scroll:		f = stopScroll		//* <- against FireFox always scrolling on mousewheel
+		,	contextmenu:	f
+		}
+	);
+
+//* listen on all page to prevent dead zones:
+//* still fails to catch events outside of document block height less than of browser window.
+
+	addEventListeners(
+		// document.body
+		window
+	,	{
+			dragover:	dragOver
+		,	drop:		drop
+		,	mousedown:	drawStart
+		,	mousemove:	drawMove
+		,	mouseup:	drawEnd
+		,	keypress:	k = hotKeys
+		,	keydown:	k
+		,	keyup:		k
+		,	mousewheel:	f = hotWheel
+		,	wheel:		f
+		,	scroll:		f
+		,	beforeunload:	beforeUnload
+		}
+	);
 
 //* Get ready to work *--------------------------------------------------------
 
-	toggleView('hotkeys');
-	id('style').innerHTML += style;
-
 	generatePalette(1, 85, 0);
-	toolSwap(3);
+	getElemById('style').innerHTML += style;
+	toggleView('hotkeys');
+	toolSwap(3, 1);	//* <- not changing switches
 	updatePalette();
+	updateSelectedSlider(selectedSlider);
 	updateViewport();
 	resetAside();
 }
@@ -2145,30 +3032,44 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 //* External config *----------------------------------------------------------
 
 function isTest() {
+
+	function getNumClamped(i,n) {return Math.min(Math.max(orz(i) || n, 3), Number.MAX_SAFE_INTEGER || 100200300);}
+
 	if (CR[0] !== 'C') return !o.send;
-var	o = outside, v = id('vars'), e, i, j, k
-,	f = o.send = id('send')
-,	r = o.read = id('read'), a = [v,f,r];
+
+var	o = outside
+,	f = o.send = getElemById('send')
+,	r = o.read = getElemById('read')
+,	v = getElemById('vars')
+,	a = [v,f,r]
+,	s = ';'
+,	regVarSep = /\s*[;\r\n\f]+\s*/g
+,	regVarName = /^([^=]+)\s*=\s*/
+,	e,i,j,k;
+
+/* ext.config syntax:
+	a) varname; var2=;		// no sign => value 1; no value => ''
+	b) warname=two=3=last_val;	// all vars => same value (rightmost part)
+*/
 	for (i in a) if ((e = a[i]) && (e = (e.getAttribute('data-vars') || e.name))) {
-		for (i in (a = e
-			.replace(/\s*=\s*/g, '=')
-			.replace(/[\s;]+=*/g, ';')
-			.split(';')
-		)) if ((e = a[i]).length) {
+		a = e.replace(regVarSep, s).split(s);
+		for (i in a) if ((e = a[i].replace(regVarName, '$1=')).length) {
 			if ((e = e.split('=')).length > 1) {
 				k = e.pop();
 				for (j in e) o[e[j]] = k;
-			} else o[e[0]] = 1;
-//*	a) varname; var2=;		//noequal=1, empty=0
-//*	b) warname=two=3=last_val;	//samevalue, rightmost
+			} else o[e[0]] = k = 1;
+			if (e[0].substr(0,2) == 'jp') o.jpg = k;
 		}
-		break;	//* <- no care about the rest
+		break;			//* <- read vars batch in the first found attribute only; no care about the rest
 	}
+
 	k = 'y2', i = k.length, j = (o.saveprfx?o.saveprfx:NS)+CR, CR = [];
 	while (i) CR[i--] = {R:e = j+k[i], T:e+CT, L:e+CL};
 	CT = CR[1].T, CL = CR[1].L;
-	o.t0 = o.t0 > 0 ? o.t0+'000' : +new Date;
-	if (!o.undo || isNaN(o.undo) || o.undo < 3) o.undo = 123; else o.undo = parseInt(o.undo);
+
+	o.undo = draw.history.max = getNumClamped(o.undo, 99);
+	o.idle = draw.time.idle = getNumClamped(o.idle, 60)*1000;
+
 	if (!o.lang) o.lang = document.documentElement.lang || 'en';
 
 //* translation: Russian *-----------------------------------------------------
@@ -2176,21 +3077,27 @@ var	o = outside, v = id('vars'), e, i, j, k
 	if (o.lang == 'ru')
 select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы линий'}
 , select.translated = {
-	shape	: ['линия', 'многоугольник', 'прямоугольник', 'круг', 'овал', 'сдвиг']
+	shape	: ['линия', 'замкнутая линия', 'многоугольник', 'прямоугольник', 'круг', 'овал', 'излучение', 'сдвиг', 'сдвиг лассо', 'текст']
 ,	lineCap	: ['круг <->', 'срез |-|', 'квадрат [-]']
 ,	lineJoin: ['круг -x-', 'срез \\_/', 'угол V']
 ,	filter	: ['масштаб', 'интеграл']
 ,	compose	: ['поверх', 'под', 'в пределах', 'предел (маска)', 'свет', 'исключение', 'стёрка']
-,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент']
+,	palette	: ['история', 'авто', 'разное', 'Тохо', 'градиент', 'круг']
 }, lang = {
 	lang: ['язык', 'Русский']
 ,	bad_data:	'Неправильный формат данных.'
 ,	bad_id:		'Ошибка выбора.'
 ,	flood:		'Полотно пусто.'
-,	confirm_send:	'Отправить рисунок в сеть?'
-,	confirm_save:	'Сохранить слои в память браузера?'
-,	confirm_load:	'Вернуть слои из памяти браузера?'
-,	copy_to_save:	'Откройте новый текстовый файл, скопируйте в него всё ниже этой линии'
+,	confirm: {
+		send:	'Отправить рисунок в сеть?'
+	,	close:	'Покинуть эту страницу и выбросить открытый рисунок?'
+	,	size:	'Превышен размер полотна. Отправить всё равно?'
+	,	save:	'Сохранить слои в память браузера?'
++TITLE_LINE_BREAK+	'Перезаписать копию, изменённую: '
+	,	load:	'Вернуть слои из памяти браузера?'
++TITLE_LINE_BREAK+	'Восстановить копию, изменённую: '
+	,	reprint:'Пересохранить с переносами строк и отступами?'
+},	copy_to_save:	'Откройте новый текстовый файл, скопируйте в него всё ниже этой линии'
 ,	found_swap:	'Рисунок был в запасе, поменялись местами.'
 ,	loading:	'Ожидание загрузки изображений'
 ,	no_LS:		'Локальное Хранилище (память браузера) недоступно.'
@@ -2215,6 +3122,7 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 		,	alpha:	'Непрозрачность слоя при наложении.'
 		,	undo:	'История отмен слоя.'
 }},	tool: {	G:	'Шаг сетки'
+	,	P:	'Муар черновика'
 	,	B:	'Тень'
 	,	O:	'Непрозрачность'
 	,	W:	'Толщина'
@@ -2222,6 +3130,8 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 	,	R:	'Размытие'
 	,	S:	'Насыщенность'
 },	shape:		'Форма'
+,	font:		'Шрифт'
+,	text_hint:	'Ваш текст тут.'
 ,	filter:		'Фильтр'
 ,	compose:	'Режим наложения'
 ,	palette:	'Палитра'
@@ -2230,17 +3140,30 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 ,	hide_hint:	'Кликните, чтобы спрятать.'
 ,	show_hint:	'Кликните, чтобы спрятать или показать.'
 ,	info: [	'{toggleView=\'hotkeys\';Управление}: [hotkeys;(указатель над полотном)'
-	,,	'C / средний клик = подобрать цвет с рисунка.'
-	,	'Q / P / R / T / Y / M = выбор формы.'
-	,,	'1-10 / колесо мыши	/ (Alt +) W = толщина кисти.'
+	,
+	,	'Esc = сбросить незавершённое действие.'
+	,	'C / средний клик = подобрать цвет с рисунка.'
+	,
+	,	'Выбор формы инструмента:'
+	,	'Q = линия, прямая, кривая.'
+	,	'P = лассо, замкнутая линия.'
+	,	'R = прямоугольник.'
+//	,	'T = печатный текст.'
+	,	'Y = лучи солнца, шестерёнка.'
+	,	'M = сдвиг, копия.'
+	,
+	,	'1-10 / колесо мыши	/ (Alt +) W = толщина кисти.'
 	,	'Ctrl	+ 1-10 / колесо / (Alt +) O = прозрачность.'
 	,	'Alt	+ 1-10 / колесо / (Alt +) B = размытие тени.'
 	,	'Shift	+ 1-10 / колесо / (Alt +) G = шаг сетки.'
-	,,	'Shift	+ стрелки = выбирать слой.'
+	,
+	,	'Shift	+ стрелки = выбирать слой.'
 	,	'Alt	+ стрелки = двигать слой по списку.'
-	,,	'Ctrl	+ тяга = поворот полотна, Home = {updateViewport;сброс}.'
+	,
+	,	'Ctrl	+ тяга = поворот полотна, Home = {updateViewport;сброс}.'
 	,	'Alt	+ тяга = масштаб, Shift + т. = сдвиг рамки.'
-	,,	']F1 = {resetAside;вернуть} панельки по местам.-'
+	,
+	,	']F1 = {resetAside;вернуть} панельки по местам.-'
 	,	'Автосохранение раз в минуту'
 ],	info_no_save:	'ещё не было'
 ,	info_no_time:	'ещё нет'
@@ -2262,25 +3185,30 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 	},	swap:	{sub:'смена',	t:'Поменять инструменты местами.'
 	},	reset:	{sub:'сброс',	t:'Сбросить инструменты к начальным.'
 	},	line:	{sub:'прямая',	t:'Прямая линия 1 зажатием.'
-	},	curve:	{sub:'кривая',	t:'Сглаживать углы пути / кривая линия 2 зажатиями.'
-	},	area:	{sub:'закрас.',	t:'Закрашивать площадь геометрических фигур. \r\nНе обводить + не закрашивать = удалить площадь.'
-	},	outline:{sub:'контур',	t:'Рисовать контур геометрических фигур. \r\nНе обводить + не закрашивать = удалить площадь.'
+	},	curve:	{sub:'кривая',	t:'Сглаживать углы линии.'
++TITLE_LINE_BREAK+	'Вместе с включением "прямой" — одна ровная кривая линия (2 клик-зажатия подряд).'
++TITLE_LINE_BREAK+	'Зажатие кнопки Alt меняет местами концевую и контрольную точку линии.'
+	},	area:	{sub:'закрас.',	t:'Закрашивать площадь геометрических фигур.'
++TITLE_LINE_BREAK+	'Не обводить + не закрашивать = удалить площадь.'
+	},	outline:{sub:'контур',	t:'Рисовать контур геометрических фигур.'
++TITLE_LINE_BREAK+	'Не обводить + не закрашивать = удалить площадь.'
 	},	copy:	{sub:'копия',	t:'Оставить старую копию.'
 	},	rect:	{sub:'прямоуг.',t:'Сдвиг прямоугольником.'
 	},	cursor:	{sub:'указат.',	t:'Показывать кисть на указателе.'
-	},	rough:	{sub:'п.штрих',	t:'Уменьшить нагрузку, пропуская перерисовку штриха.'
+	},	rough:	{sub:'черновик',t:'Рисовать немного сбитые грубоватые штрихи.'
+	// },	rough:	{sub:'п.штрих',	t:'Уменьшить нагрузку, пропуская перерисовку штриха.'
 	},	fps:	{sub:'п.кадры',	t:'Уменьшить нагрузку, пропуская кадры.'
 	},	png:	{sub:'сохр.png',t:'Сохранить рисунок в PNG файл.'
 	},	jpeg:	{sub:'сохр.jpg',t:'Сохранить рисунок в JPEG файл.'
 	},	json:	{sub:'сох.json',t:'Сохранить слои в JSON файл.'
 	},	save:	{sub:'сохран.',	t:'Сохранить слои в память браузера, 2 позиции по очереди.'
-	},	load:	{sub:'загруз.',	t:'Вернуть слои из памяти браузера, 2 позиции по очереди. \r\n\
-Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
-	},	loadd:	{sub:'загр.доб',t:'Добавить рисунок из памяти браузера на новый слой, 2 позиции по очереди. \r\n\
-Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
-	},	read:	{sub:'заг.файл',t:'Прочитать локальный файл на новый слой. \r\n\
-Может не сработать вообще, особенно при запуске самой рисовалки не с диска. \r\n\
-Вместо этого рекомендуется перетаскивать файлы из других программ.'
+	},	load:	{sub:'загруз.',	t:'Вернуть слои из памяти браузера, 2 позиции по очереди.'
++TITLE_LINE_BREAK+	'Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
+	},	loadd:	{sub:'загр.доб',t:'Добавить рисунок из памяти браузера на новый слой, 2 позиции по очереди.'
++TITLE_LINE_BREAK+	'Может не сработать в некоторых браузерах, если не настроить автоматическую загрузку и показ изображений.'
+	},	read:	{sub:'заг.файл',t:'Прочитать локальный файл на новый слой.'
++TITLE_LINE_BREAK+	'Может не сработать вообще, особенно при запуске самой рисовалки не с диска.'
++TITLE_LINE_BREAK+	'Вместо этого рекомендуется перетаскивать файлы из других программ.'
 	},	done:	{sub:'готово',	t:'Завершить и отправить рисунок в сеть.'
 
 	},	'new':	{sub:'новый',	t:'Создать новый слой.'
@@ -2304,10 +3232,16 @@ else o.lang = 'en'
 ,	bad_data:	'Invalid data format.'
 ,	bad_id:		'Invalid case.'
 ,	flood:		'Canvas is empty.'
-,	confirm_send:	'Send image to server?'
-,	confirm_save:	'Save layers to your browser memory?'
-,	confirm_load:	'Restore layers from your browser memory?'
-,	copy_to_save:	'Open new text file, copy and paste to it after this line'
+,	confirm: {
+		send:	'Send image to server?'
+	,	close:	'Leave this page and discard the drawing?'
+	,	size:	'Canvas size exceeds limit. Send anyway?'
+	,	save:	'Save layers to your browser memory?'
++TITLE_LINE_BREAK+	'Overwrite the copy edited at:'
+	,	load:	'Restore layers from your browser memory?'
++TITLE_LINE_BREAK+	'Overwrite the copy edited at:'
+	,	reprint:'Resave with line breaks and indents?'
+},	copy_to_save:	'Open new text file, copy and paste to it after this line'
 ,	found_swap:	'Found image at slot 2, swapped slots.'
 ,	loading:	'Waitind for images to load'
 ,	no_LS:		'Local Storage (browser memory) not supported.'
@@ -2332,6 +3266,7 @@ else o.lang = 'en'
 		,	alpha:	'Layer opacity ratio.'
 		,	undo:	'Layer undo history.'
 }},	tool: {	G:	'Grid step'
+	,	P:	'Rough line moire'
 	,	B:	'Shadow'
 	,	O:	'Opacity'
 	,	W:	'Width'
@@ -2339,6 +3274,8 @@ else o.lang = 'en'
 	,	R:	'Blur'
 	,	S:	'Saturation'
 },	shape:		'Shape'
+,	font:		'Font'
+,	text_hint:	'Your text here.'
 ,	filter:		'Filter'
 ,	compose:	'Composition mode'
 ,	palette:	'Palette'
@@ -2347,17 +3284,30 @@ else o.lang = 'en'
 ,	hide_hint:	'Click to hide.'
 ,	show_hint:	'Click to show/hide.'
 ,	info: [	'{toggleView=\'hotkeys\';Hot keys}: [hotkeys;(mouse over image only)'
-	,,	'C / mouse mid = pick color from image.'
-	,	'Q / P / R / T / Y / M = select shape.'
-	,,	'1-10 / mouse wheel	/ (Alt +) W = brush width.'
+	,
+	,	'Esc = cancel current unfinished change.'
+	,	'C / mouse mid = pick color from image.'
+	,
+	,	'Select tool shape:'
+	,	'Q = line, straight, curve.'
+	,	'P = lasso, freehand polygon.'
+	,	'R = rectangle.'
+//	,	'T = print text.'
+	,	'Y = sun rays, gear wheel.'
+	,	'M = move, copy.'
+	,
+	,	'1-10 / mouse wheel	/ (Alt +) W = brush width.'
 	,	'Ctrl	+ 1-10 / wheel	/ (Alt +) O = brush opacity.'
 	,	'Alt	+ 1-10 / wheel	/ (Alt +) B = brush shadow blur.'
 	,	'Shift	+ 1-10 / wheel	/ (Alt +) O = grid step.'
-	,,	'Shift	+ arrows = select layer.'
+	,
+	,	'Shift	+ arrows = select layer.'
 	,	'Alt	+ arrows = move layer on the list.'
-	,,	'Ctrl	+ drag = rotate canvas, Home = {updateViewport;reset}.'
+	,
+	,	'Ctrl	+ drag = rotate canvas, Home = {updateViewport;reset}.'
 	,	'Alt	+ drag = zoom, Shift + d. = move canvas.'
-	,,	']F1 = {resetAside;reset} floating panels.-'
+	,
+	,	']F1 = {resetAside;reset} floating panels.-'
 	,	'Autosave every minute, last saved'
 ],	info_no_save:	'not yet'
 ,	info_no_time:	'no yet'
@@ -2379,25 +3329,30 @@ else o.lang = 'en'
 	,	swap:	'Swap your tools.'
 	,	reset:	'Reset both tools.'
 	,	line:	'Draw straight line with 1 drag.'
-	,	curve:	'Smooth path corners / draw single curve with 2 drags.'
-	,	area:	'Fill geometric shapes. \r\nNo outline + no fill = erase area.'
-	,	outline:'Draw outline of geometric shapes. \r\nNo outline + no fill = erase area.'
+	,	curve	: 'Draw lines with smooth corners.'
++TITLE_LINE_BREAK+	'With "straight" enabled — draw single curve (2 click-drags).'
++TITLE_LINE_BREAK+	'Holding Alt key swaps line end and control point.'
+	,	area:	'Fill geometric shapes.'
++TITLE_LINE_BREAK+	'No outline + no fill = erase area.'
+	,	outline:'Draw outline of geometric shapes.'
++TITLE_LINE_BREAK+	'No outline + no fill = erase area.'
 	,	copy:	'Keep old copy.'
 	,	rect:	'Move rectangle.'
 	,	cursor:	'Brush preview on cursor.'
-	,	rough:	'Skip draw cleanup while drawing to use less CPU.'
+	,	rough:	'Make slightly rough hand-drawn lines.'
+	// ,	rough:	'Skip draw cleanup while drawing to use less CPU.'
 	,	fps:	'Limit FPS when drawing to use less CPU.'
 	,	png:	'Save image as PNG file.'
 	,	jpeg:	'Save image as JPEG file.'
 	,	json:	'Save layers as JSON file.'
 	,	save:	'Save layers copy to your browser memory, 2 slots in a queue.'
-	,	load:	'Load layers copy from your browser memory, 2 slots in a queue. \r\n\
-May not work in some browsers until set to load and show new images automatically.'
-	,	loadd:	'Load image copy from your browser memory to a new layer, 2 slots in a queue. \r\n\
-May not work in some browsers until set to load and show new images automatically.'
-	,	read:	'Load image from your local file to a new layer. \r\n\
-May not work at all, especially if sketcher itself is not started from disk. \r\n\
-Instead, it is recommended to drag and drop files from another program.'
+	,	load:	'Load layers copy from your browser memory, 2 slots in a queue.'
++TITLE_LINE_BREAK+	'May not work in some browsers until set to load and show new images automatically.'
+	,	loadd:	'Load image copy from your browser memory to a new layer, 2 slots in a queue.'
++TITLE_LINE_BREAK+	'May not work in some browsers until set to load and show new images automatically.'
+	,	read:	'Load image from your local file to a new layer.'
++TITLE_LINE_BREAK+	'May not work at all, especially if sketcher itself is not started from disk.'
++TITLE_LINE_BREAK+	'Instead, it is recommended to drag and drop files from another program.'
 	,	done:	'Finish and send image to server.'
 
 	,	'new':	'Add a new layer.'
@@ -2416,8 +3371,15 @@ Instead, it is recommended to drag and drop files from another program.'
 
 //* Embed CSS and container *--------------------------------------------------
 
+var CURSOR_DOT = (
+	CUSTOM_CURSOR_DOT
+	? 'url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mNgYGCYUFdXN4EBRPz//38CADX3CDIkWWD7AAAAAElFTkSuQmCC\'), auto'
+	: 'default'
+);
+
 document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 #| #|-color-text {width: 78px;}\
+#| .|-active i {color: #5ea6ed; font-weight: bold;}\
 #| .|-button {background-color: #ddd;}\
 #| .|-button-active {background-color: #ace;}\
 #| .|-button-active:hover {background-color: #bef;}\
@@ -2439,7 +3401,7 @@ document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 #| a {color: #888;}\
 #| a:hover {color: #000;}\
 #| abbr {border-bottom: 1px dotted #111;}\
-#| aside button {border: 1px solid #000; width: 38px; height: 38px; margin: 2px; padding: 2px; line-height: 7px; text-align: center; cursor: pointer;}\
+#| aside button {border: 1px solid #000; width: 38px; height: 38px; margin: 2px; padding: 2px; line-height: 7px; text-align: center; overflow: hidden; cursor: pointer;}\
 #| aside header > a {display: block; float: right; text-decoration: none; color: #eee; margin: 0;}\
 #| aside header {display: block; cursor: move; padding: 2px 2px 4px 2px; margin-bottom: 2px; background-color: #ace; overflow: hidden;}\
 #| aside header:hover {background-color: #5ea6ed;}\
@@ -2448,14 +3410,21 @@ document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 #| aside input[type="text"] {margin: 2px; width: 48px;}\
 #| aside p {line-height: 22px; margin: 0.5em;}\
 #| aside p, #|-info hr, #|-layers hr, #|-colors table {font-size: small;}\
-#| aside {position: absolute; left: 0; top: 0; text-align: left; padding: 2px; border: 2px solid #888; background-color: rgba(234,234,234,0.90);}\
-#| canvas {border: 1px solid #ddd; margin: 0; vertical-align: bottom; cursor:\
-	url(\'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAGElEQVR42mNgYGCYUFdXN4EBRPz//38CADX3CDIkWWD7AAAAAElFTkSuQmCC\'),\
-	auto;}\
-#| canvas:hover {border-color: #aaa;}\
+#| aside {position: absolute; z-index: 100; left: 0; top: 0; text-align: left; padding: 2px; border: 2px solid #888; background-color: rgba(234,234,234,0.90);}\
+#| aside, #|-load canvas {box-shadow: 3px 3px rgba(0,0,0, 0.1);}\
+#| aside:hover {background-color: #eaeaea;}\
+#| canvas {border: '+CANVAS_BORDER+'px solid #ddd; margin: 0; vertical-align: bottom; cursor: '+CURSOR_DOT+';}\
+#| canvas:hover, #| canvas:hover + #|-color-wheel-inner, #|-color-wheel-inner div:hover {border-color: #aaa;}\
 #| hr {border: 1px solid #aaa; border-top: none;}\
 #| {text-align: center; padding: 12px; background-color: #f8f8f8;}\
 #|, #| button, #| input, #| select, #|-lcd {color: #111; font-family: "Arial"; font-size: 19px; line-height: normal;}\
+#|-color-wheel * {position: absolute;}\
+#|-color-wheel {position: relative; margin: 0 auto; padding: 0;}\
+#|-color-wheel, #|-color-wheel-inner, #|-color-wheel-inner div {border: '+CANVAS_BORDER+'px solid #ddd; overflow: hidden; background-color: white;}'
++(noBorderRadius?'':'\
+#|-color-wheel-inner div {cursor: pointer; border-radius: 25%;}\
+#|-color-wheel-inner, #|-color-wheel-mark, #|-color-wheel-round {border-radius: 50%;}'
+)+'\
 #|-colors .|-text {padding: 0 4px;}\
 #|-colors table {margin: 2px 0 0 0; border-collapse: collapse;}\
 #|-colors td {margin: 0; padding: 0; height: 16px;}\
@@ -2477,15 +3446,16 @@ document.write(replaceAll(replaceAdd('\n<style id="|-style">\
 #|-layers p {border: 2px solid #ddd;}\
 #|-layers p.|-button input[type="text"] {background-color: #f5f5f5; border-color: #ddd;}\
 #|-layers {max-width: 304px;}\
-#|-lcd {text-align: center; vertical-align: middle; font-size: 40px; color: #aaa;}\
-#|-load img {position: absolute; top: 1px; left: 1px; margin: 0;}\
-#|-load, #|-load canvas {position: relative; display: inline-block;}\
+#|-lcd {text-align: center; vertical-align: middle; font-size: 40px; color: #aaa; background-color: #f5f5f5;}\
+#|-load img {position: absolute; top: '+CANVAS_BORDER+'px; left: '+CANVAS_BORDER+'px; margin: 0;}\
+#|-load, #|-load canvas {position: relative; display: inline-block; z-index: 99;}\
+#|-textStyle textarea {width: 80px; height: 68px;}\
 #|-warn {background-color: #bbb; display: inline-block;}\
 #|-warn.|-red {background-color: #f77;}'
 +abc.map(function(i) {return '.|-'+i+' .|-'+i;}).join(', ')+' {display: none;}\
 </style>', '}', '\n'), '|', NS)+'\n<div id="'+NS+'">Loading '+NS+'...</div>\n');
 
-//* Generic funcs *------------------------------------------------------------
+//* Generic helper functions *-------------------------------------------------
 
 function repeat(t,n) {return new Array(n+1).join(t);}
 function replaceAll(t,s,j) {return t.split(s).join(j);}
@@ -2496,27 +3466,44 @@ function ltrim(str, chars) {return str.replace(new RegExp('^['+(chars || '\\s')+
 function rtrim(str, chars) {return str.replace(new RegExp('['+(chars || '\\s')+']+$', 'g'), '');}
 function trim(str, chars) {return ltrim(rtrim(str, chars), chars);}
 
-function id(i) {return document.getElementById(NS+(i?'-'+i:''));}
+function cre(e,p,b) {
+	e = document.createElement(e);
+	if (!p) p = (b ? b.parentNode : null);
+	if (!p) p = getElemById();
+	if (b) p.insertBefore(e, b); else
+	if (p) p.appendChild(e);
+	return e;
+}
+function orz(n) {return parseInt(n||0)||0;}
+function getElemById(i) {return document.getElementById(NS+(i?'-'+i:''));}
 function reId(e) {return e.id.slice(NS.length+1);}
-function setId(e,id) {return e.id = NS+'-'+id;}
-function setClass(e,c) {return e.className = c?replaceAdd(' '+c,' ',NS+'-').trim():'';}
-function setEvent(e,onWhat,func) {return e.setAttribute(onWhat, NS+'.'+func);}
+function setId(e,id) {return e.id = NS+'-'+id, e;}
+function setClass(e,c) {return e.className = c?replaceAdd(' '+c,' ',NS+'-').trim():'', e;}
+function setEvent(e,onWhat,func) {return e.setAttribute(onWhat, NS+'.'+func), e;}
 function setContent(e,c) {
 var	a = ['class','id','onChange','onClick','onContextMenu'];
 	for (i in a) c = replaceAdd(c, ' '+a[i]+'="', NS+(a[i][0]=='o'?'.':'-'));
-	return e.innerHTML = c;
+	return e.innerHTML = c, e;
 }
-function setRemove(e,o) {e.setAttribute(o?o:'onclick', 'this.parentNode.removeChild(this); return false');}
-function clearContent(e) {while (e.childNodes.length) e.removeChild(e.lastChild);}	//* <- works without a blink, unlike e.innerHTML = '';
-function toggleView(e) {if (!e.tagName) e = id(e); return e.style.display = e.style.display?'':'none';}
-function propSwap(a, b) {
-var	r = {};
-	for (i in b) r[i] = a[i], a[i] = b[i];
-	return r;
+function setRemove(e,o) {return e.setAttribute(o?o:'onclick', 'this.parentNode.removeChild(this); return false'), e;}
+function clearContent(e) {while (e.childNodes.length) e.removeChild(e.lastChild); return e;}	//* <- works without a blink, unlike e.innerHTML = '';
+function toggleView(e) {if (!e.tagName) e = getElemById(e); return e.style.display = e.style.display?'':'none';}
+function dist(x,y) {return Math.sqrt(x*x + y*y)};
+function cut_period(x,y,z) {if (!y) y = -Math.PI; if (!z) z = Math.PI; return (x < y ? x-y+z : (x > z ? x+y-z : x));}
+function ang_btw(x,y) {return cut_period(y-x);}
+function o0(line,delim) {var a=line.split(delim||','),i,o={}; for(i in a) o[a[i]]=0; return o;}
+function showProps(o,r,z /*incl.zero*/) {var i,t=''; for(i in o)if(z||o[i])t+='\n'+i+'='+o[i]; if(r)return t; alert(t); return o;}
+
+function eventStop(e) {
+	if (e && e.eventPhase?e:e = window.event) {
+		if (e.stopPropagation) e.stopPropagation();
+		if (e.cancelBubble != null) e.cancelBubble = true;
+	}
+	return e;
 }
 
 //* To get started *-----------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', init, false);
 
-}; //* <- END global wrapper
+}; })('milf');	//* <- END global wrapper; set namespace here
