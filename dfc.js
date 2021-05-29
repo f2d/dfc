@@ -5,8 +5,8 @@
 
 //* Configuration *------------------------------------------------------------
 
-var	INFO_VERSION = 'v0.9.83'
-,	INFO_DATE = '2013-04-01 — 2021-01-17'
+var	INFO_VERSION = 'v0.9.91'
+,	INFO_DATE = '2013-04-01 — 2021-05-29'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 
 ,	CR = 'CanvasRecovery'
@@ -224,10 +224,12 @@ var	INFO_VERSION = 'v0.9.83'
 
 //* Set up (don't change) *----------------------------------------------------
 
+,	TESTING = (location.protocol === 'file:')
 ,	CUSTOM_CURSOR_DOT = false
 ,	noTransformByProp = /^Opera.* Version\D*11\.\d+$/i.test(navigator.userAgent)
 ,	noShadowBlurCurve = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)
 ,	noBorderRadius	= noTransformByProp || noShadowBlurCurve
+
 ,	regA0		= /^[rgba(]+[\d,\s]+[.0)]+$/i
 ,	regCommaSpace	= /\s*(,)[\s,]*/g
 ,	regCommaSplit	= /,\s*/
@@ -253,8 +255,10 @@ var	INFO_VERSION = 'v0.9.83'
 ,	t0 = +new Date
 ,	self = this
 ,	outside = this.o = {}
-,	container, canvas, c2d, cnvHid, c2s, hue, lang, i,DL,HP,LP
+,	container, hue, lang, i,DL,HP,LP
 ,	LS = window.localStorage || localStorage
+,	isPointerEventSupported = !!window.PointerEvent
+,	isPointerEventCoalesced = isPointerEventSupported && !!PointerEvent.prototype.getCoalescedEvents
 ,	fps = 0
 ,	ticks = 0
 ,	timer = 0
@@ -269,6 +273,12 @@ var	INFO_VERSION = 'v0.9.83'
 	,	timer : 0
 	,	undo  : 0
 	}
+,	cnv = {
+		result : null
+	,	figure : null
+	,	helper : null
+	}
+,	ctx = {}
 ,	used = {}
 ,	cue = {upd : {}}
 ,	postingInProgress
@@ -340,7 +350,11 @@ var	INFO_VERSION = 'v0.9.83'
 						return 0;
 					}
 
-					if ((d = t.data[t.pos]) && d.timeRest && (a = d.time)) for (i in a) {
+					if (
+						(historyData = t.data[t.pos])
+					&&	historyData.timeRest
+					&&	(a = historyData.time)
+					) for (i in a) {
 						dt[i] = a[i];
 					}
 
@@ -357,7 +371,15 @@ var	INFO_VERSION = 'v0.9.83'
 							i = select.resize.value;
 							if (t.reversable == i) --t.pos;
 							else t.reversable = i;
-							for (i in select.imgSizes) cnvHid[i] = canvas[i] = orz(getElemById('img-'+i).value);
+
+							for (i in select.imgSizes) {
+							var	size = orz(getElemById('img-'+i).value);
+
+								for (k in cnv) {
+									cnv[k][i] = size;
+								}
+							}
+
 							draw.screen(1);
 						} else {
 							if (t.reversable == i) {
@@ -380,7 +402,7 @@ var	INFO_VERSION = 'v0.9.83'
 				var	a = ['all', 'activeStart', 'activeSum']
 				,	b
 				,	c = {}
-				,	d = c2d.getImageData(0,0, canvas.width, canvas.height)
+				,	historyData = ctx.result.getImageData(0,0, cnv.result.width, cnv.result.height)
 					;
 
 					for (i in a) {
@@ -388,8 +410,8 @@ var	INFO_VERSION = 'v0.9.83'
 						c[k] = (b ? (b.join ? b.slice(0) : b) : 0);
 					}
 
-					d.time = c;
-					t.data[t.data.length = t.pos] = d;
+					historyData.time = c;
+					t.data[t.data.length = t.pos] = historyData;
 				}
 
 				text.undo.textContent = t.pos+' / '+t.last+' / '+z;
@@ -397,42 +419,54 @@ var	INFO_VERSION = 'v0.9.83'
 				return 1;
 			}
 		,	storeTime : function() {
-			var	d = this.cur();
-				if (d) d.timeRest = 1;
+			var	historyData = this.cur();
+
+				if (historyData) {
+					historyData.timeRest = 1;
+				}
 			}
 		}
 	,	screen : function(res) {
-			clearFill(canvas);
+		var	historyData = this.history.cur();
 
-		var	d = this.history.cur();
-			if (!d) {
+			if (!historyData) {
+				clearFill(cnv.result);
+
 				return;
 			}
 
-		var	c = canvas
-		,	s = select.imgSizes
-		,	i
+		var	s = select.imgSizes
+		,	i,j,k
 			;
 
 			if (res && mode.scale) {
 				for (i in s) {
-					cnvHid[i] = d[i];
-					c[i] = orz(getElemById('img-'+i).value);
+					cnv.helper[i] = historyData[i];
+					cnv.result[i] = orz(getElemById('img-'+i).value);
 				}
 
-				c2s.putImageData(d, 0,0);
-				clearFill(c).drawImage(cnvHid, 0,0, d.width, d.height, 0,0, c.width, c.height);
+				ctx.helper.putImageData(historyData, 0,0);
 
-				for (i in s) {
-					cnvHid[i] = c[i];
+				clearFill(cnv.result).drawImage(
+					cnv.helper
+				,	0,0
+				,	historyData.width
+				,	historyData.height
+				,	0,0
+				,	cnv.result.width
+				,	cnv.result.height
+				);
+
+				for (i in s) for (k in cnv) if (cnv[k][i] != cnv.result[i]) {
+					cnv[k][i] = cnv.result[i];
 				}
 			} else {
 				if (res) {
 				var	a = select.resize.value.split(' ')
-				,	w = c.width
-				,	h = c.height
-				,	i = d.width
-				,	j = d.height
+				,	w = cnv.result.width
+				,	h = cnv.result.height
+				,	i = historyData.width
+				,	j = historyData.height
 				,	y = (a.indexOf('top') < 0 ? h-j : 0)
 				,	x = (a.indexOf('left') < 0 ? w-i : 0)
 					;
@@ -446,19 +480,20 @@ var	INFO_VERSION = 'v0.9.83'
 					;
 
 					for (i in s) {
-						if (c[i] != d[i]) {
-							cnvHid[i] = c[i] = d[i];
+						for (k in cnv) if (cnv[k][i] != historyData[i]) {
+							cnv[k][i] = historyData[i];
 						}
 
-						if (unfocused && (e = getElemById('img-'+i)).value != d[i]) {
-							e.value = d[i];
+						if (unfocused && (e = getElemById('img-'+i)).value != historyData[i]) {
+							e.value = historyData[i];
 							++dif;
 						}
 					}
 
 					if (dif) updateDimension();
 				}
-				c2d.putImageData(d, x,y);
+
+				clearFill(cnv.result).putImageData(historyData, x,y);
 			}
 		}
 	};
@@ -492,6 +527,26 @@ function eventStop(evt) {
 	}
 
 	return evt;
+}
+
+function getEventPointsDist(a,b) {
+	return (
+		Math.abs(a.x - b.x)
+	+	Math.abs(a.y - b.y)
+		// dist(a.x - b.x, a.y - b.y)
+	);
+}
+
+function sortEventPoints(a,b) {
+	return (
+		a.timeStamp > b.timeStamp ? 1 :
+		a.timeStamp < b.timeStamp ? -1 :
+		a.pointerId > b.pointerId ? 1 :
+		a.pointerId < b.pointerId ? -1 :
+		a.distFromPrevTime > b.distFromPrevTime ? 1 :
+		a.distFromPrevTime < b.distFromPrevTime ? -1 :
+		0
+	);
 }
 
 function isTransparent(s) {return (s == A0 || regA0.test(s));}
@@ -628,32 +683,45 @@ var	k,v,j = ' '
 function drawCursor() {
 var	sf = draw.shapeFlags;
 
-	if (sf & 16) {
-		for (i in DRAW_HELPER) c2d[i] = DRAW_HELPER[i];
+	resetCtxAlphaAndShadow(ctx.result);
+	resetCtxAlphaAndShadow(ctx.helper);
 
-	var	i,o = draw.o
+	ctx.helper.clearRect(0,0, cnv.helper.width, cnv.helper.height);
+
+	if (sf & 16) {
+		for (i in DRAW_HELPER) ctx.helper[i] = DRAW_HELPER[i];
+
+	var	i
+	,	o = draw.o
 	,	p = DRAW_PIXEL_OFFSET
 		;
 
-		c2d.beginPath();
-		c2d.moveTo(o.x+p, 0), c2d.lineTo(o.x+p, canvas.height);
-		c2d.moveTo(0, o.y+p), c2d.lineTo(canvas.width, o.y+p);
-		c2d.stroke();
+		ctx.helper.beginPath();
+		ctx.helper.moveTo(o.x+p, 0), ctx.helper.lineTo(o.x+p, cnv.helper.height);
+		ctx.helper.moveTo(0, o.y+p), ctx.helper.lineTo(cnv.helper.width, o.y+p);
+		ctx.helper.stroke();
 	}
 
 	if (!(sf & 128)) {
 		if (mode.brushView) {
-			c2d.fillStyle = 'rgba('+tool.color+', '+tool.opacity+')';
-			c2d.shadowColor = ((c2d.shadowBlur = tool.blur) ? 'rgb('+tool.color+')' : A0);
+			ctx.result.globalAlpha = tool.opacity;
+			ctx.helper.fillStyle = 'rgb('+tool.color/*+', '+tool.opacity*/+')';
+			ctx.helper.shadowColor = ((ctx.helper.shadowBlur = tool.blur) ? 'rgb('+tool.color+')' : A0);
 		} else {
-			for (i in DRAW_HELPER) c2d[i] = DRAW_HELPER[i];
+			for (i in DRAW_HELPER) ctx.helper[i] = DRAW_HELPER[i];
 		}
 
-		c2d.beginPath();
-		c2d.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7, false);
-		c2d.closePath();
-		mode.brushView ? c2d.fill() : c2d.stroke();
+		ctx.helper.beginPath();
+		ctx.helper.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7, false);
+		ctx.helper.closePath();
+
+		mode.brushView
+		? ctx.helper.fill()
+		: ctx.helper.stroke();
 	}
+
+	ctx.result.drawImage(cnv.helper, 0,0);
+	ctx.result.globalAlpha = 1;
 
 	if (!neverFlushCursor) flushCursor = true;
 }
@@ -661,6 +729,7 @@ var	sf = draw.shapeFlags;
 function drawStart(evt) {
 	draw.evt = evt = evt || window.event;
 
+	// if (!evt || draw.active) {	//* <- breaks line+curve 2nd point
 	if (!evt) {
 		return;
 	}
@@ -681,7 +750,7 @@ function drawStart(evt) {
 
 	eventStop(evt).preventDefault();
 	draw.target = evt.target;
-//	canvas.focus();
+//	cnv.result.focus();
 
 	if (draw.btn && (draw.btn != evt.which)) {
 		return drawEnd();
@@ -697,7 +766,10 @@ var	s = draw.shape = select.shape.value
 ,	sf = draw.shapeFlags = select.shapeFlags[s]
 	;
 
-	if (evt.altKey && (draw.step && mode.step && mode.shape && (sf & 1))); else	//* <- line+curve
+	if (
+		(evt.altKey || evt.ctrlKey || evt.shiftKey)
+	&&	(draw.step && mode.step && mode.shape && (sf & 1))	//* <- line+curve
+	); else
 	if (evt.altKey)   draw.turn = {prev : draw.zoom,  zoom  : 1}; else
 	if (evt.ctrlKey)  draw.turn = {prev : draw.angle, angle : 1}; else
 	if (evt.shiftKey) draw.turn = {
@@ -724,7 +796,7 @@ var	s = draw.shape = select.shape.value
 		) {
 			for (i in draw.o) draw.prev[i] = draw.cur[i];
 
-			draw.step.swap = evt.altKey;
+			draw.step.swap = evt.altKey || evt.ctrlKey || evt.shiftKey;
 			draw.step.done = 1;
 
 			return;
@@ -738,7 +810,7 @@ var	s = draw.shape = select.shape.value
 	if ((draw.btn = evt.which) != 1 && draw.btn != 3) {
 		pickColor();
 
-		return drawEnd();
+		return drawEnd(evt);
 	}
 
 //* start drawing:
@@ -756,29 +828,57 @@ var	i = (evt.which == 1 ? 1 : 0)
 ,	fig = ((sf & 2) && (mode.shape || pf))
 	;
 
+	draw.fig = (mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8);
+	draw.points = null;
+	draw.opacity = t.opacity;
+
 	t = (sf & 4 ? DRAW_HELPER : {
 		lineWidth : (pf && !mode.step ? 1 : t.width + (mode.roughLine ? ROUGH_LINE_WIDTH_FRAC : 0))
-	,	fillStyle : (fig ? 'rgba('+(mode.step ? tools[i] : t).color+', '+t.opacity+')' : A0)
-	,	strokeStyle : (fig && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+t.opacity+')')
+	,	fillStyle : (fig ? 'rgb('+(mode.step ? tools[i] : t).color/*+', '+t.opacity*/+')' : A0)
+	,	strokeStyle : (fig && !(mode.step || pf) ? A0 : 'rgb('+t.color/*+', '+t.opacity*/+')')
 	,	shadowColor : (t.blur ? 'rgb('+t.color+')' : A0)
 	,	shadowBlur : t.blur
 	});
 
-	for (i in t) c2s[i] = c2d[i] = t[i];
+	for (i in t) for (k in ctx) if (k !== 'result') {
+		ctx[k][i] = t[i];
+	}
 
 	updatePosition(evt);
 
+	if (
+		isPointerEventCoalesced
+	&&	!draw.fig
+	&&	(
+			evt.pointerId
+		// ||	evt.timeStamp
+		)
+	) {
+		draw.points = [{
+			x : draw.cur.x
+		,	y : draw.cur.y
+		,	pointerId : 0
+		,	timeStamp : 0	//* <- keep this point first in sorting
+		}];
+	}
+
 	for (i in draw.o) draw.prev[i] = draw.cur[i];
 	for (i in draw.line) draw.line[i] = false;
-	for (i in select.lineCaps) c2s[i] = c2d[i] = select.options[i][select[i].value];
+	for (i in select.lineCaps) {
+	var	j = select.options[i][select[i].value];
+
+		for (k in ctx) if (k !== 'result') {
+			ctx[k][i] = j;
+		}
+	}
 
 	if (
 		(sf & 32)
 	&&	(t = getElemById('text-content').value).replace(regTrim, '').length
 	) {
 	var	i = getElemById('text-font')
-	,	f = c2d.font = DEFAULT_FONT
-	,	s = c2d.strokeStyle
+	,	f = ctx.figure.font = DEFAULT_FONT
+	,	s = ctx.figure.strokeStyle
 	,	a = draw.textAlign || 'center'
 	,	t = t.split(regVertSpace)
 		;
@@ -806,7 +906,7 @@ var	i = (evt.which == 1 ? 1 : 0)
 
 		if (isTransparent(s)) {
 			i = (draw.btn == 1 ? 1 : 0);
-			s = 'rgba('+tools[i].color+', '+tools[1-i].opacity+')';
+			s = 'rgb('+tools[i].color/*+', '+tools[1-i].opacity*/+')';
 		}
 
 		draw.text = {
@@ -814,7 +914,7 @@ var	i = (evt.which == 1 ? 1 : 0)
 		,	style : s
 		,	align : a
 		,	lines : t
-		,	offset : (k ? getTextOffsetXY(f,c2d,a,t) : {x : 0, y : 0})
+		,	offset : (k ? getTextOffsetXY(f, ctx.figure, a,t) : {x : 0, y : 0})
 		};
 	} else {
 		draw.text = 0;
@@ -824,8 +924,8 @@ var	i = (evt.which == 1 ? 1 : 0)
 		return drawEnd(evt);
 	}
 
-	c2d.beginPath();
-	c2d.moveTo(draw.cur.x, draw.cur.y);
+	ctx.figure.beginPath();
+	ctx.figure.moveTo(draw.cur.x, draw.cur.y);
 }
 
 function drawMove(evt) {
@@ -838,7 +938,10 @@ function drawMove(evt) {
 			return drawEnd(evt);
 		}
 
-		if (evt.type.indexOf('mouse') === 0) {
+		if (
+			evt.type.indexOf('mouse') === 0
+		||	evt.type.indexOf('pointer') === 0
+		) {
 			updatePosition(evt);
 		}
 	}
@@ -850,7 +953,8 @@ function drawMove(evt) {
 var	redraw = true
 ,	s = draw.shape
 ,	sf = draw.shapeFlags
-,	newLine = (draw.active && !((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)))
+,	newLine = (draw.active && !draw.fig)
+,	points, i,j,k
 	;
 
 	if (mode.click) {
@@ -859,29 +963,50 @@ var	redraw = true
 
 	if (newLine) {
 		if (draw.line.preview) {
-			drawShape(c2d, s);
+			drawShape(s);
 		} else
 		if (draw.line.back = mode.step) {
 			if (noShadowBlurCurve) {
-				c2d.shadowColor = A0;
-				c2d.shadowBlur = 0;
+				ctx.figure.shadowColor = A0;
+				ctx.figure.shadowBlur = 0;
 			}
 
-			if (draw.line.started) c2d.quadraticCurveTo(
-				draw.prev.x
-			,	draw.prev.y
-			,	(draw.cur.x + draw.prev.x)/2
-			,	(draw.cur.y + draw.prev.y)/2
-			);
+			if (draw.line.started) {
+				if (points = draw.points) {
+					points.isCurve = true;
+					points.push({
+						x : draw.cur.x
+					,	y : draw.cur.y
+					,	pointerId : evt.pointerId
+					,	timeStamp : evt.timeStamp
+					});
+				} else {
+					ctx.figure.quadraticCurveTo(
+						draw.prev.x
+					,	draw.prev.y
+					,	(draw.cur.x + draw.prev.x)/2
+					,	(draw.cur.y + draw.prev.y)/2
+					);
+				}
+			}
 		} else {
-			c2d.lineTo(draw.cur.x, draw.cur.y);
+			if (points = draw.points) {
+				points.push({
+					x : draw.cur.x
+				,	y : draw.cur.y
+				,	pointerId : evt.pointerId
+				,	timeStamp : evt.timeStamp
+				});
+			} else {
+				ctx.figure.lineTo(draw.cur.x, draw.cur.y);
+			}
 		}
 
 		draw.line.preview = false;
 		draw.line.started = true;
 	} else
 	if (draw.line.back) {
-		c2d.lineTo(draw.prev.x, draw.prev.y);
+		ctx.figure.lineTo(draw.prev.x, draw.prev.y);
 
 		draw.line.back = false;
 		draw.line.started = true;
@@ -893,23 +1018,121 @@ var	redraw = true
 	}
 
 	if (redraw) {
+
+//* Restore the view before current unfinished action:
+
 		if ((flushCursor || neverFlushCursor) && !(mode.lowQ && draw.active)) {
 			draw.screen();
+
+			ctx.figure.clearRect(0,0, cnv.figure.width, cnv.figure.height);
 		}
 
+//* Redraw current active shape:
+
 		if (draw.active) {
-			if ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)) {
+			if (draw.fig) {
 				draw.line.preview = true;
-				c2s.clearRect(0,0, canvas.width, canvas.height);
-				c2s.beginPath();
-				drawShape(c2s, (mode.step && (sf & 4) && (!draw.step || !draw.step.done) ? -1 : s));
-				c2s.stroke();
-				c2d.drawImage(cnvHid, 0,0);				//* <- draw 2nd canvas overlay with sole shape
+
+				drawShape(mode.step && (sf & 4) && (!draw.step || !draw.step.done) ? -1 : s);
+
+				ctx.figure.stroke();
 			}
 
 			if (draw.line.started) {
-				c2d.stroke();
+
+//* Fix for out-of-order pen points in Firefox:
+
+				if (points) {
+					points.sort(sortEventPoints);
+
+					function setEventPointDist(point) {
+						if (typeof point.distFromPrevTime === 'undefined') {
+							point.distFromPrevTime = getEventPointsDist(refPoint, point);
+
+							isResortingNeeded = true;
+						}
+					}
+
+					for (
+					var	i = 2
+					,	k = points.length
+					,	isResortingNeeded = false
+					,	refPoint = points[0]
+					,	prevPoint
+					,	nextPoint = points[1]
+						; i < k
+					&&	(prevPoint = nextPoint)
+					&&	(nextPoint = points[i])
+						; ++i
+					) if (
+						prevPoint.timeStamp === nextPoint.timeStamp
+					&&	prevPoint.pointerId === nextPoint.pointerId
+					) {
+						setEventPointDist(prevPoint);
+						setEventPointDist(nextPoint);
+					} else {
+						refPoint = prevPoint;
+					}
+
+					if (isResortingNeeded) {
+						points.sort(sortEventPoints);
+
+						// console.log('isResortingNeeded:', isResortingNeeded, points);
+					}
+
+					ctx.figure.beginPath();
+					ctx.figure.moveTo(points[0].x, points[0].y);
+
+					if (points.isCurve) {
+						for (
+						var	i = 2
+						,	k = points.length
+						,	prevPoint
+						,	nextPoint = points[1]
+							; i < k
+						&&	(prevPoint = nextPoint)
+						&&	(nextPoint = points[i])
+							; ++i
+						) {
+							ctx.figure.quadraticCurveTo(
+								prevPoint.x
+							,	prevPoint.y
+							,	(nextPoint.x + prevPoint.x)/2
+							,	(nextPoint.y + prevPoint.y)/2
+							);
+						}
+					} else {
+						for (
+						var	i = 1
+						,	k = points.length
+						,	nextPoint
+							; i < k
+						&&	(nextPoint = points[i])
+							; ++i
+						) {
+							ctx.figure.lineTo(
+								nextPoint.x
+							,	nextPoint.y
+							);
+						}
+					}
+				}
+
+//* Redraw the plotted stroke:
+
+				ctx.figure.stroke();
 			}
+
+			ctx.result.globalAlpha = draw.opacity;
+			ctx.result.drawImage(cnv.figure, 0,0);				//* <- draw 2nd canvas overlay with sole shape
+
+			if (draw.helper) {
+				ctx.result.globalAlpha = 1;
+				ctx.result.drawImage(cnv.helper, 0,0);
+
+				draw.helper = false;
+			}
+
 		} else if (neverFlushCursor && !mode.lowQ && isMouseIn()) {
 			drawCursor();
 		}
@@ -923,6 +1146,7 @@ var	redraw = true
 }
 
 function drawEnd(evt) {
+	draw.evt = evt = evt || window.event;
 	draw.target = 0;
 
 	if (!evt || draw.turn) {
@@ -931,17 +1155,20 @@ function drawEnd(evt) {
 		return draw.screen();
 	}
 
-	draw.evt = evt = evt || window.event;
+	if (evt.which && evt.which != 1 && draw.btn != 3) {
+		draw.active = draw.btn = draw.step = draw.turn = draw.text = 0;
+
+		return;
+	}
 
 	if (mode.click == 1 && evt.shiftKey) {
 		return drawMove(evt);
 	}
 
 	if (draw.active) {
-	var	c = c2d
-	,	s = draw.shape
+	var	s = draw.shape
 	,	sf = draw.shapeFlags
-	,	m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8))
+	,	i,j,k
 		;
 
 	//* normal straight 2pt line, base for 4pt curve:
@@ -968,48 +1195,44 @@ function drawEnd(evt) {
 
 		draw.time.all[1] = +new Date;
 		draw.screen();
-		c2d.fillStyle = c2s.fillStyle;
+
+		ctx.figure.clearRect(0,0, cnv.figure.width, cnv.figure.height);
 
 		if (draw.text) {
-			c = c2s;
-			c.beginPath();
-			c.clearRect(0,0, canvas.width, canvas.height);
-			drawShape(c, s);
+			drawShape(s);
 
 			used.shape = 'Shape';
 			used.text = 'Text';
 		} else
 		if (sf & 8) {
-			c.closePath();
+			ctx.figure.closePath();
 
 			if (mode.shape || !mode.step) {
-				c.fill(FILL_RULE);
+				ctx.figure.fill(FILL_RULE);
 			}
 
 			used.poly = 'Poly';
 		} else
-		if ((sf & 64) || (m && draw.line.preview)) {
-			c.beginPath();
-			drawShape(c, s);
+		if ((sf & 64) || (draw.fig && draw.line.preview)) {
+			drawShape(s);
 
 			if (!(sf & 4)) {
 				used.shape = 'Shape';
 			}
 		} else
-		if (m || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
-			c.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
+		if (draw.fig || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
+			ctx.figure.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
 		}
 
 		if (sf & 4) {
 			used.move = 'Move';
 		} else
 		if (!(sf & 8) || mode.step) {
-			c.stroke();
+			ctx.figure.stroke();
 		}
 
-		if (draw.text) {
-			c2d.drawImage(cnvHid, 0,0);
-		}
+		ctx.result.globalAlpha = draw.opacity;
+		ctx.result.drawImage(cnv.figure, 0,0);
 
 		historyAct();
 		draw.active = draw.btn = draw.step = draw.text = 0;
@@ -1030,7 +1253,7 @@ function drawEnd(evt) {
 	updateDebugScreen();
 }
 
-function drawShape(ctx, i) {
+function drawShape(i) {
 var	evt = draw.evt
 ,	s = draw.step
 ,	v = draw.prev
@@ -1038,8 +1261,12 @@ var	evt = draw.evt
 ,	AREA = 0
 	;
 
+	ctx.figure.beginPath();
+
 	switch (select.shapeModel[i] || '[') {
-	//* pan
+
+	//* pan:
+
 		case '<':
 		case '>':
 			if (
@@ -1049,10 +1276,14 @@ var	evt = draw.evt
 				moveScreen(r.x-v.x, r.y-v.y);
 			}
 		break;
-	//* rect
+
+	//* rect:
+
 		case '[':
 			if (s) {
+
 		//* show pan source area
+
 				v = s.prev;
 				r = s.cur;
 			} else {
@@ -1066,13 +1297,15 @@ var	evt = draw.evt
 				AREA = 1;
 			}
 
-			ctx.moveTo(v.x, v.y);
-			ctx.lineTo(r.x, v.y);
-			ctx.lineTo(r.x, r.y);
-			ctx.lineTo(v.x, r.y);
-			ctx.closePath();
+			ctx.figure.moveTo(v.x, v.y);
+			ctx.figure.lineTo(r.x, v.y);
+			ctx.figure.lineTo(r.x, r.y);
+			ctx.figure.lineTo(v.x, r.y);
+			ctx.figure.closePath();
 		break;
-	//* circle
+
+	//* circle:
+
 		case 'o':
 		var	x = xCenter = (v.x+r.x)/2
 		,	y = yCenter = (v.y+r.y)/2
@@ -1080,12 +1313,14 @@ var	evt = draw.evt
 		,	h = radius*2
 			;
 
-			ctx.moveTo(xCenter + radius, yCenter);
-			ctx.arc(xCenter, yCenter, radius, 0, 7, false);
-			ctx.closePath();
+			ctx.figure.moveTo(xCenter + radius, yCenter);
+			ctx.figure.arc(xCenter, yCenter, radius, 0, 7, false);
+			ctx.figure.closePath();
 			AREA = 1;
 		break;
-	//* ellipse
+
+	//* ellipse:
+
 		case 'O':
 			if (s) {
 				p = v;
@@ -1113,37 +1348,41 @@ var	evt = draw.evt
 			x = xCenter;
 			y = yCenter;
 
-			ctx.save();
+			ctx.figure.save();
 
 			if (xRadius < yRadius) {
 				xCenter /= a = xRadius/yRadius;
-				ctx.scale(a, b);
+				ctx.figure.scale(a, b);
 			} else
 			if (xRadius > yRadius) {
 				yCenter /= b = yRadius/xRadius;
-				ctx.scale(a, b);
+				ctx.figure.scale(a, b);
 			}
 
 			if (s) {
+
 		//* speech balloon
+
 			var	a = q.x/a
 			,	b = q.y/b
 			,	a1 = (Math.min(radius/8, TAIL_WIDTH) + tool.width)/8/radius*p2
 			,	a2 = Math.atan2(b-yCenter, a-xCenter)
 				;
 
-				ctx.moveTo(a, b);
-				ctx.arc(xCenter, yCenter, radius, a1+a2, p2-a1+a2, false);
+				ctx.figure.moveTo(a, b);
+				ctx.figure.arc(xCenter, yCenter, radius, a1+a2, p2-a1+a2, false);
 			} else {
-				ctx.moveTo(xCenter + xRadius/a, yCenter);
-				ctx.arc(xCenter, yCenter, radius, 0, p2, false);
+				ctx.figure.moveTo(xCenter + xRadius/a, yCenter);
+				ctx.figure.arc(xCenter, yCenter, radius, 0, p2, false);
 			}
 
-			ctx.closePath();
-			ctx.restore();
+			ctx.figure.closePath();
+			ctx.figure.restore();
 			AREA = 1;
 		break;
-	//* speech box
+
+	//* speech box:
+
 		case '{':
 			if (s) {
 				p = v;
@@ -1184,7 +1423,7 @@ var	evt = draw.evt
 				;
 
 				if (isNaN(xTail) || isNaN(yTail)) {
-					ctx.moveTo(xCenter - xRadius, yCenter);
+					ctx.figure.moveTo(xCenter - xRadius, yCenter);
 				} else {
 				var	w = Math.min(r1, TAIL_WIDTH/2) + tool.width
 				,	x = xTail-xCenter
@@ -1218,7 +1457,7 @@ var	evt = draw.evt
 						--i;
 					}
 
-					ctx.moveTo(xTail, yTail);
+					ctx.figure.moveTo(xTail, yTail);
 					drawTailPart(tc-w);
 				}
 
@@ -1247,7 +1486,7 @@ var	evt = draw.evt
 							td = -td;
 						}
 
-						ctx.lineTo(
+						ctx.figure.lineTo(
 							xCenter + ac*rc + as*td
 						,	yCenter + as*rc + ac*td
 						);
@@ -1261,7 +1500,7 @@ var	evt = draw.evt
 				,	a3 = a1-(f = -f)
 					;
 
-					ctx.arc(
+					ctx.figure.arc(
 						xCenter + Math.cos(a3)*d - Math.cos(a1)*r
 					,	yCenter + Math.sin(a3)*d - Math.sin(a1)*r
 					,	roundRadius
@@ -1281,7 +1520,7 @@ var	evt = draw.evt
 					drawTailPart(te, 1);
 				}
 
-				ctx.closePath();
+				ctx.figure.closePath();
 			}
 
 			if (s && s.done) {
@@ -1305,46 +1544,42 @@ var	evt = draw.evt
 
 			AREA = 1;
 		break;
-	//* line
+
+	//* line:
+
 		default:
 			if (s) {
 			var	d = r
 			,	w = s.prev
 			,	u = s.cur
-			,	old = {}
-			,	t = DRAW_HELPER
 				;
 
 		//* curve helpers
 
-				for (i in t) {
-					old[i] = c2s[i];
-					c2s[i] = t[i];
-				}
+				draw.helper = true;
 
-				c2s.beginPath();
+				ctx.helper.clearRect(0,0, cnv.helper.width, cnv.helper.height);
+				ctx.helper.beginPath();
+
+				for (i in DRAW_HELPER) ctx.helper[i] = DRAW_HELPER[i];
 
 		//* control point 1 phantom
 
-				c2s.moveTo(u.x, u.y);
-				c2s.lineTo(w.x, w.y);
+				ctx.helper.moveTo(u.x, u.y);
+				ctx.helper.lineTo(w.x, w.y);
 
 		//* control point 2 phantom
 
 				if (w.x != v.x || w.y != v.y) {
-					c2s.moveTo(d.x, d.y), d = v;
-					c2s.lineTo(d.x, d.y);
+					ctx.helper.moveTo(d.x, d.y), d = v;
+					ctx.helper.lineTo(d.x, d.y);
 				}
 
-				c2s.stroke();
+				ctx.helper.stroke();
 
-				for (i in t) {
-					c2s[i] = old[i];
-				}
-
-				c2s.beginPath();
 		//* curve
-			var	swapKey = (evt && evt.altKey)
+
+			var	swapKey = (evt && (evt.altKey || evt.ctrlKey || evt.shiftKey))
 			,	swapPoint1 = (s.done ? s.swap : swapKey)
 			,	swapPoint2 = (s.done ? !swapKey : swapKey)
 			,	linePoint1 = (swapPoint1 ? u : w)
@@ -1353,21 +1588,23 @@ var	evt = draw.evt
 			,	linePoint2 = (swapPoint2 ? d : r)
 				;
 
-				ctx.moveTo(linePoint1.x, linePoint1.y);
-				ctx.bezierCurveTo(
+				ctx.figure.moveTo(linePoint1.x, linePoint1.y);
+				ctx.figure.bezierCurveTo(
 					ctrlPoint1.x, ctrlPoint1.y
 				,	ctrlPoint2.x, ctrlPoint2.y
 				,	linePoint2.x, linePoint2.y
 				);
 			} else {
+
 		//* straight
-				ctx.moveTo(v.x, v.y);
-				ctx.lineTo(r.x, r.y);
+
+				ctx.figure.moveTo(v.x, v.y);
+				ctx.figure.lineTo(r.x, r.y);
 			}
 	}
 
-	if (AREA && !isTransparent(ctx.fillStyle)) {
-		ctx.fill(FILL_RULE);
+	if (AREA && !isTransparent(ctx.figure.fillStyle)) {
+		ctx.figure.fill(FILL_RULE);
 	}
 
 	if (draw.text) {
@@ -1379,38 +1616,40 @@ var	evt = draw.evt
 
 		if (!o.y) {
 			f = Math.round(h/(t.length*2-1))+'px '+f;
-			o = getTextOffsetXY(f, ctx, d.align, t);
+			o = getTextOffsetXY(f, ctx.figure, d.align, t);
 		}
 
 		h = o.y*2;
 		x += o.x;
 		y -= h/2*(t.length-1);
-		ctx.save();
-		ctx.clip();
-		ctx.font = f;
-		ctx.fillStyle = d.style;
-		ctx.textAlign = d.align;
-		ctx.textBaseline = 'middle';
+		ctx.figure.save();
+		ctx.figure.clip();
+		ctx.figure.font = f;
+		ctx.figure.fillStyle = d.style;
+		ctx.figure.textAlign = d.align;
+		ctx.figure.textBaseline = 'middle';
 
 		for (i in t) {
-			ctx.fillText(t[i], Math.round(x), Math.round(y));
+			ctx.figure.fillText(t[i], Math.round(x), Math.round(y));
 			y += h;
 		}
 
-		ctx.restore();
+		ctx.figure.restore();
 	}
-	ctx.moveTo(r.x, r.y);
+
+	ctx.figure.moveTo(r.x, r.y);
 }
 
 //* One-click all-screen manipulation *----------------------------------------
 
 function moveScreen(x, y) {
-var	d = draw.history.cur()
+var	i
+,	d = draw.history.cur()
 ,	p = draw.step
 ,	notCopy = !mode.shape
 	;
 
-	c2d.fillStyle = 'rgb(' + tools[1].color + ')';
+	ctx.result.fillStyle = 'rgb(' + tools[1].color + ')';
 
 	if (p) {
 		for (i in {min : 0, max : 0}) {
@@ -1424,16 +1663,16 @@ var	d = draw.history.cur()
 		p.max.y -= p.min.y;
 
 		if (notCopy) {
-			c2d.fillRect(p.min.x, p.min.y, p.max.x, p.max.y);
+			ctx.result.fillRect(p.min.x, p.min.y, p.max.x, p.max.y);
 		}
 
-		c2d.putImageData(d, x,y, p.min.x, p.min.y, p.max.x, p.max.y);
+		ctx.result.putImageData(d, x,y, p.min.x, p.min.y, p.max.x, p.max.y);
 	} else {
 		if (notCopy) {
-			c2d.fillRect(0,0, canvas.width, canvas.height);
+			ctx.result.fillRect(0,0, cnv.result.width, cnv.result.height);
 		}
 
-		c2d.putImageData(d, x,y);
+		ctx.result.putImageData(d, x,y);
 	}
 }
 
@@ -1453,7 +1692,7 @@ var	c = draw.history.cur()
 function fillScreen(i) {
 	if (isNaN(i)) {
 		used.wipe = 'Wipe';
-		c2d.clearRect(0,0, canvas.width, canvas.height);
+		ctx.result.clearRect(0,0, cnv.result.width, cnv.result.height);
 	} else
 	if (i < 0) {
 		historyAct('flip');	//* <- only push history 1 time for all consecutive attempts with same label
@@ -1470,8 +1709,8 @@ function fillScreen(i) {
 		} else {
 		var	hw = d.width
 		,	hh = d.height
-		,	w = canvas.width
-		,	h = canvas.height
+		,	w = cnv.result.width
+		,	h = cnv.result.height
 		,	hr = (i == -2)
 		,	l = (hr ? w : h)/2
 		,	j,k,m,n,x,y
@@ -1480,8 +1719,8 @@ function fillScreen(i) {
 			if (hr) used.flip_h = 'Hor.Flip';
 			else	used.flip_v = 'Ver.Flip';
 
-			x = canvas.width; while (x--) if ((!hr || x >= l) && x < hw) {
-			y = canvas.height; while (y--) if ((hr || y >= l) && y < hh) {
+			x = cnv.result.width; while (x--) if ((!hr || x >= l) && x < hw) {
+			y = cnv.result.height; while (y--) if ((hr || y >= l) && y < hh) {
 				m = (hr ? w-x-1 : x);
 				n = (hr ? y : h-y-1);
 				i = (x+y*hw)*(k = 4);
@@ -1496,25 +1735,33 @@ function fillScreen(i) {
 			}}
 		}
 
-		c2d.putImageData(d, 0,0);
+		ctx.result.putImageData(d, 0,0);
 
 		return;
 	} else {
 		used.fill = 'Fill';
-		c2d.fillStyle = 'rgb(' + tools[i].color + ')';
-		c2d.fillRect(0,0, canvas.width, canvas.height);
+		ctx.result.fillStyle = 'rgb(' + tools[i].color + ')';
+		ctx.result.fillRect(0,0, cnv.result.width, cnv.result.height);
 	}
 
 	cue.autoSave = 0;
 	historyAct();
 }
 
-function clearFill(c) {
-var	d = c.ctx || (c.ctx = c.getContext('2d'));
-	d.fillStyle = 'white';
-	d.fillRect(0,0, c.width, c.height);
+function resetCtxAlphaAndShadow(ctx) {
+	ctx.globalAlpha = 1;
+	ctx.shadowBlur = 0;
+	ctx.shadowColor = A0;
 
-	return d;
+	return ctx;
+}
+
+function clearFill(canvas, param) {
+var	ctx = resetCtxAlphaAndShadow(canvas.ctx || (canvas.ctx = (param ? canvas.getContext('2d', param) : canvas.getContext('2d'))));
+	ctx.fillStyle = 'white';
+	ctx.fillRect(0,0, canvas.width, canvas.height);
+
+	return ctx;
 }
 
 function pickColor(evt, e, keep) {
@@ -1565,7 +1812,7 @@ function pickColor(evt, e, keep) {
 //* from drawing container:
 
 	if (!d) {
-		c = (Math.floor(draw.o.x) + Math.floor(draw.o.y)*canvas.width)*4;
+		c = (Math.floor(draw.o.x) + Math.floor(draw.o.y)*cnv.result.width)*4;
 		d = draw.history.cur().data;
 	}
 
@@ -1885,7 +2132,10 @@ function updatePalette() {
 		evt = evt || window.event;
 
 		if (
-			evt.type === 'mousemove'
+			(
+				evt.type === 'mousemove'
+			||	evt.type === 'pointermove'
+			)
 		&&	(!draw.target || draw.target !== evt.target)
 		) {
 			return;
@@ -1959,7 +2209,7 @@ var	pt = getElemById('palette-table')
 
 			c.setAttribute('onscroll', f);
 			c.setAttribute('oncontextmenu', f);
-			c.onmousedown = pickColor;
+			c.addEventListener((isPointerEventSupported ? 'pointerdown' : 'mousedown'), pickColor, true);
 		} else
 		if (c == 'w') {
 		var	border = CANVAS_BORDER
@@ -2175,7 +2425,8 @@ var	i = SLIDER_LETTERS.indexOf(b)
 ,	j
 ,	r = RANGE[i > 0 ? i : 0]
 ,	k = (i < 0 ? '' : ' ['+SLIDER_LETTERS[i]+']')
-,	s = '';
+,	s = ''
+	;
 
 	for (j in r) {
 		s += '" '+j+'="'+r[j];
@@ -2284,7 +2535,7 @@ function updateSliders(s) {
 	if (draw.o.length) {
 		drawEnd();
 		s = tool.width+4;
-		c2d.putImageData(draw.history.cur(), 0,0, draw.o.x - s/2, draw.o.y - s/2, s, s);
+		ctx.result.putImageData(draw.history.cur(), 0,0, draw.o.x - s/2, draw.o.y - s/2, s, s);
 		drawCursor();
 	}
 
@@ -2297,9 +2548,10 @@ function updateShape(s) {
 		s = 0;
 	}
 
-var	c = select.shapeClass[s = orz((s||select.shape).value)]
+var	i
+,	j = []
+,	c = select.shapeClass[s = orz((s||select.shape).value)]
 ,	sf = select.shapeFlags[s]
-,	i,j = []
 	;
 
 	if (
@@ -2349,8 +2601,8 @@ function checkTextStyle(e, test) {
 var	v = (e.value ? (e.value = getSpaceReduced(e.value)) : e);
 
 	if (test) {
-		c2d.font = v;
-		return (c2d.font === v);
+		ctx.result.font = v;
+		return (ctx.result.font === v);
 	}
 
 	return false;
@@ -2360,7 +2612,7 @@ function updateHistoryButtons() {
 var	a = {R : draw.history.last, U : 0}
 ,	b = 'button'
 ,	d = b+'-disabled'
-,	e
+,	e,i
 	;
 
 	for (i in a) {
@@ -2379,7 +2631,7 @@ var	i = e.id.slice(-1);
 		e.title = (
 			e.title.replace(regTailBrackets, '')
 		+	' ('
-		+	(canvas.toDataURL({J : IJ, P : ''}[i]).length / 1300).toFixed(0)
+		+	(cnv.result.toDataURL({J : IJ, P : ''}[i]).length / 1300).toFixed(0)
 		+	' KB)'
 		);
 	}
@@ -2388,8 +2640,7 @@ var	i = e.id.slice(-1);
 function updateResize(e) {
 	if (e.value == 'auto crop') {
 		if (d = draw.history.cur()) {
-		var	c = c2d.canvas
-		,	d,a = d.data
+		var	d,a = d.data
 		,	i = a.length
 		,	j = i-4
 		,	k,z,x,y = 0
@@ -2423,24 +2674,24 @@ function updateResize(e) {
 					break ltr;
 				}
 //* draw cut box:
-				if (x || y || w != c.width || h != c.height) {
-					c2d.save();
-					for (i in DRAW_HELPER) c2d[i] = DRAW_HELPER[i];
+				if (x || y || w != cnv.result.width || h != cnv.result.height) {
+					ctx.result.save();
+					for (i in DRAW_HELPER) ctx.result[i] = DRAW_HELPER[i];
 					i = DRAW_PIXEL_OFFSET;
-					c2d.translate(i,i);
-					c2d.beginPath();
-					c2d.moveTo(x, 0), c2d.lineTo(x, c.height), z = x+w;
-					c2d.moveTo(z, 0), c2d.lineTo(z, c.height);
-					c2d.moveTo(0, y), c2d.lineTo(c.width, y), z = y+h;
-					c2d.moveTo(0, z), c2d.lineTo(c.width, z);
-					c2d.stroke();
-					c2d.restore();
+					ctx.result.translate(i,i);
+					ctx.result.beginPath();
+					ctx.result.moveTo(x, 0), ctx.result.lineTo(x, cnv.result.height), z = x+w;
+					ctx.result.moveTo(z, 0), ctx.result.lineTo(z, cnv.result.height);
+					ctx.result.moveTo(0, y), ctx.result.lineTo(cnv.result.width, y), z = y+h;
+					ctx.result.moveTo(0, z), ctx.result.lineTo(cnv.result.width, z);
+					ctx.result.stroke();
+					ctx.result.restore();
 //* save:
 					if (confirm('x = '+x+', y = '+y+'\nw = '+w+', h = '+h)) {
-						c2s.putImageData(d, 0,0);
-						d = c2s.getImageData(x,y, w,h);
+						ctx.helper.putImageData(d, 0,0);
+						d = ctx.helper.getImageData(x,y, w,h);
 						updateDimension(w,h);
-						c2d.putImageData(d, 0,0);
+						ctx.result.putImageData(d, 0,0);
 						historyAct();
 					}
 				} else {
@@ -2457,19 +2708,21 @@ function updateResize(e) {
 }
 
 function updateDimension(e,h) {
-var	c = canvas;
-
 	if (e && e.id) {
 	var	i = mode.scale
-	,	a = (i == 'W' || i == 'H' ? c.width/c.height : 0)
+	,	a = (i == 'W' || i == 'H' ? cnv.result.width / cnv.result.height : 0)
 	,	i = getLastWord(e.id)
 	,	v = orz(e.value)
 		;
 
-		cnvHid[i] = c[i] = e.value = v = (
+	var	size = e.value = v = (
 			v < (b = select.imgLimits[i][0]) ? b : (
 			v > (b = select.imgLimits[i][1]) ? b : v)
 		);
+
+		for (k in cnv) if (cnv[k][i] != size) {
+			cnv[k][i] = size;
+		}
 
 		if (a) {
 			if (i == 'width') {
@@ -2480,7 +2733,11 @@ var	c = canvas;
 				b = 'width';
 			}
 
-			cnvHid[b] = c[b] = getElemById('img-'+b).value = Math.max(1, Math.round(a));
+		var	otherSide = getElemById('img-'+b).value = Math.max(1, Math.round(a));
+
+			for (k in cnv) if (cnv[k][b] != otherSide) {
+				cnv[k][b] = otherSide;
+			}
 		}
 
 		historyAct(mode.scale ? 'rescale' : 'resize');
@@ -2494,7 +2751,11 @@ var	c = canvas;
 		}
 
 		for (i in select.imgSizes) {
-			getElemById('img-'+i).value = cnvHid[i] = c[i] = orz(e[i]);
+		var	size = getElemById('img-'+i).value = orz(e[i]);
+
+			for (k in cnv) if (cnv[k][i] != size) {
+				cnv[k][i] = size;
+			}
 		}
 	}
 
@@ -2504,7 +2765,7 @@ var	c = canvas;
 	,	i = getElemById('info').style
 		;
 
-		if (canvas.height < BOTH_PANELS_HEIGHT) {
+		if (cnv.result.height < BOTH_PANELS_HEIGHT) {
 		var	a = (b.className.indexOf('active') >= 0)
 		,	v = 'none'
 			;
@@ -2517,27 +2778,23 @@ var	c = canvas;
 		}
 	}
 
-	c = container.style;
-	b = 'minWidth';
-	a = (v = canvas.width+getElemById('right').offsetWidth+14)+'px';
+var	k
+,	fun
+,	size = cnv.result.width + getElemById('right').offsetWidth + 14
+,	c = container.style
+,	b = 'minWidth'
+,	a = size+'px'
+	;
 
 	if (c[b] != a) {
 		c[b] = a;
 
-		if (a = outside[i = 'resize_style']) {
-			v += 24;
-
-			if (
-				(e = outside.resize_min_id)
-			&&	(e = getElemById(e))
-			&&	(e = e.offsetWidth)
-			&&	e > v
-			) {
-				v = e;
-			}
-
-			c = getElemById(i) || setId(cre('style', getElemById()), i);
-			c.innerHTML = a+'{max-width:'+v+'px;}';
+		if (
+			(k = outside.resize_callback)
+		&&	(fun = window[k] || self[k])
+		&&	typeof fun === 'function'
+		) {
+			fun(size);
 		}
 	}
 }
@@ -2799,17 +3056,18 @@ function updateDebugScreen(lsid, refresh) {
 }
 
 function updatePosition(evt) {
-var	sf = draw.shapeFlags
+var	i
+,	sf = draw.shapeFlags
 ,	isHandDrawnLine = ((sf & 1) && !mode.shape)
 ,	isFillOnlyFigure = ((sf & 2) && mode.shape && !mode.step)
-,	isMoveToolOrEvenWidthLine = ((sf & 4) || ((draw.active ? c2d.lineWidth : tool.width) % 2))
+,	isMoveToolOrEvenWidthLine = ((sf & 4) || ((draw.active ? ctx.result.lineWidth : tool.width) % 2))
 ,	toolOffset = (
 		isMoveToolOrEvenWidthLine && !isFillOnlyFigure
 		? DRAW_PIXEL_OFFSET
 		: 0
 	)
 ,	containerOffset = getOffsetXY(draw.container)
-,	i;
+	;
 
 	evt = evt || window.event;
 	draw.o.x = evt.pageX - CANVAS_BORDER - containerOffset.x;
@@ -2825,8 +3083,8 @@ var	sf = draw.shapeFlags
 		if (draw.angle    ) cursorOffset.a -= draw.aRad;
 		if (draw.zoom != 1) cursorOffset.d /= draw.zoom;
 
-		draw.o.x = Math.cos(cursorOffset.a) * cursorOffset.d + canvas.width/2;
-		draw.o.y = Math.sin(cursorOffset.a) * cursorOffset.d + canvas.height/2;
+		draw.o.x = Math.cos(cursorOffset.a) * cursorOffset.d + cnv.result.width/2;
+		draw.o.y = Math.sin(cursorOffset.a) * cursorOffset.d + cnv.result.height/2;
 
 		toolOffset = 0;
 	}
@@ -2860,8 +3118,8 @@ function getCursorRad(r, x, y) {
 		};
 	}
 
-	x = (isNaN(x) ? draw.cur.x : x) - canvas.width/2;
-	y = (isNaN(y) ? draw.cur.y : y) - canvas.height/2;
+	x = (isNaN(x) ? draw.cur.x : x) - cnv.result.width/2;
+	y = (isNaN(y) ? draw.cur.y : y) - cnv.result.height/2;
 
 	return (
 		r
@@ -2893,8 +3151,8 @@ function isMouseIn() {
 	return (
 		draw.o.x >= 0
 	&&	draw.o.y >= 0
-	&&	draw.o.x < canvas.width
-	&&	draw.o.y < canvas.height
+	&&	draw.o.x < cnv.result.width
+	&&	draw.o.y < cnv.result.height
 	);
 }
 
@@ -2915,7 +3173,8 @@ function timeElapsed() {
 }
 
 function unixDateToHMS(t,u,y) {
-var	d = (
+var	i
+,	d = (
 		t
 		? new Date(t+(t > 0 ? 0 : new Date()))
 		: new Date()
@@ -2943,7 +3202,8 @@ var	d = (
 }
 
 function getSendMeta(sz) {
-var	i,j = ', '
+var	i
+,	j = ', '
 ,	t = +new Date
 ,	u = []
 ,	a = [
@@ -2951,11 +3211,11 @@ var	i,j = ', '
 	,	'draw_time: '+draw.time.all.join('-')
 	,	'active_time: '+draw.time.sum()
 	,	'app: '+NS+' '+INFO_VERSION
-	,	'pixels: '+canvas.width+'x'+canvas.height
+	,	'pixels: '+cnv.result.width+'x'+cnv.result.height
 	,	'bytes: '+(
 			sz || [
-				'png = '+ canvas.toDataURL().length
-			,	'jpg = '+ canvas.toDataURL(IJ).length
+				'png = '+ cnv.result.toDataURL().length
+			,	'jpg = '+ cnv.result.toDataURL(IJ).length
 			].join(j)
 		)
 	];
@@ -3039,8 +3299,7 @@ function saveShiftUp(i) {
 	&&	i < CR.length-1
 	) {
 	var	n = i+1
-	,	d = getSaveLSDict(i
-	,	n)
+	,	d = getSaveLSDict(i,n)
 	,	m = d.sum
 	,	d = d.dict
 		;
@@ -3092,15 +3351,15 @@ var	d = getSaveLSDict(i
 
 function saveDL(dataURI, suffix) {
 	if (DL) {
-	var	u = window.URL || window.webkitURL
+	var	URL = window.URL || window.webkitURL
 	,	a = cre('a', getElemById())
 		;
 
-		if (u && u.createObjectURL) {
+		if (URL && URL.createObjectURL) {
 		var	type = dataURI.split(';', 1)[0].split(':', 2)[1]
 		,	data = dataURI.slice(dataURI.indexOf(',')+1)
 		,	data = Uint8Array.from(MODE_NAMES.map.call(atob(data), function(v) { return v.charCodeAt(0); }))
-		,	blob = window.URL.createObjectURL(new Blob([data], {'type' : type}))
+		,	blob = URL.createObjectURL(new Blob([data], {'type' : type}))
 			;
 
 			a.href = ''+blob;
@@ -3112,7 +3371,7 @@ function saveDL(dataURI, suffix) {
 		a.click();
 
 		setTimeout(function() {
-			if (blob) u.revokeObjectURL(blob);
+			if (blob) URL.revokeObjectURL(blob);
 			a.parentNode.removeChild(a);
 		}, 12345);
 	} else {
@@ -3161,7 +3420,7 @@ var	t = (lsid > 0)
 			c = (
 				t
 				? LS[CR[lsid].R]
-				: canvas.toDataURL(dest ? IJ : '')
+				: cnv.result.toDataURL(dest ? IJ : '')
 			)
 		,	'_'+(
 				t
@@ -3175,7 +3434,7 @@ var	t = (lsid > 0)
 //* save to memory:
 
 	case 2:
-		c = canvas.toDataURL();
+		c = cnv.result.toDataURL();
 
 		if (!c || fillCheck())	return a ? c : alert(lang.no.drawn);
 		if (!LS)		return a ? c : alert(lang.no.LS);
@@ -3248,7 +3507,7 @@ var	t = (lsid > 0)
 			return 0;
 		}
 
-		c = canvas.toDataURL();
+		c = cnv.result.toDataURL();
 		j = CR.length;
 		i = seekSavePos(lsid || lastUsedSaveSlot+1) || seekSavePos();
 		lastUsedSaveSlot = 0;
@@ -3298,7 +3557,7 @@ var	t = (lsid > 0)
 			(a = lsid)
 		||	(
 				(outside.read || (outside.read = getElemById('read')))
-			&&	(a = outside.read.value)
+			&&	(a = outside.read.value || outside.read)
 			)
 		) {
 			draw.time.act(1);
@@ -3313,15 +3572,15 @@ var	t = (lsid > 0)
 		if (dest)		alert(lang.bad_id+'\n\nid='+dest+'\nautosave='+a); else
 		if (!outside.send)	alert(lang.no.form); else
 		if (fillCheck())	alert(lang.no.drawn); else {
+		var	confirmationText = lang.confirm.send;
 			a = select.imgLimits;
-			c = lang.confirm.send;
 
 			for (i in a) if (
-				canvas[i] < a[i][0]
-			||	canvas[i] > a[i][1]
+				cnv.result[i] < a[i][0]
+			||	cnv.result[i] > a[i][1]
 			) {
 				j = a.width.length;
-				c = lang.confirm.size.map(
+				confirmationText = lang.confirm.size.map(
 					function(v,i) {
 						return v+(i < j ? a.width[i]+'x'+a.height[i] : '');
 					}
@@ -3330,66 +3589,169 @@ var	t = (lsid > 0)
 				break;
 			}
 		}
-		if (c && confirm(c)) {
-			if ((f = outside.send) && f.tagName) clearContent(f);
-			else {
-				setId(e = cre('form', container), 'send');
-				if (!f.length || f.toLowerCase() != 'get') e.setAttribute('method', 'post');
-				outside.send = f = e;
-			}
+
+		if (confirmationText) {
 		var	pngData = savePic(2,-1)
 		,	jpgData
-		,	a = {txt : 0, pic : 0}
 			;
 
-			for (i in a) if (!(a[i] = getElemById(i))) {
-				setId(
-					e = a[i] = cre('input', f)
-				,	e.name = i
-				).type = 'hidden';
-			}
-
 			e = pngData.length;
-			c = canvas;
+			c = cnv.result;
 			d = select.imgSizes;
 			c = c.width * c.height;
 			d = d.width * d.height;
-			d = (
-				(
-					(i = outside.jpg)
-				&&	e > i
-				&&	((c <= d) || (e > (i *= c/d)))
-				&&	e > (t = (jpgData = c.toDataURL(IJ)).length)
-				)
+
+		var	isSendingAsJpg = (
+				(i = outside.jpg)
+			&&	e > i
+			&&	((c <= d) || (e > (i *= c/d)))
+			&&	e > (t = (jpgData = c.toDataURL(IJ)).length)
+			);
+
+		var	dataInBase64 = (
+				isSendingAsJpg
 				? jpgData
 				: pngData
 			);
 
 			if (mode.debug) {
-				alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
+				alert(['png limit = '+i, 'png = '+e, 'jpg = '+t].join('\n'));
 			}
 
-			a.pic.value = d;
-			a.txt.value = getSendMeta(d.length);
-			f.encoding = f.enctype = 'multipart/form-data';
+			function sendAfterConfirmation(data) {
 
-			try {
-				postingInProgress = true;
-
-				if (
-					(i = outside.check)
-				&&	(e = getElemById(i))
-				) {
-					e.setAttribute('data-id', f.id);
-					e.click();
+				if ((f = outside.send) && f.tagName) {
+					clearContent(f);
 				} else {
-					f.submit();
-				}
-			} catch (error) {
-				console.error(error);
+					setId(e = cre('form', container), 'send');
 
-				postingInProgress = false;
+					if (!f.length || f.toLowerCase() != 'get') {
+						e.setAttribute('method', 'post');
+					}
+
+					outside.send = f = e;
+				}
+
+				a = {txt : 0, pic : 0};
+
+				for (i in a) if (!(a[i] = getElemById(i))) {
+					e = a[i] = cre('input', f);
+					e.name = i;
+					e.hidden = true;
+					e.type = 'hidden';
+					e.style.display = 'none';
+					setId(e, i);
+				}
+
+			var	dataSize, dataType, dataEnc, fileExt;
+
+				function setDataVars(data) {
+					if (data.type) {
+						dataSize = data.size;
+						dataType = data.type;
+						dataEnc = 'blob';
+					} else {
+					var	dataEncParts = data.split(',', 1)[0].split(';');
+						dataSize = data.length;
+						dataType = dataEncParts[0].split(':')[1];
+						dataEnc = dataEncParts[1];
+					}
+
+					fileExt = dataType.split('/')[1];
+
+					return data;
+				}
+
+				if (data.type) {
+					setDataVars(data);
+
+				var	fileName = +new Date + '.' + fileExt;
+				var	file = new File([data], fileName, {type : dataType});
+
+					a.pic.type = 'file';
+					a.pic.value = null;
+					a.pic.files = createFileList(file);
+				}
+
+//* Fallback to base64 for old Firefox 56:
+
+				if (!(
+					data.type
+				&&	a.pic.files
+				&&	a.pic.files.length > 0
+				)) {
+					a.pic.type = 'hidden';
+					a.pic.value = setDataVars(
+						data.type
+						? dataInBase64
+						: data
+					);
+				}
+
+				a.txt.type = 'hidden';
+				a.txt.value = getSendMeta(dataSize);
+
+				f.encoding = f.enctype = 'multipart/form-data';
+
+				confirmationText = (
+					cnv.result.width + 'x' + cnv.result.height
+				+	', '
+				+	dataSize + ' ' + lang.bytes
+				+	', '
+				+	dataEnc
+				+	', '
+				+	fileExt.toUpperCase()
+				+	'\n\n'
+				+	confirmationText
+				);
+
+				function onError(evt) {
+					console.error(evt);
+
+					postingInProgress = false;
+				}
+
+				if (confirm(confirmationText)) {
+					try {
+						postingInProgress = true;
+
+					var	k, fun;
+
+						if (
+							(k = outside.send_callback)
+						&&	(fun = window[k] || self[k])
+						&&	typeof fun === 'function'
+						) {
+							fun(f, onError);
+						} else {
+							f.submit();
+						}
+
+					} catch (error) {
+						onError(error);
+					}
+				}
 			}
+
+//* Use less traffic in modern browsers with blob uploaded as file:
+
+			if (cnv.result.toBlob) {
+				try {
+					cnv.result.toBlob(
+						sendAfterConfirmation
+					,	isSendingAsJpg ? IJ : ''
+					);
+
+					return c;
+
+				} catch (error) {
+					console.error(error);
+				}
+			}
+
+//* Fallback to base64 for old Opera 11-12:
+
+			sendAfterConfirmation(dataInBase64);
 		}
 	}
 
@@ -3424,7 +3786,7 @@ var	e = new Image();
 
 	//* actual work:
 
-		var	d = canvas
+		var	d = cnv.result
 		,	i = mode.scale
 			;
 
@@ -3467,6 +3829,18 @@ var	e = new Image();
 	return s.name;
 }
 
+//* The only way to change input[type=file] value is with a other FileList instance,
+//* and this is currently the only way to construct a new FileList.
+//* Source: https://stackoverflow.com/a/50169790
+
+function createFileList(a) {
+	a = Array.prototype.slice.call(Array.isArray(a) ? a : arguments);
+	for (var c, b = c = a.length, d = !0; b-- && d;) d = a[b] instanceof File;
+	if (!d) throw new TypeError('expected argument to FileList is File or array of File objects');
+	for (b = (new ClipboardEvent('')).clipboardData || new DataTransfer; c--;) b.items.add(a[c]);
+	return b.files;
+}
+
 //* Hot keys *-----------------------------------------------------------------
 
 function addEventListeners(e, funcByEventName) {
@@ -3479,6 +3853,11 @@ function addEventListeners(e, funcByEventName) {
 			e.addEventListener(i, funcByEventName[i], true);
 		}
 	}
+}
+
+function prevent(evt) {
+	evt = evt || window.event;
+	evt.preventDefault();
 }
 
 function browserHotKeyPrevent(evt) {
@@ -3664,7 +4043,11 @@ function hotKeys(evt) {
 //* Swap control/end points of curved line:
 
 			if (
-				evt.keyCode == 18	//* 16=Shift, 17=Ctrl, 18=Alt
+				(
+					evt.keyCode == 16	//* 16=Shift
+				||	evt.keyCode == 17	//* 17=Ctrl
+				||	evt.keyCode == 18	//* 18=Alt
+				)
 			&&	draw.step
 			&&	mode.step
 			&&	mode.shape
@@ -3793,14 +4176,23 @@ var	a,b,c = 'canvas'
 	+	d+'debug"></div>'
 	);
 
-	if (!(canvas = getElemById(c)).getContext) {
-		return;
+
+	for (k in cnv) {
+		if (k === 'result') {
+			if (!(cnv[k] = getElemById(c)).getContext) {
+				return;
+			}
+		} else {
+			cnv[k] = cre(c);
+		}
 	}
 
-	cnvHid = cre(c);
-
 	for (i in select.imgSizes) {
-		cnvHid[i] = canvas[i] = (o[a = i[0]] || (o[a] = o[i] || select.imgSizes[i]));
+	var	size = (o[a = i[0]] || (o[a] = o[i] || select.imgSizes[i]));
+
+		for (k in cnv) {
+			cnv[k][i] = size;
+		}
 
 		if (
 			(o[b = a+'l'] || o[b = i+'Limit'])
@@ -3813,8 +4205,20 @@ var	a,b,c = 'canvas'
 		}
 	}
 
-	c2s = clearFill(cnvHid);
-	c2d = clearFill(canvas);
+	for (k in cnv) {
+		ctx[k] = clearFill(cnv[k], {
+			'alpha' : (k !== 'result'),
+			'desynchronized' : true,	//* <- https://developers.google.com/web/updates/2019/05/desynchronized
+		});
+
+		if (TESTING) {
+			if (ctx[k].getContextAttributes) {
+				console.log(k, 'ctx:', [ctx[k], 'canvas:', cnv[k], 'getContextAttributes:', ctx[k].getContextAttributes()]);
+			} else {
+				console.log(k, 'ctx:', [ctx[k], 'canvas:', cnv[k]]);
+			}
+		}
+	}
 
 	a = {
 		left : '←</label>'
@@ -4024,7 +4428,7 @@ var	a,b,c = 'canvas'
 		}
 	}
 
-	if (canvas.height < BOTH_PANELS_HEIGHT) {
+	if (cnv.result.height < BOTH_PANELS_HEIGHT) {
 		toggleView('info');
 	} else {
 		setClass(getElemById(b+'H'), b+'-active');
@@ -4094,31 +4498,47 @@ var	a,b,c = 'canvas'
 //* still fails to catch events outside of document block height less than of browser window.
 
 	addEventListeners(
-		// document.body
 		window
 	,	{
-			dragover :	dragOver
-		,	drop :		drop
-		,	mousedown :	drawStart
-		,	mousemove :	drawMove
-		,	mouseup :	drawEnd
-		,	keypress :	k = hotKeys
-		,	keydown :	k
-		,	keyup :		k
-		,	mousewheel :	f = hotWheel
-		,	wheel :		f
-		,	scroll :	f
-		,	beforeunload :	beforeUnload
+			'beforeunload' : beforeUnload
+		,	'dragover' :	dragOver
+		,	'drop' :	drop
+		,	'keypress' :	k = hotKeys
+		,	'keydown' :	k
+		,	'keyup' :	k
+		,	'mousewheel' :	f = hotWheel
+		,	'wheel' :	f
+		,	'scroll' :	f
 		}
 	);
 
 	addEventListeners(
-		canvas
+		window
+	,	(
+			isPointerEventSupported
+			? {
+				'pointerdown' :	drawStart
+			,	'pointermove' :	drawMove
+			,	'pointerup' :	drawEnd
+			}
+			: {
+				'mousedown' :	drawStart
+			,	'mousemove' :	drawMove
+			,	'mouseup' :	drawEnd
+			}
+		)
+	);
+
+	addEventListeners(
+		cnv.result
 	,	{
-			scroll :	f = stopScroll	//* <- against FireFox always scrolling on mousewheel
-		,	contextmenu :	f
+			'scroll' :	f = stopScroll	//* <- against FireFox always scrolling on mousewheel
+		,	'contextmenu' :	f
+		,	'touchstart' :	k = prevent
+		,	'touchmove' :	k
 		}
 	);
+
 }; //* <- END init()
 
 //* External config *----------------------------------------------------------
@@ -4225,9 +4645,28 @@ var	o = outside
 
 	j = SHAPE_HOTKEYS.split('').join(k = ', ');
 
-	if (!o.lang) {
-		o.lang = document.documentElement.lang || 'en';
+var	SUPPORTED_LANGS = ['en', 'ru'];
+
+	function getSupportedPreferredLang(lastResult, nextValue) {
+		return lastResult || (
+			!nextValue
+			? lastResult
+			:
+			nextValue.reduce
+			? nextValue.reduce(getSupportedPreferredLang, lastResult)
+			:
+			SUPPORTED_LANGS.indexOf(nextValue) < 0
+			? lastResult
+			: nextValue
+		);
 	}
+
+	if (!o.lang) o.lang = getSupportedPreferredLang(null, [
+		document.documentElement.lang
+	,	navigator.languages
+	,	navigator.language
+	,	'en'
+	]);
 
 	if (o.lang == 'ru') {
 		r = ' браузера (содержит очередь из '+o.save+' позиций максимум).';
@@ -4236,6 +4675,7 @@ var	o = outside
 			bad_id : 	'Ошибка: действие не найдено.'
 		,	err_code :	'Код ошибки'
 		,	found_swap :	'Рисунок был в запасе, теперь сдвинут на первое место.'
+		,	bytes :		'байт'
 		,	confirm : {
 				send :	'Отправить рисунок в сеть?'
 			,	close :	'Покинуть эту страницу и выбросить открытый рисунок?'
@@ -4319,7 +4759,7 @@ var	o = outside
 			,	line	: {sub : 'прямая',	t : 'Прямая линия (1 клик-зажатие).'}
 			,	curve	: {sub : 'сгиб',	t : 'Сглаживать углы линии.'
 				+TITLE_LINE_BREAK+	'Вместе с включением "прямой" — одна ровная кривая линия (2 клик-зажатия подряд).'
-				+TITLE_LINE_BREAK+	'Зажатие кнопки Alt меняет местами концевую и контрольную точку линии.'
+				+TITLE_LINE_BREAK+	'Зажатие кнопки Alt, Ctrl или Shift меняет местами концевую и контрольную точку линии.'
 				}
 			,	area	: {sub : 'закрас.',	t : 'Закрашивать площадь геометрических фигур.'}
 			,	outline	: {sub : 'контур',	t : 'Рисовать контур геометрических фигур.'}
@@ -4381,6 +4821,7 @@ var	o = outside
 			bad_id :	'Invalid action: case not found.'
 		,	err_code :	'Error code'
 		,	found_swap :	'Found same image still saved, swapped it to first slot.'
+		,	bytes :		'bytes'
 		,	confirm : {
 				send :	'Send image to server?'
 			,	close :	'Leave this page and discard the drawing?'
@@ -4462,7 +4903,7 @@ var	o = outside
 			,	line	: 'Draw straight line (1 click-drag).'
 			,	curve	: 'Draw lines with smooth corners.'
 			+TITLE_LINE_BREAK+	'With "straight" enabled — draw single curve (2 click-drags).'
-			+TITLE_LINE_BREAK+	'Holding Alt key swaps line end and control point.'
+			+TITLE_LINE_BREAK+	'Holding Alt, Ctrl or Shift key swaps line end and control point.'
 			,	area	: 'Fill geometric shapes.'
 			,	outline	: 'Draw outline of geometric shapes.'
 			,	copy	: 'Keep old copy.'

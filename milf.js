@@ -5,18 +5,32 @@
 
 //* Configuration *------------------------------------------------------------
 
-var	INFO_VERSION = 'v1.16.11'	//* needs complete rewrite, long ago
-,	INFO_DATE = '2014-07-16 — 2021-01-17'
+var	INFO_VERSION = 'v1.34'	//* needs complete rewrite, long ago
+,	INFO_DATE = '2014-07-16 — 2021-05-29'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
 ,	A0 = 'transparent', IJ = 'image/jpeg', SO = 'source-over', DO = 'destination-out'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers', DL
 ,	LS = this.LS = window.localStorage || localStorage
+,	isPointerEventSupported = !!window.PointerEvent
+,	isPointerEventCoalesced = isPointerEventSupported && !!PointerEvent.prototype.getCoalescedEvents
 ,	DRAW_PIXEL_OFFSET = 0.5, CANVAS_BORDER = 1
-,	DRAW_HELPER = {lineWidth: 1, shadowBlur: 0, shadowColor: A0, strokeStyle: 'rgba(123, 123, 123, 0.5)', globalCompositeOperation: SO}
+,	DRAW_HELPER = {
+		lineWidth: 1
+	,	shadowBlur: 0
+	,	shadowColor: A0
+	,	strokeStyle: 'rgba(123, 123, 123, 0.5)'
+	,	globalCompositeOperation: SO
+	// ,	globalAlpha : 1
+	}
+,	CTX_RESET_PROPS = {
+		globalAlpha : 1
+	,	shadowBlur : 0
+	,	shadowColor : A0
+	}
 
 ,	mode = {debug:	false	//* <- safe to define here
 	,	shape:	false	//* <- safe to define here;	straight line	/ fill area	/ copy
-	,	step:	true	//* <- safe to define here;	curve		/ outline	/ part
+	,	step:	false	//* <- safe to define here;	curve		/ outline	/ part
 	,	lowQ:	false
 	,	erase:	false
 	,	brushView:	false	//* <- safe to define here
@@ -125,11 +139,14 @@ var	INFO_VERSION = 'v1.16.11'	//* needs complete rewrite, long ago
 
 //* Set up (don't change) *----------------------------------------------------
 
+,	TESTING = false && (location.protocol === 'file:')
 ,	CUSTOM_CURSOR_DOT = false
-,	TITLE_LINE_BREAK = ' \r\n'
 ,	noShadowBlurCurve = /^Opera.* Version\D*12\.\d+$/i.test(navigator.userAgent)	//* <- broken forever, sadly
 ,	noBorderRadius = /^Opera.* Version\D*1\d\.\d+$/i.test(navigator.userAgent)
+
+,	TITLE_LINE_BREAK = ' \r\n'
 ,	abc = 'abc'.split('')
+
 ,	regLastNum = /^.*\D(\d+)$/
 ,	regHex = /^#*[0-9a-f]{6}$/i
 ,	regHex3 = /^#*([0-9a-f])([0-9a-f])([0-9a-f])$/i
@@ -218,11 +235,17 @@ var	INFO_VERSION = 'v1.16.11'	//* needs complete rewrite, long ago
 			), j, k, l, t, s = this.shift || 0, z;
 			for (i in ctx) ctx[i].globalCompositeOperation = SO;
 			for (i in a) {
+			var	oldProps = getAndResetCtxAlphaAndShadow(ctx[i]);
+				oldProps.globalAlpha = 1;
+
 				ctx[i].clearRect(0, 0, cnv.view.width, cnv.view.height);
 				for (j = a[i][0], l = a[i][1]; j <= l; j++) if (j && (t = d[j]).show && (k = y.cur(j))) {
 					if (j == c) ctx[i].putImageData(k, 0, 0);
 					else {
 						if (t.clip && !(k = getClippedImageData(k, j))) continue;
+
+						resetCtxAlphaAndShadow(ctx.temp);
+
 						ctx.temp.clearRect(0, 0, cnv.view.width, cnv.view.height);
 						ctx.temp.putImageData(k, 0, 0);
 						if (t.blur) filterCanvas(t.blur, t.filter);
@@ -230,12 +253,17 @@ var	INFO_VERSION = 'v1.16.11'	//* needs complete rewrite, long ago
 						ctx[i].drawImage(cnv.temp, z = (s?s*(j-c):0), z);
 					}
 				}
-				ctx[i].globalAlpha = 1;
+
+				resetCtxAlphaAndShadow(ctx[i], oldProps);
 			}
 		}
 	,	view: function(i) {
 			if (i) draw.preload(i === 2);
 		var	y = this.history, c = y.layer, d = y.layers, a = ['lower', 'draw', 'upper'], j, k, l;
+
+		var	oldProps = getAndResetCtxAlphaAndShadow(ctx.view);
+			oldProps.globalAlpha = 1;
+
 			if (d[0].show) {
 				ctx.view.fillStyle = d[0].color;
 				ctx.view.fillRect(0, 0, cnv.view.width, cnv.view.height);
@@ -254,6 +282,8 @@ var	INFO_VERSION = 'v1.16.11'	//* needs complete rewrite, long ago
 				} else ctx.view.globalAlpha = 1;
 				ctx.view.drawImage(cnv[j], 0, 0);
 			}
+
+			resetCtxAlphaAndShadow(ctx.view, oldProps);
 		}
 	};
 
@@ -308,13 +338,18 @@ var	y = draw.history, c = y.layer, d = y.layers, z, u;
 //* merge down
 		if (c < 2) return;
 		if (z = y.cur()) {
+		var	oldProps = getAndResetCtxAlphaAndShadow(ctx.draw);
+			oldProps.globalAlpha = 1;
+
 			d[c].show = 0, u = y.cur(--c);
 			u ?	ctx.draw.putImageData(u, 0, 0)
 			:	ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
 			ctx.temp.putImageData(z, 0, 0);
 			ctx.draw.globalAlpha = d[y.layer--].alpha/RANGE.A.max;
 			ctx.draw.drawImage(cnv.temp, 0, 0);
-			ctx.draw.globalAlpha = 1;
+
+			resetCtxAlphaAndShadow(ctx.draw, oldProps);
+
 			historyAct();
 			cue.autoSave = 1;
 		}
@@ -493,10 +528,19 @@ var	c = cnv[i?i:i = 'temp'], x = ctx[i];
 		iiBlurCanvasRGBA(i, 0, 0, c.width, c.height, r, 0);
 	} else {
 //* dummy rescale as a fallback:
-		ctx.filter.clearRect(0, 0, c.width, c.height);
-		ctx.filter.drawImage(c, 0, 0, c.width/r, c.height/r);
+	var	oldProps = getAndResetCtxAlphaAndShadow(f = ctx.filter);
+
+		f.clearRect(0, 0, c.width, c.height);
+		f.drawImage(c, 0, 0, c.width/r, c.height/r);
+
+		resetCtxAlphaAndShadow(f, oldProps);
+
+		oldProps = getAndResetCtxAlphaAndShadow(x);
+
 		x.clearRect(0, 0, c.width, c.height);
 		x.drawImage(cnv.filter, 0, 0, c.width/r, c.height/r, 0, 0, c.width, c.height);
+
+		resetCtxAlphaAndShadow(x, oldProps);
 	}
 }
 
@@ -615,7 +659,11 @@ var	c = ii.context, d = ii.imageData, p = ii.pixels;
 
 function drawCursor() {
 var	c = ctx[mode.brushView?'draw':'view']
-,	g = (tool.align === 'grid' ? tool.grid : 1);
+,	g = (tool.align === 'grid' ? tool.grid : 1)
+	;
+
+var	oldProps = getAndResetCtxAlphaAndShadow(c);
+
 	if (g > 1) {
 	var	m, n = Math.floor(tool.width/g), o = draw.o, v = (n < 1?(n = 1):n)*g, p = DRAW_PIXEL_OFFSET, w = v+p, v = v-p;
 		for (i in DRAW_HELPER) c[i] = DRAW_HELPER[i];
@@ -643,13 +691,21 @@ var	c = ctx[mode.brushView?'draw':'view']
 		c.lineWidth = 1;
 	}
 	c.beginPath();
-	c.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7);
+	c.arc(draw.cur.x, draw.cur.y, tool.width/2, 0, 7, false);
 	mode.brushView ? c.fill() : c.stroke();
+
 	c.globalCompositeOperation = SO;
+
+	resetCtxAlphaAndShadow(c, oldProps);
 }
 
 function drawStart(evt) {
 	draw.evt = evt = evt || window.event;
+
+	// if (!evt || draw.active) {	//* <- breaks line+curve 2nd point
+	if (!evt) {
+		return;
+	}
 
 	try {
 		showProps(evt,1,1);	//* <- check if permission denied to read some property
@@ -674,7 +730,10 @@ var	s = draw.shape = select.shape.value
 ,	fig = draw.shapeFig = select.shapeFig[s]
 	;
 
-	if (evt.altKey && (draw.step && mode.step && mode.shape && (sf & 1))); else	//* <- line+curve
+	if (
+		(evt.altKey || evt.ctrlKey || evt.shiftKey)
+	&&	(draw.step && mode.step && mode.shape && (sf & 1))	//* <- line+curve
+	); else
 	if (evt.altKey) draw.turn = {prev: draw.zoom, zoom: 1}; else
 	if (evt.ctrlKey) draw.turn = {prev: draw.angle, angle: 1}; else
 	if (evt.shiftKey) draw.turn = {prev: draw.pan ? {x: draw.pan.x, y: draw.pan.y} : {x:0,y:0}, pan: 1};
@@ -686,7 +745,9 @@ var	s = draw.shape = select.shape.value
 		ctx.view.lineTo(cnv.view.width/2, cnv.view.height/2);
 		ctx.view.stroke();
 	}
+
 	updatePosition(evt);
+
 	if (draw.turn) return draw.turn.origin = getCursorRad();
 
 //* Drawing on cnv.draw:
@@ -704,7 +765,7 @@ var	y = draw.history, i = y.layer;
 		) {
 			for (i in draw.o) draw.prev[i] = draw.cur[i];
 
-			draw.step.swap = evt.altKey;
+			draw.step.swap = evt.altKey || evt.ctrlKey || evt.shiftKey;
 			draw.step.done = 1;
 
 			return;
@@ -714,7 +775,7 @@ var	y = draw.history, i = y.layer;
 	}
 //	if (evt.shiftKey) mode.click = 1;	//* <- draw line/form chains, meh, forget for now
 
-	if ((draw.btn = evt.which) != 1 && draw.btn != 3) return pickColor(), drawEnd();
+	if ((draw.btn = evt.which) != 1 && draw.btn != 3) return pickColor(), drawEnd(evt);
 
 //* Start drawing:
 
@@ -727,15 +788,39 @@ var	i = (evt.which == 1)?1:0, j, t = tools[1-i]
 ,	b = (fig ? t.blur : 0)
 ,	pf = ((sf & 8) && (mode.shape || !mode.step))
 ,	sh = ((sf & 2) && (mode.shape || pf));
+
 	draw.clip = t.clip;
-	for (i in (t = mode.erase ? DRAW_HELPER : {
+	draw.fig = (mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8);
+	draw.points = null;
+
+	t = (mode.erase ? DRAW_HELPER : {
 		lineWidth: ((!fig || (pf && !mode.step))?1:t.width+(t.align === 'subpixel' ? ROUGH_LINE_WIDTH_FRAC : 0))
 	,	fillStyle: (sh ? 'rgba('+(mode.step?tools[i]:t).color+', '+t.opacity+')' : A0)
 	,	strokeStyle: (sh && !(mode.step || pf) ? A0 : 'rgba('+t.color+', '+(fig?t.opacity:(draw.step?0.33:0.66))+')')
 	,	shadowColor: (b ? 'rgb('+t.color+')' : A0)
 	,	shadowBlur: b
-	})) for (j in y) ctx[j][i] = t[i];
+	});
+
+	for (i in t) for (j in y) ctx[j][i] = t[i];
+
 	updatePosition(evt);		//* <- update pixel offset based on tool width && draw.active
+
+	if (
+		isPointerEventCoalesced
+	&&	!draw.fig
+	&&	(
+			evt.pointerId
+		// ||	evt.timeStamp
+		)
+	) {
+		draw.points = [{
+			x : draw.cur.x
+		,	y : draw.cur.y
+		,	pointerId : 0
+		,	timeStamp : 0	//* <- keep this point first in sorting
+		}];
+	}
+
 	for (i in draw.o) draw.prev[i] = draw.cur[i];
 	for (i in draw.line) draw.line[i] = false;
 	for (i in select.lineCaps) {
@@ -750,10 +835,19 @@ var	i = (evt.which == 1)?1:0, j, t = tools[1-i]
 function drawMove(evt) {
 	draw.evt = evt = evt || window.event;
 
-	if (mode.click == 1 && !evt.shiftKey) return mode.click = 0, drawEnd(evt);
+	if (evt) {
+		if (mode.click == 1 && !evt.shiftKey) {
+			mode.click = 0;
 
-	if (evt.type.indexOf('mouse') === 0) {
-		updatePosition(evt);
+			return drawEnd(evt);
+		}
+
+		if (
+			evt.type.indexOf('mouse') === 0
+		||	evt.type.indexOf('pointer') === 0
+		) {
+			updatePosition(evt);
+		}
 	}
 
 	if (draw.turn) return updateViewport(draw.turn.pan?1:draw.turn.delta = getCursorRad() - draw.turn.origin);
@@ -761,8 +855,10 @@ function drawMove(evt) {
 var	s = draw.shape
 ,	sf = draw.shapeFlags
 ,	fig = draw.shapeFig
-,	redraw = true, i
-,	newLine = (draw.active && !((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)));
+,	redraw = true
+,	newLine = (draw.active && !draw.fig)
+,	points, i,j,k, isCursorIn
+	;
 
 	if (mode.click) mode.click = 1;
 	if (newLine) {
@@ -771,24 +867,58 @@ var	s = draw.shape
 		} else
 		if (draw.line.back = mode.step) {
 			if (noShadowBlurCurve) ctx.draw.shadowColor = A0, ctx.draw.shadowBlur = 0;
-			if (draw.line.started) ctx.draw.quadraticCurveTo(draw.prev.x, draw.prev.y, (draw.cur.x + draw.prev.x)/2, (draw.cur.y + draw.prev.y)/2);
-		} else ctx.draw.lineTo(draw.cur.x, draw.cur.y);
-		draw.line.preview =	!(draw.line.started = true);
+			if (draw.line.started) {
+				if (points = draw.points) {
+					points.isCurve = true;
+					points.push({
+						x : draw.cur.x
+					,	y : draw.cur.y
+					,	pointerId : evt.pointerId
+					,	timeStamp : evt.timeStamp
+					});
+				} else {
+					ctx.draw.quadraticCurveTo(
+						draw.prev.x
+					,	draw.prev.y
+					,	(draw.cur.x + draw.prev.x)/2
+					,	(draw.cur.y + draw.prev.y)/2
+					);
+				}
+			}
+		} else {
+			if (points = draw.points) {
+				points.push({
+					x : draw.cur.x
+				,	y : draw.cur.y
+				,	pointerId : evt.pointerId
+				,	timeStamp : evt.timeStamp
+				});
+			} else {
+				ctx.draw.lineTo(draw.cur.x, draw.cur.y);
+			}
+		}
+		draw.line.preview = false;
+		draw.line.started = true;
 	} else if (draw.line.back) {
 		ctx.draw.lineTo(draw.prev.x, draw.prev.y);
-		draw.line.back =	!(draw.line.started = true);
+
+		draw.line.back = false;
+		draw.line.started = true;
 	}
 	if (mode.limitFPS) {
 	var	t = +new Date;
 		if (t-draw.refresh > 30) draw.refresh = t; else redraw = false;		//* <- put "> 1000/N" to redraw maximum N FPS
 	}
-	if (redraw && ((i = isMouseIn()) > 0 || draw.active)) {
+	if (redraw && ((isCursorIn = isMouseIn()) > 0 || draw.active)) {
 		redraw = 0;
-		if (i || (draw.active && !mode.lowQ)) draw.preload(), ++redraw;
+		if (isCursorIn || (draw.active && !mode.lowQ)) draw.preload(), ++redraw;
 		if (draw.active) {
 			if (fig) ctx.draw.globalCompositeOperation = draw.clip;
-			if ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8)) {
+			if (draw.fig) {
 				draw.line.preview = true;
+
+			var	oldProps = getAndResetCtxAlphaAndShadow(ctx.draw);
+
 				if (mode.erase && (sf & 2)) {
 					ctx.draw.beginPath();
 					drawShape(ctx.draw, s, 1), ++redraw;		//* <- erase shape area
@@ -797,32 +927,123 @@ var	s = draw.shape
 					ctx.temp.beginPath();
 					drawShape(ctx.temp, s);
 					ctx.temp.stroke();
+
 					ctx.draw.drawImage(cnv.temp, 0, 0), ++redraw;
 				}
+
+				resetCtxAlphaAndShadow(ctx.draw, oldProps);
 			} else
-			if (draw.line.started) ctx.draw.stroke(), ++redraw;
-		} else if (i && mode.brushView && !mode.lowQ) drawCursor(), ++redraw;
+			if (draw.line.started) {
+
+//* Fix for out-of-order pen points in Firefox:
+
+				if (points) {
+					points.sort(sortEventPoints);
+
+					function setEventPointDist(point) {
+						if (typeof point.distFromPrevTime === 'undefined') {
+							point.distFromPrevTime = getEventPointsDist(refPoint, point);
+
+							isResortingNeeded = true;
+						}
+					}
+
+					for (
+					var	i = 2
+					,	k = points.length
+					,	isResortingNeeded = false
+					,	refPoint = points[0]
+					,	prevPoint
+					,	nextPoint = points[1]
+						; i < k
+					&&	(prevPoint = nextPoint)
+					&&	(nextPoint = points[i])
+						; ++i
+					) if (
+						prevPoint.timeStamp === nextPoint.timeStamp
+					&&	prevPoint.pointerId === nextPoint.pointerId
+					) {
+						setEventPointDist(prevPoint);
+						setEventPointDist(nextPoint);
+					} else {
+						refPoint = prevPoint;
+					}
+
+					if (isResortingNeeded) {
+						points.sort(sortEventPoints);
+					}
+
+					ctx.draw.beginPath();
+					ctx.draw.moveTo(points[0].x, points[0].y);
+
+					if (points.isCurve) {
+						for (
+						var	i = 2
+						,	k = points.length
+						,	prevPoint
+						,	nextPoint = points[1]
+							; i < k
+						&&	(prevPoint = nextPoint)
+						&&	(nextPoint = points[i])
+							; ++i
+						) {
+							ctx.draw.quadraticCurveTo(
+								prevPoint.x
+							,	prevPoint.y
+							,	(nextPoint.x + prevPoint.x)/2
+							,	(nextPoint.y + prevPoint.y)/2
+							);
+						}
+					} else {
+						for (
+						var	i = 1
+						,	k = points.length
+						,	nextPoint
+							; i < k
+						&&	(nextPoint = points[i])
+							; ++i
+						) {
+							ctx.draw.lineTo(
+								nextPoint.x
+							,	nextPoint.y
+							);
+						}
+					}
+				}
+
+				ctx.draw.stroke(), ++redraw;
+			}
+		} else if (isCursorIn && mode.brushView && !mode.lowQ) drawCursor(), ++redraw;
 		updateDebugScreen();
 		if (redraw) {
 			draw.view();
-			if (i && !(draw.active || mode.brushView || mode.lowQ)) drawCursor();
+			if (isCursorIn && !(draw.active || mode.brushView || mode.lowQ)) drawCursor();
 		}
 	}
 	if (newLine) for (i in draw.o) draw.prev[i] = draw.cur[i];
 }
 
 function drawEnd(evt) {
-	if (!evt || draw.turn) return draw.active = draw.step = draw.btn = draw.turn = 0, draw.view(1);
-
 	draw.evt = evt = evt || window.event;
+	draw.target = 0;
+
+	if (!evt || draw.turn) {
+		draw.active = draw.step = draw.btn = draw.turn = 0;
+
+		return draw.view(1);
+	}
+
+	if (evt.which && evt.which != 1 && draw.btn != 3) {
+		draw.active = draw.btn = draw.step = draw.turn = draw.text = 0;
+
+		return;
+	}
+
 	if (mode.click == 1 && evt.shiftKey) return drawMove(evt);
 	if (draw.active) {
-		if (draw.target != cnv.view) return;
-
 	var	s = draw.shape
 	,	sf = draw.shapeFlags
 	,	fig = draw.shapeFig
-	,	m = ((mode.click == 1 || mode.shape || !(sf & 1)) && !(sf & 8))
 		;
 
 	//* 2pt line, base for 4pt curve:
@@ -859,11 +1080,11 @@ function drawEnd(evt) {
 				if (mode.shape || !mode.step) ctx.draw.fill();
 				used.poly = 'Poly';
 			} else
-			if ((sf & 64) || (m && draw.line.preview)) {
+			if ((sf & 64) || (draw.fig && draw.line.preview)) {
 				drawShape(ctx.draw, s);
 				if (fig) ++used_shape[select.options.shape[s]];//used.shape = 'Shape';
 			} else
-			if (m || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
+			if (draw.fig || draw.line.back || !draw.line.started) {//* <- draw 1 pixel on short click, regardless of mode or browser
 				ctx.draw.lineTo(draw.cur.x, draw.cur.y + (draw.cur.y == draw.prev.y ? 0.01 : 0));
 			}
 			if (!fig) used.move = 'Move';
@@ -878,7 +1099,6 @@ function drawEnd(evt) {
 		if (cue.autoSave < 0) autoSave(); else cue.autoSave = 1;
 		if (mode.click && evt.shiftKey) return mode.click = 0, drawStart(evt);
 	}
-	draw.target = 0;
 	updateDebugScreen();
 }
 
@@ -891,7 +1111,7 @@ var	cd = ctx.draw, v = draw.prev, r = draw.cur
 		(c?c:c = ct).moveTo(
 		(a?a:a = x)+r,
 		(b?b:b = y));
-		c.arc(a, b, r, 0, 7);
+		c.arc(a, b, r, 0, 7, false);
 	}
 
 	switch (fig) {
@@ -921,7 +1141,7 @@ var	cd = ctx.draw, v = draw.prev, r = draw.cur
 
 				propSwap(ct, old, 0);
 		//* curve
-			var	swapKey = (evt && evt.altKey)
+			var	swapKey = (evt && (evt.altKey || evt.ctrlKey || evt.shiftKey))
 			,	swapPoint1 = (s.done ? s.swap : swapKey)
 			,	swapPoint2 = (s.done ? !swapKey : swapKey)
 			,	linePoint1 = (swapPoint1 ? u : w)
@@ -979,7 +1199,7 @@ var	cd = ctx.draw, v = draw.prev, r = draw.cur
 					if (xRadius > yRadius) c.scale(x, y = yRadius/xRadius); else
 					if (xRadius < yRadius) c.scale(x = xRadius/yRadius, y);
 					c.moveTo((xCenter+xRadius)/x, yCenter/y);
-					c.arc(xCenter/x, yCenter/y, Math.max(xRadius, yRadius), 0, 7);
+					c.arc(xCenter/x, yCenter/y, Math.max(xRadius, yRadius), 0, 7, false);
 					c.restore();
 				}
 				if (clear) insideClear(cd);
@@ -1116,10 +1336,28 @@ function propSwap(a, b, c, r) {
 	return r;
 }
 
+function getAndResetCtxAlphaAndShadow(ctx, ref) {
+var	result = {};
+	if (!ref) ref = CTX_RESET_PROPS;
+	for (var i in ref) {
+		result[i] = ctx[i];
+		ctx[i] = ref[i];
+	}
+	return result;
+}
+
+function resetCtxAlphaAndShadow(ctx, ref) {
+	if (!ref) ref = CTX_RESET_PROPS;
+	for (var i in ref) {
+		ctx[i] = ref[i];
+	}
+}
+
 //* One-click all-screen manipulation *----------------------------------------
 
 function moveScreen(dx, dy, fin) {
 var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape, v = cnv.view;
+
 	if (z) {
 		if (d = y.cur()) (c = ctx.draw).putImageData(d, 0, 0);
 		else return;
@@ -1133,7 +1371,12 @@ var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape,
 		var	c = ctx.upper, d = c.getImageData(0, 0, v.width, v.height);
 		}
 	}
+
+var	oldProps = getAndResetCtxAlphaAndShadow(c);
+var	oldTemp = getAndResetCtxAlphaAndShadow(ctx.temp);
+
 	ctx.temp.clearRect(0, 0, v.width, v.height);
+
 	if (p) {
 		for (i in {min:0,max:0}) p[i] = {
 			x:Math[i](p.cur.x, p.prev.x)
@@ -1147,7 +1390,11 @@ var	y = draw.history, l = y.layers, z = y.layer, p = draw.step, n = !mode.shape,
 		if (n) c.clearRect(0, 0, v.width, v.height);
 		ctx.temp.putImageData(d, dx, dy);
 	}
+
 	c.drawImage(cnv.temp, 0, 0);
+
+	resetCtxAlphaAndShadow(c, oldProps);
+	resetCtxAlphaAndShadow(ctx.temp, oldTemp);
 }
 
 function fillCheck(c, returnRGBA) {
@@ -1448,8 +1695,18 @@ function updatePalette() {
 	function pickHue(evt) {
 		evt = evt || window.event;
 
-		if (evt.type === 'mousemove' && (!draw.target || draw.target != evt.target)) return;
+		if (
+			(
+				evt.type === 'mousemove'
+			||	evt.type === 'pointermove'
+			)
+		&&	(!draw.target || draw.target !== evt.target)
+		) {
+			return;
+		}
+
 		eventStop(evt).preventDefault();
+
 		if (!draw.target) draw.target = getElemById('color-wheel-round');
 	var	hue = pickColor(evt, draw.target, getElemById('color-wheel-hue'));
 		drawGradient(getElemById('color-wheel-box'), getBoxGradientPixel, hue);
@@ -1508,7 +1765,7 @@ var	pt = getElemById('colors')
 
 			c.setAttribute('onscroll', f);
 			c.setAttribute('oncontextmenu', f);
-			c.onmousedown = pickColor;
+			c.addEventListener((isPointerEventSupported ? 'pointerdown' : 'mousedown'), pickColor, true);
 		} else
 		if (c == 'w') {
 		var	border = CANVAS_BORDER
@@ -1747,14 +2004,19 @@ function updateDim(i) {
 		if (v > c) //historyAct(0),
 			draw.view(2);
 	}
-	c = container.style, b = 'minWidth', a = (v = cnv.view.width)+'px';
+
+var	k, fun, size = cnv.view.width;
+	c = container.style, b = 'minWidth', a = size+'px';
+
 	if (c[b] != a) {
 		c[b] = a;
-		if (a = outside[i = 'resize_style']) {
-			v += 24;
-			if ((e = outside.resize_min_id) && (e = document.getElementById(e)) && (e = e.offsetWidth) && e > v) v = e;
-			c = getElemById(i) || setId(cre('style'), i);
-			c.innerHTML = a+'{max-width:'+v+'px;}';
+
+		if (
+			(k = outside.resize_callback)
+		&&	(fun = window[k] || self[k])
+		&&	typeof fun === 'function'
+		) {
+			fun(size);
 		}
 	}
 }
@@ -1895,7 +2157,7 @@ var	i, j, a = select.affect;
 
 //* Save, load, send picture *-------------------------------------------------
 
-function autoSave() {if (mode.autoSave && cue.autoSave && !(cue.autoSave = (draw.active?-1:0))) sendPic(2,true);}
+function autoSave() {if (mode.autoSave && cue.autoSave && !(cue.autoSave = (draw.active?-1:0))) savePic(2,true);}
 function fpsCount() {fps = ticks; ticks = 0;}
 function timeElapsed() {text.timer.textContent = unixDateToHMS(timer += 1000, 1);}
 
@@ -1995,7 +2257,7 @@ function saveDL(data, suffix) {
 	}
 
 	function dataToBlob(data) {
-		if (u && u.createObjectURL) {
+		if (URL && URL.createObjectURL) {
 			if (data.slice(0, k = prefix.length) == prefix) {
 			var	i = data.indexOf(',')
 			,	meta = data.slice(k,i)
@@ -2009,11 +2271,11 @@ function saveDL(data, suffix) {
 				}
 			}
 			data = Uint8Array.from(MODE_NAMES.map.call(data, function(v) {return v.charCodeAt(0);}));
-			return u.createObjectURL(new Blob([data], {'type': type}));
+			return URL.createObjectURL(new Blob([data], {'type': type}));
 		}
 	}
 
-var	u = window.URL || window.webkitURL
+var	URL = window.URL || window.webkitURL
 ,	data = ''+data
 ,	prefix = 'data:'
 ,	type = 'text/plain'
@@ -2027,7 +2289,7 @@ var	u = window.URL || window.webkitURL
 			a[DL] = getSaveFileName(suffix);
 			a.click();
 			setTimeout(function() {
-				if (blob) u.revokeObjectURL(blob);
+				if (blob) URL.revokeObjectURL(blob);
 				a.parentNode.removeChild(a);
 			}, 12345);
 		} catch(e) {
@@ -2036,8 +2298,8 @@ var	u = window.URL || window.webkitURL
 	} else window.open(dataToURI(data), '_blank');
 }
 
-function sendPic(dest, auto) {
-var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view;
+function savePic(dest, auto) {
+var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 	draw.view(1);
 
 	function getTimeToShow(s) {
@@ -2049,12 +2311,12 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view;
 
 	switch (dest) {
 	case 0:
-	case 1:	saveDL(c = cnv.view.toDataURL(dest?IJ:''), dest?'.jpg':'.png');
+	case 1:	saveDL(c = canvas.toDataURL(dest?IJ:''), dest?'.jpg':'.png');
 		break;
 //* save project
 	case 2:
 		if (fillCheck()) return a?c:alert(lang.flood);
-		c = cnv.view.toDataURL();
+		c = canvas.toDataURL();
 		if (!LS) return a?c:alert(lang.no_LS);
 		d = LS[CR[1].R];
 		if (d == c) return a?c:alert(lang.no_change);
@@ -2103,7 +2365,7 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view;
 		t = LS[CR[1].T];
 		if (!t) return;
 		d = LS[CR[1].R], i = CR[1].L;
-		if ((d == (c = cnv.view.toDataURL()))
+		if ((d == (c = canvas.toDataURL()))
 		|| ((a = draw.history.layer) && draw.history.layers[a].name == unixDateToHMS(+t.split('-')[1],0,1))
 		) {
 			if ((!(t = LS[CR[2].T]) || ((d = LS[CR[2].R]) == c))) return alert(lang.no_change);
@@ -2177,51 +2439,172 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view;
 		if (dest) alert(lang.bad_id+'\n\nid='+dest+'\na='+auto); else
 		if (!outside.send) alert(lang.no_form); else
 		if (fillCheck()) alert(lang.flood); else {
-			a = select.imgLimits, c = 'send';
-			for (i in a) if (v[i] < a[i][0] || v[i] > a[i][1]) c = 'size';
+		var	confirmationText = lang.confirm.send;
+			a = select.imgLimits;
+			for (i in a) if (v[i] < a[i][0] || v[i] > a[i][1]) confirmationText = lang.confirm.size;
 		}
-		if (c && confirm(lang.confirm[c])) {
-			if ((f = outside.send) && f.tagName) clearContent(f);
-			else {
-				setId(e = cre('form', container), 'send');
-				if (!f.length || f.toLowerCase() != 'get') e.setAttribute('method', 'post');
-				outside.send = f = e;
-			}
-		var	pngData = sendPic(2,-1), jpgData, a = {txt:0,pic:0};
-			for (i in a) if (!(a[i] = getElemById(i))) {
-				setId(e = a[i] = cre('input', f), e.name = i).type = 'hidden';
-			}
-			e = pngData.length, d = select.imgRes;
+
+		if (confirmationText) {
+		var	pngData = savePic(2,-1)
+		,	jpgData
+			;
+
+			e = pngData.length;
+			d = select.imgRes;
 			c = v.width * v.height;
 			d = d.width * d.height;
-			d = ((
+
+		var	isSendingAsJpg = (
 				(i = outside.jpg)
 			&&	e > i
 			&&	((c <= d) || (e > (i *= c/d)))
-			&&	e > (t = (jpgData = v.toDataURL(IJ)).length)
-			) ? jpgData : pngData);
-			if (mode.debug) alert('png limit = '+i+'\npng = '+e+'\njpg = '+t);
-			a.pic.value = d;
-			a.txt.value = getSendMeta(d.length);
-			f.encoding = f.enctype = 'multipart/form-data';
+			&&	e > (t = (jpgData = c.toDataURL(IJ)).length)
+			);
 
-			try {
-				postingInProgress = true;
+		var	dataInBase64 = (
+				isSendingAsJpg
+				? jpgData
+				: pngData
+			);
 
-				if (
-					(i = outside.check)
-				&&	(e = document.getElementById(i))
-				) {
-					e.setAttribute('data-id', f.id);
-					e.click();
-				} else {
-					f.submit();
-				}
-			} catch (error) {
-				console.log(error);
-
-				postingInProgress = false;
+			if (mode.debug) {
+				alert(['png limit = '+i, 'png = '+e, 'jpg = '+t].join('\n'));
 			}
+
+			function sendAfterConfirmation(data) {
+
+				if ((f = outside.send) && f.tagName) {
+					clearContent(f);
+				} else {
+					setId(e = cre('form', container), 'send');
+
+					if (!f.length || f.toLowerCase() != 'get') {
+						e.setAttribute('method', 'post');
+					}
+
+					outside.send = f = e;
+				}
+
+				a = {txt : 0, pic : 0};
+
+				for (i in a) if (!(a[i] = getElemById(i))) {
+					e = a[i] = cre('input', f);
+					e.name = i;
+					e.hidden = true;
+					e.type = 'hidden';
+					e.style.display = 'none';
+					setId(e, i);
+				}
+
+			var	dataSize, dataType, dataEnc, fileExt;
+
+				function setDataVars(data) {
+					if (data.type) {
+						dataSize = data.size;
+						dataType = data.type;
+						dataEnc = 'blob';
+					} else {
+					var	dataEncParts = data.split(',', 1)[0].split(';');
+						dataSize = data.length;
+						dataType = dataEncParts[0].split(':')[1];
+						dataEnc = dataEncParts[1];
+					}
+
+					fileExt = dataType.split('/')[1];
+
+					return data;
+				}
+
+				if (data.type) {
+					setDataVars(data);
+
+				var	fileName = +new Date + '.' + fileExt;
+				var	file = new File([data], fileName, {type : dataType});
+
+					a.pic.type = 'file';
+					a.pic.value = null;
+					a.pic.files = createFileList(file);
+				}
+
+//* Fallback to base64 for old Firefox 56:
+
+				if (!(
+					data.type
+				&&	a.pic.files
+				&&	a.pic.files.length > 0
+				)) {
+					a.pic.type = 'hidden';
+					a.pic.value = setDataVars(
+						data.type
+						? dataInBase64
+						: data
+					);
+				}
+
+				a.txt.type = 'hidden';
+				a.txt.value = getSendMeta(dataSize);
+
+				f.encoding = f.enctype = 'multipart/form-data';
+
+				confirmationText = (
+					canvas.width + 'x' + canvas.height
+				+	', '
+				+	dataSize + ' ' + lang.bytes
+				+	', '
+				+	dataEnc
+				+	', '
+				+	fileExt.toUpperCase()
+				+	'\n\n'
+				+	confirmationText
+				);
+
+				function onError(evt) {
+					console.error(evt);
+
+					postingInProgress = false;
+				}
+
+				if (confirm(confirmationText)) {
+					try {
+						postingInProgress = true;
+
+					var	k, fun;
+
+						if (
+							(k = outside.send_callback)
+						&&	(fun = window[k] || self[k])
+						&&	typeof fun === 'function'
+						) {
+							fun(f, onError);
+						} else {
+							f.submit();
+						}
+
+					} catch (error) {
+						onError(error);
+					}
+				}
+			}
+
+//* Use less traffic in modern browsers with blob uploaded as file:
+
+			if (canvas.toBlob) {
+				try {
+					canvas.toBlob(
+						sendAfterConfirmation
+					,	isSendingAsJpg ? IJ : ''
+					);
+
+					return c;
+
+				} catch (error) {
+					console.error(error);
+				}
+			}
+
+//* Fallback to base64 for old Opera 11-12:
+
+			sendAfterConfirmation(dataInBase64);
 		}
 	}
 	return c;
@@ -2250,8 +2633,14 @@ var	e = new Image(), i = 'lcd', lcd = getElemById(i);
 		if (t) updateDim();
 		i = draw.history, j = i.layer;
 		if (j > 0 && !i.layers[j].last && !i.cur()) tweakLayer(s.name,j,1); else newLayer(s);
+
+	var	oldProps = getAndResetCtxAlphaAndShadow(ctx.draw);
+
 		ctx.draw.clearRect(0, 0, cnv.view.width, cnv.view.height);
 		ctx.draw.drawImage(e, 0, 0);
+
+		resetCtxAlphaAndShadow(ctx.draw, oldProps);
+
 		historyAct(s.z ? draw.time.all[1] : null);
 		cue.autoSave = 0;
 		if (d = e.parentNode) d.removeChild(e);
@@ -2262,6 +2651,18 @@ var	e = new Image(), i = 'lcd', lcd = getElemById(i);
 	if (!(mode.debug || text.debug.innerHTML) && ++loading > 1) container.style.visibility = 'hidden', setLCD();
 	draw.container.appendChild(e);
 	return e.src = s.data, s.name;
+}
+
+//* The only way to change input[type=file] value is with a other FileList instance,
+//* and this is currently the only way to construct a new FileList.
+//* Source: https://stackoverflow.com/a/50169790
+
+function createFileList(a) {
+	a = Array.prototype.slice.call(Array.isArray(a) ? a : arguments);
+	for (var c, b = c = a.length, d = !0; b-- && d;) d = a[b] instanceof File;
+	if (!d) throw new TypeError('expected argument to FileList is File or array of File objects');
+	for (b = (new ClipboardEvent('')).clipboardData || new DataTransfer; c--;) b.items.add(a[c]);
+	return b.files;
 }
 
 //* Hot keys *-----------------------------------------------------------------
@@ -2441,14 +2842,14 @@ function hotKeys(evt) {
 				case getKeyCode('U-line-curve'):	toggleMode('U');	return;
 
 				case 112:	resetAside();	return;	//* F1
-				case 120:	sendPic(0);	return;	//* F9
-			//	case 118:	sendPic(1);	return;	//* jpeg
-				case 113:	sendPic(2);	return;
-				case 114:	sendPic(3);	return;
-				case 115:	sendPic(4);	return;
-				case 117:	sendPic(5);	return;
-				case 118:	sendPic(7);	return;
-				case 119:	sendPic();	return;
+				case 120:	savePic(0);	return;	//* F9
+			//	case 118:	savePic(1);	return;	//* jpeg
+				case 113:	savePic(2);	return;
+				case 114:	savePic(3);	return;
+				case 115:	savePic(4);	return;
+				case 117:	savePic(5);	return;
+				case 118:	savePic(7);	return;
+				case 119:	savePic();	return;
 
 				case getKeyCode('Z-Undo'):		historyAct(-1);	return;
 				case getKeyCode('X-Redo'):		historyAct(1);	return;
@@ -2498,7 +2899,11 @@ function hotKeys(evt) {
 //* Swap control/end points of curved line:
 
 			if (
-				evt.keyCode == 18	//* 16=Shift, 17=Ctrl, 18=Alt
+				(
+					evt.keyCode == 16	//* 16=Shift
+				||	evt.keyCode == 17	//* 17=Ctrl
+				||	evt.keyCode == 18	//* 18=Alt
+				)
 			&&	draw.step
 			&&	mode.step
 			&&	mode.shape
@@ -2715,7 +3120,7 @@ function drop(evt) {
 			if (!!((f = d[i]).type && m.test(f.type)) !== !!pic) return;
 			(r = new FileReader()).onload = (function(f) {
 				return function(e) {
-					sendPic(pic?5:6, {
+					savePic(pic?5:6, {
 						name: f.name
 					,	data: e.target.result
 					});
@@ -2786,7 +3191,22 @@ var	a = {B:'RST',W:'A'},b,c = 'canvas',d,e,f,g,h,i,j,k,l,m,n, o = outside, style
 	setContent(container = getElemById(), a), e = getElemById(c);
 	if (!e.getContext) return;
 
-	for (i in cnv) ctx[i] = (cnv[i] = (i == 'view'?e:document.createElement(c))).getContext('2d');
+	for (i in cnv) {
+	var	canvas = cnv[i] = (i == 'view'?e:document.createElement(c));
+	var	c2d = ctx[i] = canvas.getContext('2d', {
+			'alpha' : true,
+			'desynchronized' : true,	//* <- https://developers.google.com/web/updates/2019/05/desynchronized
+		});
+
+		if (TESTING) {
+			if (c2d.getContextAttributes) {
+				console.log(i, ['ctx:', c2d, 'canvas:', canvas, 'getContextAttributes:', c2d.getContextAttributes()]);
+			} else {
+				console.log(i, ['ctx:', c2d, 'canvas:', canvas]);
+			}
+		}
+	}
+
 	for (i in select.imgRes) {
 		b = o[a = i[0]]?o[a]:(o[a] = o[i]?o[i]:select.imgRes[i]);
 		for (j in cnv) cnv[j][i] = b;
@@ -2880,7 +3300,7 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 			return bf ? e.insertBefore(c, bf) : e.appendChild(c);
 		}
 
-		a = 'Alt+', b = 'button', c = 'color', d = 'sendPic(', f = 'fillScreen(', g = 'toggleMode(', h = 'check', j = 'toolSwap(';
+		a = 'Alt+', b = 'button', c = 'color', d = 'savePic(', f = 'fillScreen(', g = 'toggleMode(', h = 'check', j = 'toolSwap(';
 		if (k == 'info') {
 			btnArray([
 //* subtitle, hotkey, pictogram, function, id
@@ -3001,15 +3421,6 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 
 	for (i in MODE_NAMES) if (mode[MODE_NAMES[i]]) toggleMode(i, 1);		//* <- only after select lists are defined
 
-	addEventListeners(
-		// canvas
-		cnv.view
-	,	{
-			scroll:		f = stopScroll		//* <- against FireFox always scrolling on mousewheel
-		,	contextmenu:	f
-		}
-	);
-
 //* listen on all page to prevent dead zones:
 //* still fails to catch events outside of document block height less than of browser window.
 
@@ -3017,18 +3428,43 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 		// document.body
 		window
 	,	{
-			dragover:	dragOver
-		,	drop:		drop
-		,	mousedown:	drawStart
-		,	mousemove:	drawMove
-		,	mouseup:	drawEnd
-		,	keypress:	k = hotKeys
-		,	keydown:	k
-		,	keyup:		k
-		,	mousewheel:	f = hotWheel
-		,	wheel:		f
-		,	scroll:		f
-		,	beforeunload:	beforeUnload
+			'beforeunload' : beforeUnload
+		,	'dragover' :	dragOver
+		,	'drop' :	drop
+		,	'keypress' :	k = hotKeys
+		,	'keydown' :	k
+		,	'keyup' :	k
+		,	'mousewheel' :	f = hotWheel
+		,	'wheel' :	f
+		,	'scroll' :	f
+		}
+	);
+
+	addEventListeners(
+		window
+	,	(
+			isPointerEventSupported
+			? {
+				'pointerdown' :	drawStart
+			,	'pointermove' :	drawMove
+			,	'pointerup' :	drawEnd
+			}
+			: {
+				'mousedown' :	drawStart
+			,	'mousemove' :	drawMove
+			,	'mouseup' :	drawEnd
+			}
+		)
+	);
+
+	addEventListeners(
+		// canvas
+		cnv.view
+	,	{
+			'scroll' :	f = stopScroll		//* <- against FireFox always scrolling on mousewheel
+		,	'contextmenu' :	f
+		,	'touchstart' :	k = prevent
+		,	'touchmove' :	k
 		}
 	);
 
@@ -3085,7 +3521,28 @@ var	o = outside
 	o.undo = draw.history.max = getNumClamped(o.undo, 99);
 	o.idle = draw.time.idle = getNumClamped(o.idle, 60)*1000;
 
-	if (!o.lang) o.lang = document.documentElement.lang || 'en';
+var	SUPPORTED_LANGS = ['en', 'ru'];
+
+	function getSupportedPreferredLang(lastResult, nextValue) {
+		return lastResult || (
+			!nextValue
+			? lastResult
+			:
+			nextValue.reduce
+			? nextValue.reduce(getSupportedPreferredLang, lastResult)
+			:
+			SUPPORTED_LANGS.indexOf(nextValue) < 0
+			? lastResult
+			: nextValue
+		);
+	}
+
+	if (!o.lang) o.lang = getSupportedPreferredLang(null, [
+		document.documentElement.lang
+	,	navigator.languages
+	,	navigator.language
+	,	'en'
+	]);
 
 //* translation: Russian *-----------------------------------------------------
 
@@ -3103,6 +3560,7 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 ,	bad_data:	'Неправильный формат данных.'
 ,	bad_id:		'Ошибка выбора.'
 ,	flood:		'Полотно пусто.'
+,	bytes:		'bytes'
 ,	confirm: {
 		send:	'Отправить рисунок в сеть?'
 	,	close:	'Покинуть эту страницу и выбросить открытый рисунок?'
@@ -3191,7 +3649,7 @@ select.lineCaps = {lineCap: 'Концы линий', lineJoin: 'Сгибы ли�
 	},	line:	{sub:'прямая',	t:'Прямая линия 1 зажатием.'
 	},	curve:	{sub:'кривая',	t:'Сглаживать углы линии.'
 +TITLE_LINE_BREAK+	'Вместе с включением "прямой" — одна ровная кривая линия (2 клик-зажатия подряд).'
-+TITLE_LINE_BREAK+	'Зажатие кнопки Alt меняет местами концевую и контрольную точку линии.'
++TITLE_LINE_BREAK+	'Зажатие кнопки Alt, Ctrl или Shift меняет местами концевую и контрольную точку линии.'
 	},	area:	{sub:'закрас.',	t:'Закрашивать площадь геометрических фигур.'
 +TITLE_LINE_BREAK+	'Не обводить + не закрашивать = удалить площадь.'
 	},	outline:{sub:'контур',	t:'Рисовать контур геометрических фигур.'
@@ -3236,6 +3694,7 @@ else o.lang = 'en'
 ,	bad_data:	'Invalid data format.'
 ,	bad_id:		'Invalid case.'
 ,	flood:		'Canvas is empty.'
+,	bytes:		'bytes'
 ,	confirm: {
 		send:	'Send image to server?'
 	,	close:	'Leave this page and discard the drawing?'
@@ -3324,7 +3783,7 @@ else o.lang = 'en'
 	,	line:	'Draw straight line with 1 drag.'
 	,	curve	: 'Draw lines with smooth corners.'
 +TITLE_LINE_BREAK+	'With "straight" enabled — draw single curve (2 click-drags).'
-+TITLE_LINE_BREAK+	'Holding Alt key swaps line end and control point.'
++TITLE_LINE_BREAK+	'Holding Alt, Ctrl or Shift key swaps line end and control point.'
 	,	area:	'Fill geometric shapes.'
 +TITLE_LINE_BREAK+	'No outline + no fill = erase area.'
 	,	outline:'Draw outline of geometric shapes.'
@@ -3487,12 +3946,37 @@ function ang_btw(x,y) {return cut_period(y-x);}
 function o0(line,delim) {var a=line.split(delim||','),i,o={}; for(i in a) o[a[i]]=0; return o;}
 function showProps(o,r,z /*incl.zero*/) {var i,t=''; for(i in o)if(z||o[i])t+='\n'+i+'='+o[i]; if(r)return t; alert(t); return o;}
 
-function eventStop(e) {
-	if (e && e.eventPhase?e:e = window.event) {
-		if (e.stopPropagation) e.stopPropagation();
-		if (e.cancelBubble != null) e.cancelBubble = true;
+function getEventPointsDist(a,b) {
+	return (
+		Math.abs(a.x - b.x)
+	+	Math.abs(a.y - b.y)
+		// dist(a.x - b.x, a.y - b.y)
+	);
+}
+
+function sortEventPoints(a,b) {
+	return (
+		a.timeStamp > b.timeStamp ? 1 :
+		a.timeStamp < b.timeStamp ? -1 :
+		a.pointerId > b.pointerId ? 1 :
+		a.pointerId < b.pointerId ? -1 :
+		a.distFromPrevTime > b.distFromPrevTime ? 1 :
+		a.distFromPrevTime < b.distFromPrevTime ? -1 :
+		0
+	);
+}
+
+function prevent(evt) {
+	evt = evt || window.event;
+	evt.preventDefault();
+}
+
+function eventStop(evt) {
+	if (evt && evt.eventPhase ? evt : (evt = window.event)) {
+		if (evt.stopPropagation) evt.stopPropagation();
+		if (evt.cancelBubble != null) evt.cancelBubble = true;
 	}
-	return e;
+	return evt;
 }
 
 //* To get started *-----------------------------------------------------------
