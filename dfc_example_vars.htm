@@ -2,8 +2,8 @@
 <html lang="ru">
 <head>
 	<meta charset="utf-8">
-	<link rel="shortcut icon" type="image/png" href="dfc.png">
-	<title>test, how it's used</title>
+	<link rel="shortcut icon" type="image/png" href="draw_app/dfc.png">
+	<title>dfc.js - test, how it's used</title>
 	<style>
 		body, body > * {
 			min-width: 690px;
@@ -21,9 +21,9 @@
 	<header>document.write(</header>
 	<div id="d">
 		<noscript>&lt;JavaScript support required.&gt;</noscript>
-		<script id="dfc-vars" src="dfc.js" data-vars="
+		<script id="dfc-vars" src="draw_app/dfc.js" data-vars="
 			t0=1234567890;
-			read_init=dfc.png;
+			read_init=draw_app/dfc.png;
 			send=png;
 			send_blob=yes (remove this line if server cannot parse file blob);
 			send_callback=onSendDrawing;
@@ -35,7 +35,22 @@
 			wl=100,1920;
 			hl=100,1080;
 		"></script>
+
+		<script>
+			function onSendDrawing(form, onError) {
+
+				// Prepare form fields, attributes, etc, for example:
+
+				form.setAttribute('action', 'finish.pl');
+				form.submit();
+			}
+
+			function onResizeDrawing(width, height) {
+
+				// Update UI to accomodate new drawpad dimensions.
+			}
+		</script>
 	</div>
-	<footer>), read = <input type="text" id="dfc-read" value="../p.png" title="filepath">.</footer>
+	<footer>), read = <input type="text" id="dfc-read" value="/favicon.ico" title="filepath">.</footer>
 </body>
 </html>
