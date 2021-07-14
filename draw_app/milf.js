@@ -5,8 +5,8 @@
 
 //* Configuration *------------------------------------------------------------
 
-var	INFO_VERSION = 'v1.35'	//* needs complete rewrite, long ago
-,	INFO_DATE = '2014-07-16 — 2021-05-31'
+var	INFO_VERSION = 'v1.37'	//* needs complete rewrite, long ago
+,	INFO_DATE = '2014-07-16 — 2021-07-14'
 ,	INFO_ABBR = 'Multi-Layer Fork of DFC'
 ,	A0 = 'transparent', IJ = 'image/jpeg', SO = 'source-over', DO = 'destination-out'
 ,	CR = 'CanvasRecover', CT = 'Time', CL = 'Layers', DL
@@ -2298,7 +2298,7 @@ var	URL = window.URL || window.webkitURL
 	} else window.open(dataToURI(data), '_blank');
 }
 
-function savePic(dest, auto) {
+function savePic(dest, auto, onDone, onError) {
 var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 	draw.view(1);
 
@@ -2371,9 +2371,19 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 			if ((!(t = LS[CR[2].T]) || ((d = LS[CR[2].R]) == c))) return alert(lang.no_change);
 			i = CR[2].L;
 		}
+//* load project
+		if (dest == 3) {
+		var	saveHasLayers = (LS[i] && (b = JSON.parse(LS[i])) && (b.time == t));
+
+			if (saveHasLayers && confirm(lang.confirm.load + getTimeToShow(t))) {
+				draw.time.act(1);
+				used = {LS:'Local Storage'}, readSavedLayers(b);
+			} else
+			if (!auto) alert(lang.no_layers);
+		}
 //* load flat image to new layer
-		if (dest == 4) {
-		var	dt = draw.time, a = t.split('-'), t = a.slice(0,2).map(orz), i = t[1], c = unixDateToHMS(i,0,1);
+		if (dest == 4 || !saveHasLayers) {
+		var	saveHasLayers, dt = draw.time, a = t.split('-'), t = a.slice(0,2).map(orz), i = t[1], c = unixDateToHMS(i,0,1);
 			if (a.length > 2) used.read = a.slice(2).join('-');
 			if (dt.all[0] > t[0]) dt.all[0] = t[0];
 			if (dt.all[1] < t[1]) {
@@ -2383,21 +2393,15 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 				a.textContent = c.split(' ',2)[1];
 			}
 			draw.time.act(1);
-			readPic({name:c, data:d});
+			readPic({name:c, data:d}, onDone, onError);
 			used.LS = 'Local Storage';
-		} else
-//* load project
-		if (!LS[i] || (b = JSON.parse(LS[i])).time != t) alert(lang.no_layers); else
-		if (confirm(lang.confirm.load + getTimeToShow(t))) {
-			draw.time.act(1);
-			used = {LS:'Local Storage'}, readSavedLayers(b);
 		}
 		break;
 	case 5:
 	case 6:
 		if (a || ((outside.read || (outside.read = getElemById('read'))) && (a = outside.read.value))) {
 	//		draw.time = [0, 0];
-			if (dest == 5) a = readPic(a);
+			if (dest == 5) a = readPic(a, onDone, onError);
 			else {
 				try {
 					if (
@@ -2568,15 +2572,25 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 					try {
 						postingInProgress = true;
 
-					var	k, fun;
+					var	i,k, fun
+					,	funcNames = [
+							outside.send_callback
+						,	outside.send_form_callback
+						];
 
-						if (
-							(k = outside.send_callback)
+						for (i in funcNames) if (
+							(k = funcNames[i])
 						&&	(fun = window[k] || self[k])
 						&&	typeof fun === 'function'
 						) {
 							fun(f, onError);
+
+							break;
 						} else {
+							k = null;
+						}
+
+						if (!k) {
 							f.submit();
 						}
 
@@ -2610,8 +2624,8 @@ var	a = auto || false, b,c,d,e,f,i,j,k,l,t,v = cnv.view, canvas = v;
 	return c;
 }
 
-function readPic(source, saveSlot, onDone, onError) {
-	if (!source || source == 0 || (!source.data && !source.length)) return;
+function readPic(source, onDone, onError) {
+	if (!source || source == 0 || (!source.data && !source.length)) return (onError ? onError(source) : null);
 	if (!source.data) source = {data: source, name: (0 === source.indexOf('data:') ? source.split(',', 1) : source)};
 
 	function setLCD() {
@@ -3508,11 +3522,15 @@ var	wnd = container.getElementsByTagName('aside'), wit = wnd.length;
 	updateViewport();
 	resetAside();
 
-var	url = o.read_init || o.read_at_start;
+var	url = o.preload_url || o.read_init || o.read_at_start;
 
 	if (url) {
-		readPic(url, null, initEventListeners, initEventListeners);
+		readPic(url, initEventListeners, initEventListeners);
+	} else
+	if (o.preload_last || o.preload_last_save) {
+		savePic(3,1, initEventListeners, initEventListeners);
 	} else {
+		// historyAct(0);
 		initEventListeners();
 	}
 }

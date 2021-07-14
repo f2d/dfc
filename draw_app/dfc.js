@@ -5,8 +5,8 @@
 
 //* Configuration *------------------------------------------------------------
 
-var	INFO_VERSION = 'v0.9.92'
-,	INFO_DATE = '2013-04-01 — 2021-05-31'
+var	INFO_VERSION = 'v0.9.94'
+,	INFO_DATE = '2013-04-01 — 2021-07-14'
 ,	INFO_ABBR = 'Dumb Flat Canvas'
 
 ,	CR = 'CanvasRecovery'
@@ -527,6 +527,14 @@ function eventStop(evt) {
 	}
 
 	return evt;
+}
+
+function getFunctionByName(name) {
+var	fun = window[name] || self[name];
+
+	if (typeof fun === 'function') {
+		return fun;
+	}
 }
 
 function getEventPointsDist(a,b) {
@@ -2804,11 +2812,7 @@ var	k
 	if (c[b] != a) {
 		c[b] = a;
 
-		if (
-			(k = outside.resize_callback)
-		&&	(fun = window[k] || self[k])
-		&&	typeof fun === 'function'
-		) {
+		if (fun = getFunctionByName(outside.resize_callback)) {
 			fun(size);
 		}
 	}
@@ -3035,7 +3039,7 @@ function updateDebugScreen(lsid, refresh) {
 			, ';', g)
 			, '}', '</a>,\n')
 		+		(outside.read ? '' : ', F6=read: <textarea id="|-read">/9.png</textarea>')
-		+		'<hr>'+nl2br(getSendMeta(draw.screen()))
+		+		'<hr>'+nl2br(getSendMetaText(draw.screen()))
 		+		'<hr>'+j
 		+		'<hr>'
 			, '|', NS)
@@ -3216,34 +3220,54 @@ var	i
 	);
 }
 
-function getSendMeta(sz) {
+function getSendMetaText(sz) {
 var	i
-,	j = ', '
-,	t = +new Date
-,	u = []
-,	a = [
-		'open_time: '+t0+'-'+t
-	,	'draw_time: '+draw.time.all.join('-')
-	,	'active_time: '+draw.time.sum()
-	,	'app: '+NS+' '+INFO_VERSION
-	,	'pixels: '+cnv.result.width+'x'+cnv.result.height
-	,	'bytes: '+(
-			sz || [
-				'png = '+ cnv.result.toDataURL().length
-			,	'jpg = '+ cnv.result.toDataURL(IJ).length
-			].join(j)
-		)
-	];
+,	a = []
+,	fields = getSendMetaFields(sz)
+,	u = fields.used
+	;
 
-	for (i in used) {
-		u.push(used[i].replace(/[\r\n]+/g, j));
+	if (u) {
+		for (i in u) {
+			a.push(u[i].replace(/[\r\n]+/g, ', '));
+		}
+
+		fields.used = a.join(', ');
+		a = [];
 	}
 
-	if (u.length) {
-		a.push('used: '+u.join(j));
+	for (i in fields) {
+		a.push(i+': '+fields[i]);
 	}
 
 	return a.join('\n');
+}
+
+function getSendMetaFields(sz) {
+var	i
+,	t = +new Date
+,	fields = {
+		'open_time' : t0+'-'+t
+	,	'draw_time' : draw.time.all.join('-')
+	,	'active_time' : draw.time.sum()
+	,	'app' : NS+' '+INFO_VERSION
+	,	'pixels' : cnv.result.width+'x'+cnv.result.height
+	};
+
+	if (sz) {
+		fields.bytes = sz;
+	} else {
+		fields.bytes_png = cnv.result.toDataURL().length;
+		fields.bytes_jpg = cnv.result.toDataURL(IJ).length;
+	}
+
+	for (i in used) if (used[i]) {
+		fields.used = JSON.parse(JSON.stringify(used));
+
+		break;
+	}
+
+	return fields;
 }
 
 function getSaveLSKeys(i) {
@@ -3416,7 +3440,7 @@ function confirmShowTime(la, s) {
 	return confirm(r);
 }
 
-function savePic(dest, lsid) {
+function savePic(dest, lsid, onDone, onError) {
 var	t = (lsid > 0)
 ,	a = (lsid < 0)
 ,	b = 'button'
@@ -3559,7 +3583,7 @@ var	t = (lsid > 0)
 			a.textContent = unixDateToHMS(t);
 			a.title = new Date(t);
 
-			readPic(d,i);
+			readPic(d, i, onDone, onError);
 			used.LS = 'Local Storage';
 		}
 
@@ -3576,7 +3600,7 @@ var	t = (lsid > 0)
 			)
 		) {
 			draw.time.act(1);
-			used.read = 'Read File: '+readPic(a);
+			used.read = 'Read File: '+readPic(a, null, onDone, onError);
 		}
 
 		break;
@@ -3704,7 +3728,7 @@ var	t = (lsid > 0)
 				}
 
 				a.txt.type = 'hidden';
-				a.txt.value = getSendMeta(dataSize);
+				a.txt.value = getSendMetaText(dataSize);
 
 				f.encoding = f.enctype = 'multipart/form-data';
 
@@ -3730,15 +3754,21 @@ var	t = (lsid > 0)
 					try {
 						postingInProgress = true;
 
-					var	k, fun;
+					var	fun
+					,	varNames = [
+							// 'send_data_callback',
+							// 'send_json_callback',
+							'send_form_callback',
+							'send_callback',
+						];
 
-						if (
-							(k = outside.send_callback)
-						&&	(fun = window[k] || self[k])
-						&&	typeof fun === 'function'
-						) {
+						for (i in varNames) if (fun = getFunctionByName(outside[varNames[i]])) {
 							fun(f, onError);
-						} else {
+
+							break;
+						}
+
+						if (!fun) {
 							f.submit();
 						}
 
@@ -3764,7 +3794,7 @@ var	t = (lsid > 0)
 				}
 			}
 
-//* Fallback to base64 for old Opera 11-12:
+//* Fallback to base64 for old Opera 11-12, Firefox 56, etc:
 
 			sendAfterConfirmation(dataInBase64);
 		}
@@ -3774,13 +3804,12 @@ var	t = (lsid > 0)
 }
 
 function readPic(source, saveSlot, onDone, onError) {
-
 	if (
 		source == 0
 	||	!source
 	||	(!source.data && !source.length)
 	) {
-		return;
+		return (onError ? onError(source) : null);
 	}
 
 	if (!source.data) {
@@ -4555,10 +4584,13 @@ var	a,b,c = 'canvas'
 	updateSliders();
 	updateViewport();
 
-var	url = o.read_init || o.read_at_start;
+var	url = o.preload_url || o.read_init || o.read_at_start;
 
 	if (url) {
 		readPic(url, null, initEventListeners, initEventListeners);
+	} else
+	if (o.preload_last || o.preload_last_save) {
+		savePic(3,1, initEventListeners, initEventListeners);
 	} else {
 		historyAct(0);
 		initEventListeners();
@@ -5058,7 +5090,7 @@ var	content = replaceAll(
 	,	'#| input[type="range"] {width: 100%; height: 100%; margin: 1px; padding: 0; vertical-align: top; background-color: transparent;}'
 	,	'#| input[type="text"] {width: 40px; height: 22px;}'
 	,	'#| select optgroup option {margin: 0;}'
-	,	'#| select optgroup {margin-top: 1em 0;}'
+	,	'#| select optgroup {margin-top: 1em;}'
 	,	'#| select {width: 78px; height: 28px;}'
 	,	'#| textarea {min-width: 80px; min-height: 16px; height: 16px; vertical-align: top;}'
 	,	'#| {white-space: nowrap; text-align: center; padding: 12px; background-color: #f8f8f8;}'
